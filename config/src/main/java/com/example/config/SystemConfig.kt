@@ -6,4 +6,5 @@ object SystemConfig {
     // o basada en la detección del hardware.
     // Por ejemplo, para probar, puedes asignarla directamente:
     var managerSelected: EnumManufacturer = EnumManufacturer.NEWPOS
+    var keyCombinationMethod: KeyCombinationMethod = KeyCombinationMethod.XOR_PLACEHOLDER // Valor por defecto
 }

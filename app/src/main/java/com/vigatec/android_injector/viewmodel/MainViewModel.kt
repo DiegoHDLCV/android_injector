@@ -19,19 +19,19 @@ class MainViewModel @Inject constructor(
 
     fun navigateToSplashScreen() {
         viewModelScope.launch {
-            _uiEvents.emit(UiEvent.NavigateToSplashScreen)
+            //_uiEvents.emit(UiEvent.NavigateToSplashScreen)
         }
     }
 
     fun navigateToLogin() {
         viewModelScope.launch {
-            _uiEvents.emit(UiEvent.NavigateToLogin)
+            //_uiEvents.emit(UiEvent.NavigateToLogin)
         }
     }
 
     fun showError(message: String) {
         viewModelScope.launch {
-            _uiEvents.emit(UiEvent.ShowError(message))
+            //_uiEvents.emit(UiEvent.ShowError(message))
         }
     }
 }

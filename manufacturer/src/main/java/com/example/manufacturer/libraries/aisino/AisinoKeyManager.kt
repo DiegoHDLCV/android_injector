@@ -14,6 +14,9 @@ object AisinoKeyManager : IKeyManager {
     private var pedControllerInstance: IPedController? = null
     private var isSdkInitialized = false // Tracks if *this manager* is initialized
     private lateinit var applicationContext: Context
+    override suspend fun connect() {
+        TODO("Not yet implemented")
+    }
 
     override suspend fun initialize(application: Application) {
         if (isSdkInitialized) {

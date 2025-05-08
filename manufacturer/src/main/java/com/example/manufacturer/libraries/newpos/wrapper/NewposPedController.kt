@@ -33,7 +33,9 @@ import kotlin.coroutines.resumeWithException
 class NewposPedController(private val context: Context) : IPedController {
 
     private val TAG = "NewposPedController"
-    private val pedInstance: Ped // Instance obtained in init
+    private lateinit var pedInstance: Ped // Instance obtained in init
+    private var isPedInitialized = false
+
 
     // --- Mappings ---
 
@@ -58,6 +60,26 @@ class NewposPedController(private val context: Context) : IPedController {
                 Log.w(TAG, "Unsupported generic KeyType to NewposKeySystem mapping: $generic")
                 null
             }
+        }
+    }
+
+    internal fun initializePedInternal(): Boolean {
+        if (isPedInitialized) return true
+        try {
+            Log.i(TAG, "Attempting Ped.getInstance(). Context: $context, Thread: ${Thread.currentThread().name}")
+            // Ahora intentamos obtener la instancia aquí
+            pedInstance = Ped.getInstance()
+            if (!::pedInstance.isInitialized || pedInstance == null) { // Doble chequeo
+                throw IllegalStateException("Ped.getInstance() returned null or failed. NewPOS SDK not operational.")
+            }
+            isPedInitialized = true // Marcar como inicializado
+            Log.i(TAG, "NewPOS Ped instance obtained successfully in initializePedInternal.")
+            return true
+        } catch (e: Throwable) {
+            Log.e(TAG, "!!! Ped.getInstance() FAILED in initializePedInternal!!! Error: ${e.message}", e)
+            isPedInitialized = false
+            // Relanzar como PedException para que NewposKeyManager lo capture
+            throw PedException("Failed to initialize NewPOS PED via Ped.getInstance(): ${e.message}", e)
         }
     }
 
@@ -160,15 +182,19 @@ class NewposPedController(private val context: Context) : IPedController {
     // --- Initialization ---
     init {
         try {
-            Log.d(TAG, "Attempting to get NewPOS Ped instance...")
+            Log.i(TAG, "Attempting Ped.getInstance(). Context: $context, Thread: ${Thread.currentThread().name}") // Added context/thread info
+            // --> The failing call is next:
             pedInstance = Ped.getInstance()
+            // <-- If it gets past here, it succeeded
             if (pedInstance == null) {
+                // This case might not be reachable if getInstance throws, but good to have
+                Log.e(TAG, "Ped.getInstance() returned null!")
                 throw IllegalStateException("Ped.getInstance() returned null. NewPOS SDK not operational.")
             }
-            Log.d(TAG, "NewPOS Ped instance obtained successfully.")
-        } catch (e: Throwable) { // Catch Throwable to include ExceptionInInitializerError, UnsatisfiedLinkError etc.
-            Log.e(TAG, "Failed to initialize NewPOS PED controller: ${e.message}", e)
-            // Propagate as a standard PedException or specific subtype if identifiable
+            Log.i(TAG, "NewPOS Ped instance obtained successfully.") // Changed to Info level
+        } catch (e: Throwable) {
+            // Log the exception *before* re-throwing
+            Log.e(TAG, "!!! Ped.getInstance() FAILED !!! Error: ${e.message}", e)
             throw PedException("Failed to initialize NewPOS PED: ${e.message}", e)
         }
     }

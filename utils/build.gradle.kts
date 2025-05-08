@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    id("kotlin-kapt") // Aplica el plugin KAPT para Hilt
 }
 
 android {
@@ -36,9 +35,6 @@ android {
 dependencies {
 
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
-
 
 
     implementation(libs.androidx.core.ktx)

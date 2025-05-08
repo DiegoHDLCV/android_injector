@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android) // Agrega el plugin de Hilt
-    id("kotlin-kapt")
+    id("com.google.devtools.ksp")
 }
 
 
@@ -44,11 +44,18 @@ android {
 
 dependencies {
 
+    implementation(fileTree(mapOf("dir" to "../shared-libs", "include" to listOf("*.jar"), "exclude" to listOf("core-3.2.1.jar"))))
+
+
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
+    implementation(libs.androidx.security.crypto) // <--- DEPENDENCIA AÑADIDA AQUÍ
 
+    implementation(project(":manufacturer"))
+    implementation(project(":config"))
+    implementation(project(":persistence"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

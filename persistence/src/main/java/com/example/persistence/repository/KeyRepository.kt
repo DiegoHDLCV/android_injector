@@ -1,7 +1,6 @@
 package com.example.persistence.repository
 
 import com.example.persistence.dao.KeyDao
-import com.example.persistence.dao.UserDao
 import com.example.persistence.entities.KeyEntity
 import com.vigatec.utils.enums.Role
 import jakarta.inject.Inject
@@ -11,29 +10,24 @@ import kotlinx.coroutines.flow.Flow
 @Singleton
 class KeyRepository @Inject constructor(
     private val keyDao: KeyDao,
-    private val userDao: UserDao // Para verificar el rol del admin
 ) {
 
     suspend fun createKey(
         keyValue: String,
-        description: String?,
-        adminUserId: Long
-    ): KeyEntity? {
-        val adminUser = userDao.getUserById(adminUserId)
-        if (adminUser?.role != Role.ADMIN.name) {
-            // Solo los administradores pueden crear llaves
-            println("Error: Usuario con ID $adminUserId no es administrador o no existe.")
-            // Considera lanzar una excepción específica o devolver un resultado encapsulado
-            return null
-        }
-
+        description: String?
+        // Quita: adminUserId: Long
+    ): KeyEntity { // Devuelve KeyEntity directamente si el ID se autogenera
+        // Ya no necesitas verificar el rol del admin aquí
         val newKey = KeyEntity(
             keyValue = keyValue,
             description = description,
-            createdByAdminId = adminUserId
+            // Necesitas decidir qué poner en createdByAdminId si ya no pasas el ID.
+            // ¿Quizás un valor por defecto, o quitar el campo si ya no es relevante?
+            // Por ahora, lo pongo como 0 o un valor dummy, pero debes definir esto.
+            createdByAdminId = 0L // O un ID de sistema/admin por defecto si tienes uno
         )
         val id = keyDao.insertKey(newKey)
-        return newKey.copy(id = id)
+        return newKey.copy(id = id) // Room actualiza el ID en el objeto insertado si es Long
     }
 
     fun getKeysCreatedByAdmin(adminUserId: Long): Flow<List<KeyEntity>> {
@@ -68,12 +62,8 @@ class KeyRepository @Inject constructor(
         return keyDao.getKeyById(keyId)
     }
 
-    suspend fun updateKeyStatus(keyId: Long, isActive: Boolean, adminUserId: Long): Boolean {
-        val adminUser = userDao.getUserById(adminUserId)
-        if (adminUser?.role != Role.ADMIN.name) {
-            println("Error: Solo un administrador puede actualizar llaves.")
-            return false
-        }
+    suspend fun updateKeyStatus(keyId: Long, isActive: Boolean): Boolean {
+        // Ya no se necesita verificar el admin
         val key = keyDao.getKeyById(keyId)
         return if (key != null) {
             keyDao.updateKey(key.copy(isActive = isActive))
@@ -83,13 +73,9 @@ class KeyRepository @Inject constructor(
         }
     }
 
-    suspend fun deleteKey(keyId: Long, adminUserId: Long): Boolean {
-        val adminUser = userDao.getUserById(adminUserId)
-        if (adminUser?.role != Role.ADMIN.name) {
-            println("Error: Solo un administrador puede eliminar llaves.")
-            return false
-        }
+    suspend fun deleteKey(keyId: Long): Boolean {
+        // Ya no se necesita verificar el admin
         keyDao.deleteKeyById(keyId)
-        return true // Asumimos que si no lanza excepción, se eliminó o no existía.
+        return true // O verifica si la fila fue afectada si el DAO lo permite
     }
 }

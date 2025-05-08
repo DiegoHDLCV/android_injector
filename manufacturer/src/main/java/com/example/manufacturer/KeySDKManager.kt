@@ -7,7 +7,7 @@ import com.example.config.SystemConfig // Adjust package if needed
 import com.example.manufacturer.base.controllers.manager.IKeyManager
 import com.example.manufacturer.base.controllers.ped.IPedController
 import com.example.manufacturer.libraries.newpos.NewposKeyManager
-import com.example.manufacturer.libraries.aisino.AisinoKeyManager // <-- Importar AisinoKeyManager
+import com.example.manufacturer.libraries.aisino.AisinoKeyManager
 
 object KeySDKManager : IKeyManager {
 
@@ -18,66 +18,53 @@ object KeySDKManager : IKeyManager {
         Log.d(TAG, "Seleccionando KeyManager para el fabricante: ${SystemConfig.managerSelected}")
         when (SystemConfig.managerSelected) {
             EnumManufacturer.NEWPOS -> NewposKeyManager
-            EnumManufacturer.AISINO -> AisinoKeyManager // <-- Añadir caso para Aisino
-            // EnumManufacturer.INGENICO -> IngenicoKeyManager() // Descomentar e implementar
-            // EnumManufacturer.PAX -> PaxKeyManager()       // Descomentar e implementar
-            // ... otros fabricantes
-            else -> {
-                Log.w(TAG, "Fabricante ${SystemConfig.managerSelected} no tiene implementación de gestión de llaves dedicada. Usando DummyKeyManager.")
-                DummyKeyManager
-            }
+            EnumManufacturer.AISINO -> AisinoKeyManager
+            // ... otros fabricantes ...
+            else -> throw IllegalStateException("Fabricante no soportado para KeySDKManager: ${SystemConfig.managerSelected}") // O un Dummy si prefieres
         }
     }
 
+    // Delegar initialize al manager específico
     override suspend fun initialize(application: Application) {
         try {
-            Log.d(TAG, "Inicializando SDK de gestión de llaves para: ${SystemConfig.managerSelected}")
+            Log.d(TAG, "Delegando inicialización a ${SystemConfig.managerSelected} KeyManager...")
             manager.initialize(application)
+            Log.i(TAG, "Inicialización delegada a ${SystemConfig.managerSelected} KeyManager completada.")
         } catch (e: Exception) {
-            Log.e(TAG, "Error durante la inicialización del SDK de gestión de llaves (${SystemConfig.managerSelected})", e)
-            // Considera relanzar la excepción o manejar el error de forma más específica
-            // dependiendo de los requisitos de la aplicación.
-            // Podrías querer notificar al usuario que las funciones de PED no estarán disponibles.
+            Log.e(TAG, "Error durante la inicialización delegada a ${SystemConfig.managerSelected} KeyManager", e)
+            throw e // Relanzar para que SDKInitManager se entere
         }
     }
 
-    override fun getPedController(): IPedController? {
-        Log.d(TAG, "Delegando getPedController a ${SystemConfig.managerSelected}")
-        return try {
-            manager.getPedController() // Puede devolver null si el manager no está inicializado o no tiene controlador
+    // Delegar connect al manager específico
+    override suspend fun connect() {
+        Log.d(TAG, "Delegando connect a ${SystemConfig.managerSelected} KeyManager...")
+        try {
+            manager.connect()
         } catch (e: Exception) {
-            Log.e(TAG, "Error en getPedController para ${SystemConfig.managerSelected}", e)
+            Log.e(TAG, "Error durante connect delegado a ${SystemConfig.managerSelected} KeyManager", e)
+            // Decide si relanzar o no
+        }
+    }
+
+    // Delegar getPedController al manager específico
+    override fun getPedController(): IPedController? {
+        Log.d(TAG, "Delegando getPedController a ${SystemConfig.managerSelected} KeyManager...")
+        return try {
+            manager.getPedController()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error durante getPedController delegado a ${SystemConfig.managerSelected} KeyManager", e)
             null
         }
     }
 
+    // Delegar release al manager específico
     override fun release() {
-        Log.d(TAG, "Delegando release a ${SystemConfig.managerSelected}")
+        Log.d(TAG, "Delegando release a ${SystemConfig.managerSelected} KeyManager...")
         try {
             manager.release()
         } catch (e: Exception) {
-            Log.e(TAG, "Error durante la liberación de recursos (release) para ${SystemConfig.managerSelected}", e)
-        }
-    }
-
-    /**
-     * Implementación Dummy para casos donde no hay un gestor específico o para pruebas.
-     */
-    private object DummyKeyManager : IKeyManager {
-        private const val DUMMY_TAG = "DummyKeyManager"
-        override suspend fun initialize(application: Application) {
-            Log.w(DUMMY_TAG, "Initialize llamado en DummyKeyManager, no realiza ninguna acción.")
-        }
-
-        override fun getPedController(): IPedController? {
-            Log.w(DUMMY_TAG, "getPedController llamado en DummyKeyManager, devuelve null.")
-            // Podría devolver una implementación dummy de IPedController que loguea las llamadas
-            // o lanza NotImplementedError si se prefiere un comportamiento más estricto.
-            return null
-        }
-
-        override fun release() {
-            Log.w(DUMMY_TAG, "Release llamado en DummyKeyManager, no realiza ninguna acción.")
+            Log.e(TAG, "Error durante release delegado a ${SystemConfig.managerSelected} KeyManager", e)
         }
     }
 }

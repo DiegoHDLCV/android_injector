@@ -8,6 +8,8 @@ import com.example.manufacturer.base.controllers.ped.IPedController
  * Proporciona acceso a los controladores de PED específicos del fabricante.
  */
 interface IKeyManager {
+    suspend fun connect()
+
     /**
      * Inicializa el gestor de llaves para el fabricante seleccionado.
      * @param application El contexto de la aplicación.
