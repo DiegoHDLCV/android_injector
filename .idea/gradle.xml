@@ -15,6 +15,7 @@
             <option value="$PROJECT_DIR$/manufacturer" />
             <option value="$PROJECT_DIR$/persistence" />
             <option value="$PROJECT_DIR$/utils" />
+            <option value="$PROJECT_DIR$/utils/urovo" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="false" />

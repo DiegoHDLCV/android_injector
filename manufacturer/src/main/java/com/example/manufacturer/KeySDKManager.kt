@@ -8,6 +8,7 @@ import com.example.manufacturer.base.controllers.manager.IKeyManager
 import com.example.manufacturer.base.controllers.ped.IPedController
 import com.example.manufacturer.libraries.newpos.NewposKeyManager
 import com.example.manufacturer.libraries.aisino.AisinoKeyManager
+import com.example.manufacturer.libraries.urovo.UrovoKeyManager
 
 object KeySDKManager : IKeyManager {
 
@@ -19,6 +20,7 @@ object KeySDKManager : IKeyManager {
         when (SystemConfig.managerSelected) {
             EnumManufacturer.NEWPOS -> NewposKeyManager
             EnumManufacturer.AISINO -> AisinoKeyManager
+            EnumManufacturer.UROVO -> UrovoKeyManager
             // ... otros fabricantes ...
             else -> throw IllegalStateException("Fabricante no soportado para KeySDKManager: ${SystemConfig.managerSelected}") // O un Dummy si prefieres
         }

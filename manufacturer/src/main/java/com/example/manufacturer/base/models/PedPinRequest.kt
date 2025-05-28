@@ -1,5 +1,8 @@
 package com.example.manufacturer.base.models
 
+// Importa KeyAlgorithm si no está ya importado
+import com.example.manufacturer.base.models.KeyAlgorithm as GenericKeyAlgorithm
+
 /**
  * Parameters for requesting a PIN block from the PED.
  *
@@ -12,15 +15,19 @@ package com.example.manufacturer.base.models
  * @property format The desired PIN block format (e.g., ISO9564_0).
  * @property isDukpt Whether this request uses a DUKPT key scheme.
  * @property dukptGroupIndex If isDukpt is true, the DUKPT group index to use.
+ * @property algorithm The underlying cryptographic algorithm (DES/TDES/AES) used, especially crucial for DUKPT.
+ * @property allowBypass Whether bypassing PIN entry (entering 0 digits) is allowed.
  */
 data class PedPinRequest(
     val keyIndex: Int,
-    val keyType: KeyType, // Typically WORKING_PIN_KEY or DUKPT group index implies DUKPT_WORKING_KEY
+    val keyType: KeyType,
     val pinLengthConstraints: String,
     val pan: String?,
     val timeoutSeconds: Int,
     val promptMessage: String?,
     val format: PinBlockFormatType,
     val isDukpt: Boolean = false,
-    val dukptGroupIndex: Int? = null // Use instead of keyIndex/keyType if isDukpt=true
+    val dukptGroupIndex: Int? = null,
+    val algorithm: GenericKeyAlgorithm, // <--- CAMPO AÑADIDO
+    val allowBypass: Boolean = false // <--- CAMPO AÑADIDO (inferido de tu código)
 )
