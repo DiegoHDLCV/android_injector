@@ -11,11 +11,12 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/communication" />
             <option value="$PROJECT_DIR$/config" />
+            <option value="$PROJECT_DIR$/format" />
             <option value="$PROJECT_DIR$/manufacturer" />
             <option value="$PROJECT_DIR$/persistence" />
             <option value="$PROJECT_DIR$/utils" />
-            <option value="$PROJECT_DIR$/utils/urovo" />
           </set>
         </option>
         <option name="resolveExternalAnnotations" value="false" />

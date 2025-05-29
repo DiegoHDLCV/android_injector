@@ -60,6 +60,19 @@ object Navigator {
                     Log.e(TAG, "Excepción general al navegar a PrintingScreen (ruta: '$route').", e)
                 }
             }
+            is UiEvent.NavigateToMainScreen -> {
+                val route = Routes.MainScreen.route
+                Log.d(TAG, "Caso: NavigateToMainScreen. Navegando a ruta: '$route'")
+                try {
+                    navController.navigate(route)
+                    Log.d(TAG, "Navegación a MainScreen (ruta: '$route') ejecutada.")
+                } catch (e: IllegalArgumentException) {
+                    Log.e(TAG, "Error al navegar a MainScreen (ruta: '$route'). ¿Ruta definida en NavGraph?", e)
+                }
+                catch (e: Exception) {
+                    Log.e(TAG, "Excepción general al navegar a MainScreen (ruta: '$route').", e)
+                }
+            }
 
 
 

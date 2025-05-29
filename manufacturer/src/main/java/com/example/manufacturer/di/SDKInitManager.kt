@@ -26,7 +26,8 @@ object SDKInitManager {
             try {
                 // Llamada al Manager(s) genérico(s)
                 Log.d(TAG, "-> Inicializando KeySDKManager...")
-                KeySDKManager.initialize(app)
+                //KeySDKManager.initialize(app)
+                //CommunicationSDKManager.initialize(app)
                 // Log.d(TAG, "-> Inicializando ManufacturerSDKManager...") // Si necesitas ambos
                 // ManufacturerSDKManager.initialize(app)
 

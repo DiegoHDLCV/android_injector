@@ -56,7 +56,7 @@ class SplashViewModel @Inject constructor(
                 _initState.value = InitState.Success
 
                 // --- Navegar ---
-                val nextRoute = Routes.MasterKeyEntryScreen.route
+                val nextRoute = Routes.MainScreen.route
                 Log.d(TAG_VM, "Enviando UiEvent para navegar a: $nextRoute")
                 _uiEvent.send(UiEvent.NavigateToRoute(
                     route = nextRoute,

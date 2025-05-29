@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.manufacturer"
+    namespace = "com.example.format"
     compileSdk = 35
 
     defaultConfig {
@@ -33,15 +33,11 @@ android {
 }
 
 dependencies {
-    implementation(fileTree(mapOf("dir" to "../shared-libs", "include" to listOf("*.jar"), "exclude" to listOf("core-3.2.1.jar"))))
-
-    implementation(project(":config"))
-    implementation(project(":utils"))
-    implementation(":urovo-sdk:@aar")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation(project(":utils"))
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

@@ -19,7 +19,10 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         // Aquí se pueden incluir repositorios locales (flatDir) si es necesario:
-        flatDir { dirs("shared-libs", "app/libs", "manufacturer/libs") }
+        flatDir {
+            dirs("project_local_aars") // Apunta a la carpeta que creaste
+            // dirs("project_local_aars", "shared-libs", "app/libs", ...) // Si tienes otras
+        }
     }
 }
 
@@ -29,4 +32,5 @@ include(":utils")
 include(":persistence")
 include(":manufacturer")
 include(":config")
-include(":utils:urovo")
+include(":communication")
+include(":format")

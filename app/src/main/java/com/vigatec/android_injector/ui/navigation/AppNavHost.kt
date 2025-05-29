@@ -6,6 +6,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.vigatec.android_injector.ui.screens.LoginScreen
+import com.vigatec.android_injector.ui.screens.MainScreen
 import com.vigatec.android_injector.ui.screens.MasterKeyEntryScreen
 import com.vigatec.android_injector.ui.screens.SplashScreen
 import com.vigatec.android_injector.viewmodel.MainViewModel
@@ -31,6 +32,11 @@ fun AppNavHost(
                 navController = navController,
                 viewModel = masterKeyViewModel
             )
+        }
+        // --- Add Composable for MainScreen ---
+        composable(Routes.MainScreen.route) {
+            val mainViewModel: MainViewModel = viewModel()
+            MainScreen(navController = navController)
         }
         // Add other composables (like PrintingScreen) if they exist
         // composable(Routes.PrintingScreen.route) { ... }
