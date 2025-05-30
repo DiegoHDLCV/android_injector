@@ -12,6 +12,12 @@ android {
     namespace = "com.vigatec.android_injector"
     compileSdk = 35
 
+    sourceSets {
+        named("main") {
+            jniLibs.srcDirs("src/main/jniLibs")
+        }
+    }
+
     defaultConfig {
         applicationId = "com.vigatec.android_injector"
         minSdk = 24

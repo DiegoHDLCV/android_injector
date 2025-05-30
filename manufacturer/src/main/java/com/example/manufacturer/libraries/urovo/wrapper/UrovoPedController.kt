@@ -1,5 +1,6 @@
 package com.example.manufacturer.libraries.urovo.wrapper
 
+import android.app.Application
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
@@ -114,7 +115,7 @@ class UrovoPedController(private val context: Context) : IPedController {
 
     // --- Interface Implementation ---
 
-    override suspend fun initializePed(): Boolean {
+    override suspend fun initializePed(application: Application): Boolean {
         Log.d(TAG, "initializePed: Urovo se inicializa al obtener la instancia.")
         // Establecer algoritmo por defecto a DES, ya que es común.
         setKeyAlgorithm(GenericKeyAlgorithm.DES_TRIPLE)

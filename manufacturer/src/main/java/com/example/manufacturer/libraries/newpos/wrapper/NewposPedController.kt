@@ -1,6 +1,7 @@
 package com.example.manufacturer.libraries.newpos.wrapper
 
 // Import generic types (Adjust package if needed)
+import android.app.Application
 import com.example.manufacturer.base.controllers.ped.*
 import com.example.manufacturer.base.models.*
 import com.example.manufacturer.base.models.KeyType as GenericKeyType
@@ -201,7 +202,7 @@ class NewposPedController(private val context: Context) : IPedController {
 
     // --- Interface Implementation ---
 
-    override suspend fun initializePed(): Boolean {
+    override suspend fun initializePed(application: Application): Boolean {
         Log.d(TAG, "initializePed called (NewPOS instance already obtained in init).")
         // Could add a status check here if needed
         return true

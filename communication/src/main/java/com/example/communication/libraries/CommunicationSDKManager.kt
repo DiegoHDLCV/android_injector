@@ -16,6 +16,7 @@ object CommunicationSDKManager : ICommunicationManager {
         when (SystemConfig.managerSelected) {
             //EnumManufacturer.NEWPOS -> NewposCommunicationManager
             //EnumManufacturer.AISINO -> AisinoCommunicationManager // Implementar
+            EnumManufacturer.AISINO -> AisinoCommunicationManager // Implementar
             EnumManufacturer.UROVO -> UrovoCommunicationManager // Implementar
             // ... otros fabricantes
             else -> {

@@ -1,6 +1,7 @@
 package com.example.manufacturer.libraries.aisino.wrapper // Using your specified package
 
 // Import generic types (Ensure these paths are correct)
+import android.app.Application
 import com.example.manufacturer.base.controllers.ped.*
 import com.example.manufacturer.base.models.*
 import com.example.manufacturer.base.models.KeyType as GenericKeyType
@@ -20,6 +21,11 @@ import android.content.Context
 import android.os.IBinder // Needed for Stub implementation
 import android.os.RemoteException
 import android.util.Log
+import com.vanstone.appsdk.client.ISdkStatue
+import com.vanstone.appsdk.client.SdkApi
+import com.vanstone.trans.api.SystemApi
+import com.vanstone.utils.CommonConvert
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -30,6 +36,8 @@ import java.util.Arrays // For Arrays.fill
 class AisinoPedController(private val context: Context) : IPedController {
 
     private val TAG = "AisinoPedController"
+    private val initDeferred = CompletableDeferred<Unit>()
+
 
     // --- Mappings (Same as before - keep them here) ---
 
@@ -132,15 +140,91 @@ class AisinoPedController(private val context: Context) : IPedController {
 
     // --- Interface Implementation ---
 
-    override suspend fun initializePed(): Boolean {
+    override suspend fun initializePed(application: Application): Boolean {
         Log.d(TAG, "initializePed called. No specific PED initialization required for Aisino.")
         return try {
+
+            Log.i(TAG, ">>> INICIO: AisinoSDKManager.initialize")
+            val context: Context = application.applicationContext
+            Log.d(TAG, "Contexto de la aplicación obtenido: $context")
+            val curAppDir = application.filesDir.absolutePath
+            Log.d(TAG, "Directorio de la aplicación obtenido: $curAppDir")
+
+            Log.d(TAG, "Iniciando SystemApi.SystemInit_Api...")
+            val pathBytes = CommonConvert.StringToBytes("$curAppDir/\u0000")
+            if (pathBytes == null) {
+                Log.e(TAG, "SystemApi.SystemInit_Api: Error al convertir la ruta a bytes.")
+                initDeferred.completeExceptionally(IllegalStateException("Error al convertir la ruta del directorio a bytes para SystemInit_Api."))
+                Log.e(TAG, "<<< ERROR FIN: AisinoSDKManager.initialize (Error en pathBytes)")
+                return false
+            }
+            SystemApi.SystemInit_Api(0, pathBytes, context, object : ISdkStatue {
+                override fun sdkInitSuccessed() {
+                    Log.i(TAG, "SystemApi.SystemInit_Api: SDK inicializado exitosamente (Callback).")
+                    initializeSdk(context)
+                }
+
+                override fun sdkInitFailed() {
+                    Log.e(TAG, "SystemApi.SystemInit_Api: Falló la inicialización del SDK AISINO (Callback).")
+//                if (!initDeferred.isCompleted) {
+//                    initDeferred.completeExceptionally(
+//                        IllegalStateException("Falló la inicialización del SDK AISINO (SystemApi).")
+//                    )
+//                }
+                    Log.e(TAG, "<<< ERROR FIN: AisinoSDKManager.initialize (SystemApi falló)")
+                }
+            })
             PedApi.PEDGetLastError_Api() // Simple check if API is callable
             true
         } catch(e: Throwable) {
             Log.e(TAG, "Error checking Aisino PED API availability during initializePed", e)
             false
         }
+    }
+
+    private fun initializeSdk(context: Context) {
+        Log.i(TAG, ">>> INICIO: AisinoSDKManager.initializeSdk")
+        Log.d(TAG, "Llamando a SdkApi.getInstance().init()...")
+        SdkApi.getInstance().init(context, object : ISdkStatue {
+            override fun sdkInitSuccessed() {
+                Log.i(TAG, "SdkApi.getInstance().init(): Inicialización exitosa (Callback).")
+                try {
+                    //sdkApi = SdkApi.getInstance()
+                    Log.d(TAG, "Instancia de SdkApi obtenida y asignada.")
+                    //initializeEMVKernel(context)
+                    if (!initDeferred.isCompleted) {
+                        initDeferred.complete(Unit)
+                        Log.i(TAG, "initDeferred completado con éxito en initializeSdk.")
+                    }
+                } catch (e: NoSuchMethodError) {
+                    Log.e(TAG, "Error crítico: NoSuchMethodError durante la asignación de SdkApi o la inicialización del SDK.", e)
+                    if (!initDeferred.isCompleted) {
+                        initDeferred.completeExceptionally(e)
+                    }
+                    Log.e(TAG, "<<< ERROR FIN: AisinoSDKManager.initializeSdk (NoSuchMethodError)")
+                    return
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error inesperado durante la inicialización de SdkApi.", e)
+                    if (!initDeferred.isCompleted) {
+                        initDeferred.completeExceptionally(e)
+                    }
+                    Log.e(TAG, "<<< ERROR FIN: AisinoSDKManager.initializeSdk (Exception)")
+                    return
+                }
+                Log.i(TAG, "<<< FIN: AisinoSDKManager.initializeSdk (Éxito)")
+            }
+
+            override fun sdkInitFailed() {
+                Log.e(TAG, "SdkApi.getInstance().init(): Falla en la inicialización del SDK (Callback).")
+                if (!initDeferred.isCompleted) {
+                    initDeferred.completeExceptionally(
+                        IllegalStateException("Falla en la inicialización del SDK (SdkApi).")
+                    )
+                }
+                Log.e(TAG, "<<< ERROR FIN: AisinoSDKManager.initializeSdk (SdkApi falló)")
+            }
+        })
+        Log.d(TAG, "SdkApi.getInstance().init() llamado, esperando callback...")
     }
 
     override fun releasePed() {

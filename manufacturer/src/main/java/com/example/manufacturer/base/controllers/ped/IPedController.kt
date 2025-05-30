@@ -1,5 +1,6 @@
 package com.example.manufacturer.base.controllers.ped
 
+import android.app.Application
 import com.example.manufacturer.base.models.*
 
 /**
@@ -8,7 +9,7 @@ import com.example.manufacturer.base.models.*
 interface IPedController {
 
     // --- Lifecycle & Status ---
-    suspend fun initializePed(): Boolean
+    suspend fun initializePed(application: Application): Boolean
     fun releasePed()
     @Throws(PedException::class)
     suspend fun getStatus(): PedStatusInfo

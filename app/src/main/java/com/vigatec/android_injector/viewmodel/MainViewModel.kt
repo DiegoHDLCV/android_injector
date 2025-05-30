@@ -17,6 +17,7 @@ import com.example.manufacturer.base.controllers.ped.IPedController
 import com.example.manufacturer.base.controllers.ped.PedKeyException
 import com.example.manufacturer.base.models.KeyAlgorithm
 import com.example.manufacturer.base.models.KeyType // Asegúrate que GenericKeyType se llame KeyType aquí
+import com.example.manufacturer.base.models.PedKeyData
 import com.vigatec.android_injector.ui.events.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -83,7 +84,7 @@ class MainViewModel @Inject constructor(
             Log.i(TAG, "IPedController obtenido exitosamente.")
             viewModelScope.launch {
                 try {
-                    pedController?.initializePed()
+                    pedController?.initializePed(application)
                     Log.i(TAG, "IPedController inicializado.")
                 } catch (e: Exception) {
                     handleError("Error al inicializar PED: ${e.message}")

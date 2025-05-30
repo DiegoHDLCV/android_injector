@@ -34,7 +34,7 @@ object AisinoKeyManager : IKeyManager {
             // Crear la instancia del controlador específico de Aisino
             pedControllerInstance = AisinoPedController(applicationContext)
             // Llamar a la inicialización interna del controlador si es necesario
-            val initialized = pedControllerInstance?.initializePed() ?: false
+            val initialized = pedControllerInstance?.initializePed(application) ?: false
             if (!initialized) {
                 throw PedException("Falló la inicialización interna de AisinoPedController.")
             }

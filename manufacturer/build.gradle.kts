@@ -37,7 +37,7 @@ dependencies {
 
     implementation(project(":config"))
     implementation(project(":utils"))
-    implementation(":urovo-sdk:@aar")
+    implementation(":urovo-sdk-v1.0.20:@aar")
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

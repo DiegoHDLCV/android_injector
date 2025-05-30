@@ -21,6 +21,8 @@ dependencyResolutionManagement {
         // Aquí se pueden incluir repositorios locales (flatDir) si es necesario:
         flatDir {
             dirs("project_local_aars") // Apunta a la carpeta que creaste
+            dirs("shared-libs", "app/libs", "manufacturer/libs")
+
             // dirs("project_local_aars", "shared-libs", "app/libs", ...) // Si tienes otras
         }
     }
