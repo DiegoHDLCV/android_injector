@@ -141,7 +141,8 @@ class MasterKeyEntryViewModel @Inject constructor(
                     keyIndex = keyIndexToInject,
                     keyType = keyTypeToInject,
                     keyAlgorithm = keyAlgorithmToInject,
-                    keyBytes = combinedKeyBytes
+                    keyBytes = combinedKeyBytes,
+                    kcvBytes = combinedKeyBytes
                 )
 
                 if (success) {

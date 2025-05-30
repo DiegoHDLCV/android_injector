@@ -9,7 +9,7 @@ enum class KeyAlgorithm {
     DES_TRIPLE,       // 16 or 24-byte key (TDES)
     AES_128,          // 16-byte key
     AES_192,          // 24-byte key
-    AES_256,          // 32-byte key
+    AES_256,          // 32-byte key  <-- Esta es la que probablemente necesitas
     SM4,              // 16-byte key (Chinese standard)
     RSA               // Generic RSA, size often implicit or defined elsewhere
     // Add others like ECC if needed and commonly supported

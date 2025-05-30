@@ -12,12 +12,11 @@ import com.example.communication.libraries.CommunicationSDKManager
 import com.example.format.SerialMessage
 import com.example.format.SerialMessageFormatter
 import com.example.format.SerialMessageParser
-import com.example.manufacturer.KeySDKManager // <<< Importar KeySDKManager
-import com.example.manufacturer.base.controllers.ped.IPedController // <<< Importar IPedController
+import com.example.manufacturer.KeySDKManager
+import com.example.manufacturer.base.controllers.ped.IPedController
 import com.example.manufacturer.base.controllers.ped.PedKeyException
-
 import com.example.manufacturer.base.models.KeyAlgorithm
-import com.example.manufacturer.base.models.KeyType
+import com.example.manufacturer.base.models.KeyType // Asegúrate que GenericKeyType se llame KeyType aquí
 import com.vigatec.android_injector.ui.events.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -57,18 +56,19 @@ class MainViewModel @Inject constructor(
     private val _connectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     val connectionStatus = _connectionStatus.asStateFlow()
 
-    // --- MODIFICADO --- Cambiado a _rawReceivedData
     private val _rawReceivedData = MutableStateFlow<String>("")
     val rawReceivedData = _rawReceivedData.asStateFlow()
 
     // --- Controladores y Parser ---
     private var comController: IComController? = null
-    private var pedController: IPedController? = null // <<< NUEVO: Controlador PED
+    private var pedController: IPedController? = null
     private var listeningJob: Job? = null
-    private val messageParser = SerialMessageParser() // <<< NUEVO: Instancia del Parser
+    private val messageParser = SerialMessageParser()
+
+    // Define un ID conocido para tu KEK si es constante, o gestiona cómo se conoce este ID.
+    private val KEK_SLOT_ID_PRIMARY = 10 // Ejemplo, el ID que usas para tu KEK principal
 
     init {
-        // Obtener controlador de comunicación
         comController = CommunicationSDKManager.getComController()
         if (comController == null) {
             handleError("Error al obtener controlador de comunicación")
@@ -76,16 +76,11 @@ class MainViewModel @Inject constructor(
             Log.i(TAG, "IComController obtenido exitosamente.")
         }
 
-        // <<< NUEVO: Obtener controlador PED ---
-        // Asumiendo que KeySDKManager ya está inicializado (esto debería manejarse
-        // en una capa de inicialización de la app, aquí lo obtenemos directamente).
-        // ¡¡Asegúrate que KeySDKManager.initialize() se llame antes!!
         pedController = KeySDKManager.getPedController()
         if (pedController == null) {
             handleError("Error al obtener controlador PED")
         } else {
             Log.i(TAG, "IPedController obtenido exitosamente.")
-            // Podrías llamar a initializePed aquí si es necesario
             viewModelScope.launch {
                 try {
                     pedController?.initializePed()
@@ -97,14 +92,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    // --- Función de Ayuda para Errores ---
     private fun handleError(message: String, e: Exception? = null) {
         Log.e(TAG, message, e)
         _connectionStatus.value = ConnectionStatus.ERROR
         viewModelScope.launch { _snackbarEvent.emit(message) }
     }
 
-    // --- Lógica de Escucha ---
     fun startListening(
         baudRate: EnumCommConfBaudRate = EnumCommConfBaudRate.BPS_9600,
         parity: EnumCommConfParity = EnumCommConfParity.NOPAR,
@@ -139,13 +132,11 @@ class MainViewModel @Inject constructor(
 
                 while (isActive) {
                     val bytesRead = comController!!.readData(buffer.size, buffer, 5000)
-
                     when {
                         bytesRead > 0 -> {
                             val received = buffer.copyOf(bytesRead)
-                            // --- MODIFICADO: Usar parser ---
                             Log.d(TAG, "Datos recibidos ($bytesRead bytes): ${received.toHexString()}")
-                            _rawReceivedData.value = _rawReceivedData.value + String(received, Charsets.US_ASCII) // Muestra en UI
+                            _rawReceivedData.value = _rawReceivedData.value + String(received, Charsets.US_ASCII)
 
                             messageParser.appendData(received)
                             var parsedMessage: SerialMessage?
@@ -153,16 +144,14 @@ class MainViewModel @Inject constructor(
                                 parsedMessage = messageParser.nextMessage()
                                 parsedMessage?.let { processParsedCommand(it) }
                             } while (parsedMessage != null && isActive)
-                            // --- FIN MODIFICADO ---
                         }
-                        bytesRead == -6 -> Log.d(TAG, "Timeout de lectura, continuando escucha...") // ERROR_READ_TIMEOUT
+                        bytesRead == -6 -> Log.d(TAG, "Timeout de lectura, continuando escucha...")
                         bytesRead < 0 -> throw Exception("Error de lectura: $bytesRead")
                     }
-                    delay(50) // Pequeña pausa para no sobrecargar CPU
+                    delay(50)
                 }
-
             } catch (e: Exception) {
-                if (isActive) { // Solo mostrar error si no fue cancelado
+                if (isActive) {
                     handleError("Error en bucle de escucha: ${e.message}", e)
                 }
             } finally {
@@ -182,8 +171,6 @@ class MainViewModel @Inject constructor(
             listeningJob?.cancel()
             Log.i(TAG, "Escucha cancelada.")
         }
-        // El 'finally' del bucle se encargará de cerrar si es necesario.
-        // Forzamos el cierre si no estaba escuchando pero no desconectado.
         if (_connectionStatus.value != ConnectionStatus.LISTENING && _connectionStatus.value != ConnectionStatus.DISCONNECTED) {
             comController?.close()
             _connectionStatus.value = ConnectionStatus.DISCONNECTED
@@ -191,14 +178,12 @@ class MainViewModel @Inject constructor(
         listeningJob = null
     }
 
-    // --- Lógica de Envío ---
     fun sendData(data: ByteArray) {
         if (comController == null || _connectionStatus.value != ConnectionStatus.LISTENING) {
             Log.e(TAG, "No se puede enviar: Puerto no listo.")
             viewModelScope.launch { _snackbarEvent.emit("Error: Puerto no listo para enviar") }
             return
         }
-
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 Log.d(TAG, "Enviando ${data.size} bytes: ${data.toHexString()}")
@@ -207,7 +192,6 @@ class MainViewModel @Inject constructor(
                     _snackbarEvent.emit("Error al enviar datos: $bytesWritten")
                 } else {
                     Log.i(TAG, "Se enviaron $bytesWritten bytes.")
-                    // _snackbarEvent.emit("Datos enviados") // Opcional, puede ser ruidoso
                 }
             } catch (e: Exception) {
                 handleError("Excepción al enviar datos", e)
@@ -215,91 +199,183 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    // --- <<< LÓGICA DE PROCESAMIENTO DE COMANDOS >>> ---
     private fun processParsedCommand(message: SerialMessage) {
-        viewModelScope.launch { // Usar coroutine para llamadas suspend y no bloquear
+        viewModelScope.launch {
             Log.i(TAG, "Procesando Comando: ${message.command} | Datos: ${message.fields}")
             _snackbarEvent.emit("Recibido: ${message.command}")
-
             try {
                 if (pedController == null) {
-                    sendResponse(message.command, "E1") // E1 = Error PED
+                    sendResponse(message.command.toResponseCode(), "E1") // E1 = Error PED no disponible
                     return@launch
                 }
-
                 when (message.command) {
-                    "0700" -> handleLoadMainKey(message) // Cargar Llave Maestra
-                    "0720" -> handleLoadWorkKey(message) // Cargar Llave Trabajo
-                    "0770" -> handleLoadTr31(message) // Cargar TR-31 (¡Implementación pendiente!)
+                    "0700" -> handleLoadMainKey(message)
+                    "0720" -> handleLoadWorkKey(message)
+                    "0740" -> handleLoadKek(message)
+                    "0770" -> handleLoadTr31(message)
                     "PING" -> sendResponse("PONG", "OK")
                     else -> {
                         Log.w(TAG, "Comando desconocido: ${message.command}")
-                        sendResponse(message.command, "01") // 01 = Comando no soportado
+                        sendResponse(message.command.toResponseCode(), "01") // Comando no soportado
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error procesando comando ${message.command}", e)
-                sendResponse(message.command, "99") // 99 = Error general
+                sendResponse(message.command.toResponseCode(), "99") // Error general
             }
+        }
+    }
+
+    private suspend fun handleLoadKek(message: SerialMessage) {
+        val command = message.command
+        try {
+            if (message.fields.size < 2) throw IllegalArgumentException("Campos insuficientes para KEK (key_id, key_hex)")
+            val keyId = message.fields[0].toInt()
+            val keyHex = message.fields[1]
+            val checkValueHex = if (message.fields.size > 2 && message.fields[2].isNotBlank()) message.fields[2] else null
+            val kcvBytes = checkValueHex?.hexToByteArray()
+            val keyBytes = keyHex.hexToByteArray()
+
+            Log.i(TAG, "$command: Procesando KEK: keyId=$keyId, keyHex (len=${keyBytes.size}), kcvHex=$checkValueHex")
+
+            val actualKeyAlgorithm = determineKeyAlgorithm(keyBytes, command)
+
+            // Usamos TRANSPORT_KEY para KEKs, que el UrovoPedController debería mapear a loadTEK.
+            val success = pedController!!.writeKeyPlain(
+                keyIndex = keyId,
+                keyType = KeyType.TRANSPORT_KEY,
+                keyAlgorithm = actualKeyAlgorithm,
+                keyBytes = keyBytes,
+                kcvBytes = kcvBytes
+            )
+            sendResponse(command.toResponseCode(), if (success) "00" else "E2")
+        } catch (e: Exception) {
+            handleCommandException(command, e, "KEK")
         }
     }
 
     private suspend fun handleLoadMainKey(message: SerialMessage) {
         val command = message.command
         try {
-            if (message.fields.size < 2) throw IllegalArgumentException("Campos insuficientes")
+            if (message.fields.size < 2) throw IllegalArgumentException("Campos insuficientes para Main Key (key_id, key_hex)")
             val keyId = message.fields[0].toInt()
             val keyHex = message.fields[1]
-            // val checkValueHex = if (message.fields.size > 2) message.fields[2] else null // Urovo no usa KCV para claro
-
+            val checkValueHex = if (message.fields.size > 2 && message.fields[2].isNotBlank()) message.fields[2] else null
+            val kcvBytes = checkValueHex?.hexToByteArray()
             val keyBytes = keyHex.hexToByteArray()
 
-            // ¡¡IMPORTANTE!! Debes saber el algoritmo. Asumimos TDES por defecto.
-            // Podrías añadir otro campo al comando serial para especificarlo.
+            Log.i(TAG, "$command: Procesando MainKey: keyId=$keyId, keyHex (len=${keyBytes.size}), kcvHex=$checkValueHex")
+
+            val actualKeyAlgorithm = determineKeyAlgorithm(keyBytes, command)
+
             val success = pedController!!.writeKeyPlain(
                 keyIndex = keyId,
                 keyType = KeyType.MASTER_KEY,
-                keyAlgorithm = KeyAlgorithm.DES_TRIPLE, // ¡Asunción!
-                keyBytes = keyBytes
+                keyAlgorithm = actualKeyAlgorithm,
+                keyBytes = keyBytes,
+                kcvBytes = kcvBytes
             )
-
-            if (success) sendResponse(command.toResponseCode(), "00")
-            else sendResponse(command.toResponseCode(), "E2") // E2 = Error Escritura Llave
-
-        } catch (e: NumberFormatException) {
-            Log.e(TAG, "$command: keyId no es un número", e)
-            sendResponse(command.toResponseCode(), "09") // 09 = Formato Incorrecto
-        } catch (e: IllegalArgumentException) {
-            Log.e(TAG, "$command: ${e.message}", e)
-            sendResponse(command.toResponseCode(), "09") // 09 = Formato Incorrecto
-        } catch (e: PedKeyException) {
-            Log.e(TAG, "$command: Error PED", e)
-            sendResponse(command.toResponseCode(), "E2")
+            sendResponse(command.toResponseCode(), if (success) "00" else "E2")
+        } catch (e: Exception) {
+            handleCommandException(command, e, "MainKey")
         }
     }
 
     private suspend fun handleLoadWorkKey(message: SerialMessage) {
-        // TODO: Implementar lógica similar a handleLoadMainKey,
-        //       parseando keyType, mkId, wkId, keyHex, kcvHex
-        //       y llamando a pedController!!.writeKey(...)
-        //       ¡Maneja errores y envía respuestas!
-        Log.w(TAG, "handleLoadWorkKey no implementado.")
-        sendResponse(message.command.toResponseCode(), "01")
+        val command = message.command // Será "0720"
+        try {
+            if (message.fields.size < 4) throw IllegalArgumentException("Campos insuficientes (key_type, mk_id, wk_id, key_hex)")
+
+            val keyTypeInt = message.fields[0].toInt()
+            val mkId = message.fields[1].toInt()
+            val wkId = message.fields[2].toInt()
+            val keyHex = message.fields[3]
+            val checkValueHex = if (message.fields.size > 4 && message.fields[4].isNotBlank()) message.fields[4] else null
+            val kcvBytes = checkValueHex?.hexToByteArray()
+            val keyBytes = keyHex.hexToByteArray() // Esta es la llave CIFRADA
+
+            val keyTypeToLoad = mapIntToKeyType(keyTypeInt)
+            val transportKeyTypeActual = determineTransportKeyType(mkId)
+            val keyAlgorithmToLoad = determineKeyAlgorithm(keyBytes, command, isEncryptedKey = true, keyTypeToLoad = keyTypeToLoad)
+
+
+            Log.i(TAG, "$command: Cargando Llave Cifrada: KeyTypeToLoad=$keyTypeToLoad (val SDK=$keyTypeInt), MK_ID=$mkId (Type=$transportKeyTypeActual), WK_ID=$wkId, Algorithm=$keyAlgorithmToLoad KeyHexLen=${keyBytes.size}, KCV=$checkValueHex")
+
+            // `keyAlgorithm` aquí es el de la llave que se está cargando, NO el de la MK.
+            // El IPedController.writeKey se encargará de llamar a setKeyAlgorithm para la llave a cargar si es necesario,
+            // o el SDK de Urovo lo deduce.
+            val success = pedController!!.writeKey(
+                keyIndex = wkId,
+                keyType = keyTypeToLoad,
+                keyAlgorithm = keyAlgorithmToLoad, // Algoritmo de la llave que se está cargando
+                keyData = PedKeyData(keyBytes, kcvBytes), // PedKeyData debe existir y tomar (keyCiphered, kcvOfClearKey)
+                transportKeyIndex = mkId,
+                transportKeyType = transportKeyTypeActual
+            )
+            sendResponse(command.toResponseCode(), if (success) "00" else "E2")
+        } catch (e: Exception) {
+            handleCommandException(command, e, "WorkKey")
+        }
     }
 
     private suspend fun handleLoadTr31(message: SerialMessage) {
-        // TODO: ¡Esta es la parte compleja!
-        //       Necesitarás:
-        //       1. Parsear el bloque TR-31 (key_slot, key_usage, tr31_block_hex)
-        //       2. Probablemente usar una librería para parsear el bloque TR-31.
-        //       3. Determinar qué función de Urovo usar (¿loadEncryptMainKey?, ¿loadDukptBlob?).
-        //       4. Llamar a pedController con los datos correctos.
         Log.w(TAG, "handleLoadTr31 no implementado.")
         sendResponse(message.command.toResponseCode(), "01")
     }
 
+    // --- Funciones Helper para Manejo de Comandos ---
+    private fun determineKeyAlgorithm(keyBytes: ByteArray, commandName: String, isEncryptedKey: Boolean = false, keyTypeToLoad: KeyType? = null): KeyAlgorithm {
+        val context = if(isEncryptedKey) "llave cifrada" else "llave en claro"
+        val keyLength = keyBytes.size
+        val determinedAlgorithm = when (keyLength) {
+            16 -> if (keyTypeToLoad == KeyType.MASTER_KEY && isEncryptedKey) KeyAlgorithm.AES_128 else KeyAlgorithm.AES_128 // AES-128 para TMK o WK
+            24 -> KeyAlgorithm.AES_192 // AES-192
+            32 -> KeyAlgorithm.AES_256 // AES-256
+            8 -> KeyAlgorithm.DES_SINGLE
+            // Para llaves TDES dobles (16 bytes) o triples (24 bytes) que no son AES:
+            // Podrías necesitar lógica adicional si una llave de 16 bytes puede ser TDES o AES.
+            // Por ahora, si es de 16 bytes y no es MASTER_KEY cifrada, se asume AES_128.
+            // Si fuera TDES, la longitud de keyBytes (cifrados) podría ser la misma que AES.
+            else -> throw IllegalArgumentException("Longitud de $context ($keyLength bytes) no soportada para comando $commandName.")
+        }
+        Log.i(TAG, "$commandName: Determined KeyAlgorithm: $determinedAlgorithm for $context based on key length $keyLength")
+        return determinedAlgorithm
+    }
 
-    // --- <<< Funciones de Envío de Respuesta >>> ---
+    private fun mapIntToKeyType(keyTypeInt: Int): KeyType {
+        // Estos valores deben coincidir con la especificación del SDK de Urovo para el parámetro 'keyType' de `loadWorkKey`
+        // 0-Main key, 1-MAC key, 2-PIN key, 3-TD key [cite: 12, 16, 52, 56]
+        return when (keyTypeInt) {
+            0 -> KeyType.MASTER_KEY // Ej: TMK cargada bajo KEK
+            1 -> KeyType.WORKING_MAC_KEY
+            2 -> KeyType.WORKING_PIN_KEY
+            3 -> KeyType.WORKING_DATA_ENCRYPTION_KEY
+            else -> throw IllegalArgumentException("Valor de 'key_type': $keyTypeInt no es un KeyType de Urovo soportado para llaves de trabajo.")
+        }
+    }
+
+    private fun determineTransportKeyType(mkId: Int): KeyType {
+        // Asume que KEK_SLOT_ID_PRIMARY es el slot donde se cargó la KEK.
+        // La KEK es una TRANSPORT_KEY. Cualquier otra llave maestra (como una TMK) es MASTER_KEY.
+        return if (mkId == KEK_SLOT_ID_PRIMARY) {
+            KeyType.TRANSPORT_KEY
+        } else {
+            KeyType.MASTER_KEY
+        }
+    }
+
+    private suspend fun handleCommandException(command: String, e: Exception, keyContext: String) {
+        Log.e(TAG, "$command: Error procesando $keyContext: ${e.message}", e)
+        val errorCode = when (e) {
+            is NumberFormatException, is IllegalArgumentException -> "09" // Formato Incorrecto
+            is PedKeyException -> "E2" // Error PED (puede contener SDK error code en e.message)
+            else -> "99" // Error General
+        }
+        sendResponse(command.toResponseCode(), errorCode)
+    }
+
+
+    // --- Funciones de Envío de Respuesta ---
     private fun sendResponse(command: String, field: String) {
         val responseBytes = SerialMessageFormatter.format(command, field)
         sendData(responseBytes)
@@ -310,7 +386,7 @@ class MainViewModel @Inject constructor(
         sendData(responseBytes)
     }
 
-    // --- <<< Utilidades >>> ---
+    // --- Utilidades ---
     fun navigate(event: UiEvent) {
         viewModelScope.launch { _uiEvent.emit(event) }
     }
@@ -318,12 +394,10 @@ class MainViewModel @Inject constructor(
     override fun onCleared() {
         Log.i(TAG, "ViewModel onCleared: Deteniendo escucha y liberando...")
         stopListening()
-        comController?.close() // Asegurar cierre
-        // pedController?.releasePed() // Opcional, si KeySDKManager no lo hace.
+        comController?.close()
         super.onCleared()
     }
 
-    // Helper para convertir hex a bytes (¡Añadir validación si es necesario!)
     private fun String.hexToByteArray(): ByteArray {
         check(length % 2 == 0) { "Must have an even length" }
         return chunked(2)
@@ -331,7 +405,6 @@ class MainViewModel @Inject constructor(
             .toByteArray()
     }
 
-    // Helper para convertir comando de request a response (ej. 0700 -> 0710)
     private fun String.toResponseCode(): String {
         return try {
             val num = this.toInt()
@@ -341,6 +414,5 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    // Helper para mostrar bytes en logs
     private fun ByteArray.toHexString(): String = joinToString(" ") { "%02X".format(it) }
 }

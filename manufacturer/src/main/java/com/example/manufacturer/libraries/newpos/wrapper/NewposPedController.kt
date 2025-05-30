@@ -263,6 +263,7 @@ class NewposPedController(private val context: Context) : IPedController {
     override suspend fun writeKey(
         keyIndex: Int,
         keyType: GenericKeyType,
+        keyAlgorithm: GenericKeyAlgorithm, // Algoritmo de la nueva llave (no usado directamente por loadWorkKey/loadEncryptMainKey pero sí por setKeyAlgorithm)
         keyData: PedKeyData,
         transportKeyIndex: Int?,
         transportKeyType: GenericKeyType?
@@ -313,7 +314,8 @@ class NewposPedController(private val context: Context) : IPedController {
         keyIndex: Int,
         keyType: GenericKeyType,
         keyAlgorithm: GenericKeyAlgorithm, // Algorithm info might be needed for some PEDs, NewPOS injectKey doesn't use it directly
-        keyBytes: ByteArray
+        keyBytes: ByteArray,
+        kcvBytes: ByteArray?
     ): Boolean {
         // NewPOS uses injectKey for plaintext Master Keys
         if (keyType != GenericKeyType.MASTER_KEY) {

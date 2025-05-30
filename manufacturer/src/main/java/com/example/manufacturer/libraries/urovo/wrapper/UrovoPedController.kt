@@ -136,65 +136,123 @@ class UrovoPedController(private val context: Context) : IPedController {
     }
 
     override suspend fun writeKey(
-        keyIndex: Int,
-        keyType: GenericKeyType,
-        keyData: PedKeyData,
-        transportKeyIndex: Int?,
-        transportKeyType: GenericKeyType?
+        keyIndex: Int, // Índice de la nueva llave a cargar (wkId)
+        keyType: GenericKeyType, // Tipo de la nueva llave a cargar
+        keyAlgorithm: GenericKeyAlgorithm, // Algoritmo de la nueva llave (no usado directamente por loadWorkKey/loadEncryptMainKey pero sí por setKeyAlgorithm)
+        keyData: PedKeyData, // Datos de la nueva llave (cifrada) y su KCV (en claro)
+        transportKeyIndex: Int?, // Índice de la llave que cifra (mkId o tekId)
+        transportKeyType: GenericKeyType? // Tipo de la llave que cifra
     ): Boolean {
         if (transportKeyIndex == null || transportKeyType == null) {
             throw PedKeyException("La carga de llaves cifradas requiere transportKeyIndex y transportKeyType")
         }
-        if (transportKeyType != GenericKeyType.MASTER_KEY) {
-            throw PedKeyException("Urovo loadWorkKey espera que la llave de transporte sea MASTER_KEY")
-        }
 
-        val npKeyType = mapToUrovoKeyType(keyType)
+        // Establecer el algoritmo GLOBAL del Pinpad ANTES de la operación de carga de llave.
+        // El SDK de Urovo usa un estado global mAlg.
+        setKeyAlgorithm(keyAlgorithm)
+
         try {
-            // Asumimos que la llave ya viene cifrada y que la KCV es para verificar la *llave en claro*.
-            // Urovo `loadWorkKey` parece hacer la verificación internamente si se pasa KCV.
-            // Es importante saber con qué algoritmo se debe cargar (DES/SM4/AES).
-            // TODO: Determinar cómo se pasa el algoritmo aquí. Usamos `setKeyAlgorithm` antes.
-            Log.d(TAG, "Cargando Work Key: Type=$npKeyType, MK_ID=$transportKeyIndex, WK_ID=$keyIndex, KCV=${keyData.kcv != null}")
-            val result = pinpadInstance.loadWorkKey(
-                npKeyType,
-                transportKeyIndex,
-                keyIndex,
-                keyData.keyBytes,
-                keyData.kcv
-            )
-            if (!result) {
-                // TODO: Obtener un código de error más específico si es posible.
-                throw PedKeyException("Fallo al escribir llave (cifrada - loadWorkKey).")
+            // CASO 1: Cargando una Llave Maestra (ej. TMK) cifrada por otra Maestra/Transporte (ej. KEK)
+            if (keyType == GenericKeyType.MASTER_KEY) {
+                Log.d(TAG, "Cargando Main Key Cifrada: MK_ID(KEK_ID)=$transportKeyIndex, WK_ID(TMK_ID)=$keyIndex, KCV=${keyData.kcv != null}")
+                // El SDK de Urovo usa tekId para la llave de cifrado de una Main Key
+                val result = pinpadInstance.loadEncryptMainKey(
+                    transportKeyIndex, // tekId (índice de la KEK)
+                    keyIndex,          // keyId (índice de la nueva TMK)
+                    keyData.keyBytes,  // TMK cifrada
+                    keyData.kcv        // KCV de la TMK en claro
+                )
+                if (!result) {
+                    val lastError = PinPadProviderImpl.lastErrorCode
+                    throw PedKeyException("Fallo al escribir Main Key cifrada (loadEncryptMainKey). SDK Error: $lastError")
+                }
+                return true
             }
-            return true
+            // CASO 2: Cargando una Llave de Trabajo (PIN, MAC, TD) cifrada por una Llave Maestra (ej. TMK)
+            else if (keyType == GenericKeyType.WORKING_PIN_KEY ||
+                keyType == GenericKeyType.WORKING_MAC_KEY ||
+                keyType == GenericKeyType.WORKING_DATA_ENCRYPTION_KEY) {
+
+                // La validación original sobre transportKeyType.
+                // Si la TMK se cargó como MASTER_KEY, esto está bien.
+                if (transportKeyType != GenericKeyType.MASTER_KEY) {
+                    // Podrías flexibilizar esto si tu TMK puede ser de otro tipo genérico pero funciona como MK.
+                    throw PedKeyException("Urovo loadWorkKey espera que la llave de transporte (TMK) sea de tipo MASTER_KEY")
+                }
+
+                val npKeyType = mapToUrovoKeyType(keyType) // Convierte WORKING_PIN_KEY a 2, WORKING_MAC_KEY a 1, etc.
+                // según la especificación de Urovo para el parámetro keyType de loadWorkKey
+                Log.d(TAG, "Cargando Work Key: Type(SDK)=$npKeyType, MK_ID(TMK_ID)=$transportKeyIndex, WK_ID=$keyIndex, KCV=${keyData.kcv != null}")
+
+                val result = pinpadInstance.loadWorkKey(
+                    npKeyType,         // Tipo de Work Key para el SDK (1, 2, o 3)
+                    transportKeyIndex, // mkId (índice de la TMK)
+                    keyIndex,          // wkId (índice de la nueva Work Key)
+                    keyData.keyBytes,  // Work Key cifrada
+                    keyData.kcv        // KCV de la Work Key en claro
+                )
+                if (!result) {
+                    val lastError = PinPadProviderImpl.lastErrorCode
+                    throw PedKeyException("Fallo al escribir Work Key (loadWorkKey). SDK Error: $lastError")
+                }
+                return true
+            }
+            // Otros tipos de llave cifrada no soportados por esta lógica
+            else {
+                throw PedKeyException("Tipo de llave '${keyType}' no soportado para carga cifrada con esta función.")
+            }
+
         } catch (e: Exception) {
-            Log.e(TAG, "Error al escribir llave (cifrada)", e)
-            throw PedKeyException("Fallo al escribir llave (cifrada): ${e.message}", e)
+            Log.e(TAG, "Error al escribir llave cifrada ($keyType)", e)
+            if (e is PedKeyException) throw e // Re-lanzar si ya es PedKeyException
+            throw PedKeyException("Fallo al escribir llave cifrada ($keyType): ${e.message}", e)
         }
     }
+
+    // En UrovoPedController.kt
 
     override suspend fun writeKeyPlain(
         keyIndex: Int,
         keyType: GenericKeyType,
         keyAlgorithm: GenericKeyAlgorithm,
-        keyBytes: ByteArray
+        keyBytes: ByteArray,
+        kcvBytes: ByteArray?
     ): Boolean {
-        if (keyType != GenericKeyType.MASTER_KEY) {
-            throw PedKeyException("Carga en claro implementada solo para MASTER_KEY (loadMainKey)")
+        // Permitir MASTER_KEY o TRANSPORT_KEY para carga en claro.
+        // Ambas representan llaves de alto nivel y el SDK las maneja de forma similar para carga en claro.
+        if (keyType != GenericKeyType.MASTER_KEY && keyType != GenericKeyType.TRANSPORT_KEY) {
+            throw PedKeyException("Carga en claro (writeKeyPlain) implementada solo para MASTER_KEY o TRANSPORT_KEY.")
         }
 
         try {
             setKeyAlgorithm(keyAlgorithm) // Establecer el algoritmo antes de cargar
-            Log.d(TAG, "Cargando Main Key (Claro): ID=$keyIndex, Alg=$keyAlgorithm")
-            // loadMainKey no necesita KCV si es en claro.
-            val result = pinpadInstance.loadMainKey(keyIndex, keyBytes, null)
+
+            val keyPurposeDescription = if (keyType == GenericKeyType.TRANSPORT_KEY) "Transport Key (KEK)" else "Main Key"
+            Log.d(TAG, "Cargando $keyPurposeDescription (Claro): ID=$keyIndex, Alg=$keyAlgorithm, KCV presente: ${kcvBytes != null}")
+
+            // PinPadProviderImpl.loadMainKey() y loadTEK() son funcionalmente equivalentes para carga en claro.
+            // Podemos seguir usando loadMainKey() o usar loadTEK() si keyType es TRANSPORT_KEY
+            // para mayor alineación semántica con el SDK, aunque su implementación interna es casi idéntica.
+            val result = if (keyType == GenericKeyType.TRANSPORT_KEY) {
+                pinpadInstance.loadTEK(keyIndex, keyBytes, kcvBytes) // Usar loadTEK para KEKs
+            } else {
+                pinpadInstance.loadMainKey(keyIndex, keyBytes, kcvBytes) // Usar loadMainKey para otras Master Keys
+            }
+
             if (!result) {
-                throw PedKeyException("Fallo al escribir llave (claro - loadMainKey).")
+                var sdkErrorCodeMessage = ""
+                try {
+                    val lastError = PinPadProviderImpl.lastErrorCode
+                    sdkErrorCodeMessage = " (SDK Error Code: $lastError)"
+                } catch (e_sdk: Exception) {
+                    Log.w(TAG, "No se pudo obtener el lastErrorCode del SDK de Urovo", e_sdk)
+                }
+                throw PedKeyException("Fallo al escribir llave ($keyPurposeDescription - claro).$sdkErrorCodeMessage")
             }
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Error al escribir llave (claro)", e)
+            Log.e(TAG, "Error al escribir llave ($keyType - claro)", e) // Loguear el tipo genérico
+            if (e is PedKeyException) throw e
             throw PedKeyException("Fallo al escribir llave (claro): ${e.message}", e)
         }
     }

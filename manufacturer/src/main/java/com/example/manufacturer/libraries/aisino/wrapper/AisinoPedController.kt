@@ -203,6 +203,8 @@ class AisinoPedController(private val context: Context) : IPedController {
     override suspend fun writeKey(
         keyIndex: Int,
         keyType: GenericKeyType,
+        keyAlgorithm: GenericKeyAlgorithm, // Algoritmo de la nueva llave (no usado directamente por loadWorkKey/loadEncryptMainKey pero sí por setKeyAlgorithm)
+
         keyData: PedKeyData,
         transportKeyIndex: Int?,
         transportKeyType: GenericKeyType?
@@ -248,7 +250,8 @@ class AisinoPedController(private val context: Context) : IPedController {
         keyIndex: Int,
         keyType: GenericKeyType,
         keyAlgorithm: GenericKeyAlgorithm,
-        keyBytes: ByteArray
+        keyBytes: ByteArray,
+        kcvBytes: ByteArray?
     ): Boolean {
         if (keyType != GenericKeyType.MASTER_KEY) {
             throw PedKeyException("Plaintext loading via writeKeyPlain typically for MASTER_KEY on Aisino using PEDWriteMKey_Api.")
