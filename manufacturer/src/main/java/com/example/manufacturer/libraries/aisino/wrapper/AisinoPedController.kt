@@ -44,10 +44,12 @@ class AisinoPedController(private val context: Context) : IPedController {
     // Map Generic KeyType to Aisino key type constant (1=Master, 2=Work)
     private fun mapToAisinoKeyTypeInt(generic: GenericKeyType): Int? {
         return when (generic) {
+            GenericKeyType.TRANSPORT_KEY,
             GenericKeyType.MASTER_KEY -> 1 // PEDKEYTYPE_MASTKEY
             GenericKeyType.WORKING_PIN_KEY,
             GenericKeyType.WORKING_MAC_KEY,
             GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> 2 // PEDKEYTYPE_WORKKET
+
             else -> null // DUKPT/RSA/Transport handled differently
         }
     }
@@ -337,7 +339,7 @@ class AisinoPedController(private val context: Context) : IPedController {
         keyBytes: ByteArray,
         kcvBytes: ByteArray?
     ): Boolean {
-        if (keyType != GenericKeyType.MASTER_KEY) {
+        if (keyType != GenericKeyType.MASTER_KEY && keyType != GenericKeyType.TRANSPORT_KEY) {
             throw PedKeyException("Plaintext loading via writeKeyPlain typically for MASTER_KEY on Aisino using PEDWriteMKey_Api.")
         }
 
@@ -349,9 +351,13 @@ class AisinoPedController(private val context: Context) : IPedController {
 
         try {
             val result = PedApi.PEDWriteMKey_Api(keyIndex, aisinoMode, keyBytes)
+            Log.d(TAG, "writeKeyPlain: PEDWriteMKey_Api result: $result")
             if (result != 0) {
                 throw PedKeyException("Failed to write key (plaintext). Aisino Error Code: $result")
             }
+            val kcvHexString = kcvBytes?.joinToString("") { "%02X".format(it) } ?: "N/A"
+            //exito muestra kcv de llave inyectada
+            Log.d(TAG, "Successfully wrote key (plaintext). Key Index: $keyIndex, Type: $keyType, Algorithm: $keyAlgorithm, KCV: $kcvHexString")
             return true
         } catch (e: Exception) {
             Log.e(TAG, "Error writing key (plaintext)", e)
@@ -401,7 +407,7 @@ class AisinoPedController(private val context: Context) : IPedController {
             ?: return false // Not a type Aisino can check with isKeyExist
 
         return try {
-            PedApi.isKeyExist(aisinoKeyType, keyIndex) // Returns boolean
+            PedApi.isKeyExist_Api(aisinoKeyType, keyIndex) // Returns boolean
         } catch (e: Exception) {
             Log.e(TAG, "Error checking key presence", e)
             throw PedException("Failed to check key presence: ${e.message}", e)
@@ -410,12 +416,20 @@ class AisinoPedController(private val context: Context) : IPedController {
 
     @Throws(PedException::class)
     override suspend fun getKeyInfo(keyIndex: Int, keyType: GenericKeyType): PedKeyInfo? {
-        Log.w(TAG, "getKeyInfo not supported by Aisino PedApi. Checking presence only.")
-        if (isKeyPresent(keyIndex, keyType)) {
+        Log.d(TAG, "AisinoPedController.getKeyInfo: Solicitado para keyIndex=$keyIndex, keyType=$keyType") // Log de entrada
+        // El Log.w original ya es bueno, lo mantenemos.
+        Log.w(TAG, "AisinoPedController.getKeyInfo: La API PedApi de Aisino no soporta obtener detalles como el algoritmo. Se verificará solo la presencia.")
+
+        val keyPresent = isKeyPresent(keyIndex, keyType) // Llama a tu función isKeyPresent
+
+        if (keyPresent) {
+            Log.i(TAG, "AisinoPedController.getKeyInfo: Llave PRESENTE en keyIndex=$keyIndex, keyType=$keyType. Devolviendo PedKeyInfo básico.")
             // Cannot determine algorithm
             return PedKeyInfo(index = keyIndex, type = keyType, algorithm = null)
+        } else {
+            Log.i(TAG, "AisinoPedController.getKeyInfo: Llave NO PRESENTE en keyIndex=$keyIndex, keyType=$keyType. Devolviendo null.")
+            return null
         }
-        return null
         // throw UnsupportedOperationException("Getting detailed key info not supported by Aisino PedApi.")
     }
 

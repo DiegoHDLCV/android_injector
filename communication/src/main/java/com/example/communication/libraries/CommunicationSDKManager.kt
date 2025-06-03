@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.example.communication.base.IComController
 import com.example.communication.base.controllers.manager.ICommunicationManager
+import com.example.communication.libraries.aisino.AisinoCommunicationManager
 import com.example.communication.libraries.urovo.UrovoCommunicationManager
 import com.example.config.EnumManufacturer
 import com.example.config.SystemConfig
