@@ -128,9 +128,9 @@ fun MainScreen(navController: NavHostController) {
             Spacer(modifier = Modifier.height(16.dp))
 
             // Ejemplo de botón de navegación
-            Button(onClick = { viewModel.navigate(UiEvent.NavigateBack) }) {
-                Text("Ir Atrás (Ejemplo Nav)")
-            }
+//            Button(onClick = { viewModel.navigate(UiEvent.NavigateBack) }) {
+//                Text("Ir Atrás (Ejemplo Nav)")
+//            }
         }
     }
 }
