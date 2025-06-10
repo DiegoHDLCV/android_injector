@@ -1,10 +1,21 @@
+// com/example/config/SystemConfig.kt
+
 package com.example.config
 
+// --- NUEVO ---
+/**
+ * Define los protocolos de comunicación serial soportados.
+ */
+enum class CommProtocol {
+    LEGACY, // El protocolo original que usa '|'
+    FUTUREX // El nuevo protocolo del manual
+}
 
 object SystemConfig {
-    // Esta variable debe ser configurada al inicio de la aplicación
-    // o basada en la detección del hardware.
-    // Por ejemplo, para probar, puedes asignarla directamente:
     var managerSelected: EnumManufacturer = EnumManufacturer.UROVO
-    var keyCombinationMethod: KeyCombinationMethod = KeyCombinationMethod.XOR_PLACEHOLDER // Valor por defecto
+    var keyCombinationMethod: KeyCombinationMethod = KeyCombinationMethod.XOR_PLACEHOLDER
+
+    // --- NUEVO: Variable para seleccionar el protocolo ---
+    // Se puede cambiar desde la UI (ej. un menú de configuración)
+    var commProtocolSelected: CommProtocol = CommProtocol.FUTUREX
 }

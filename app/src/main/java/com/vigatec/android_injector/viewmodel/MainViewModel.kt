@@ -9,15 +9,14 @@ import com.example.communication.base.EnumCommConfDataBits
 import com.example.communication.base.EnumCommConfParity
 import com.example.communication.base.IComController
 import com.example.communication.libraries.CommunicationSDKManager
-import com.example.format.SerialMessage
-import com.example.format.SerialMessageFormatter
-import com.example.format.SerialMessageParser
+import com.example.config.CommProtocol
+import com.example.config.SystemConfig
+import com.example.format.*
+import com.example.format.base.IMessageFormatter
+import com.example.format.base.IMessageParser
 import com.example.manufacturer.KeySDKManager
 import com.example.manufacturer.base.controllers.ped.IPedController
-import com.example.manufacturer.base.controllers.ped.PedKeyException // Asumiendo que existe
-import com.example.manufacturer.base.models.KeyAlgorithm
-import com.example.manufacturer.base.models.KeyType // Nombre de tu enum para tipos de llave genéricos
-import com.example.manufacturer.base.models.PedKeyData
+import com.example.manufacturer.base.controllers.ped.PedKeyException
 import com.vigatec.android_injector.ui.events.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +28,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.nio.charset.Charset // Para Charsets.US_ASCII
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.nio.charset.Charset
 import javax.inject.Inject
 
 enum class ConnectionStatus {
@@ -51,25 +52,29 @@ class MainViewModel @Inject constructor(
     // --- Flows para UI y Eventos ---
     private val _uiEvent = MutableSharedFlow<UiEvent>()
     val uiEvent = _uiEvent.asSharedFlow()
-
     private val _snackbarEvent = MutableSharedFlow<String>()
     val snackbarEvent = _snackbarEvent.asSharedFlow()
-
     private val _connectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     val connectionStatus = _connectionStatus.asStateFlow()
 
-    private val _rawReceivedData = MutableStateFlow<String>("")
+    // La variable _rawReceivedData es privada para que solo el ViewModel pueda modificarla.
+    private val _rawReceivedData = MutableStateFlow("")
+    // Se añade la variable pública (sin el guion bajo) para que la UI pueda observarla.
     val rawReceivedData = _rawReceivedData.asStateFlow()
 
-    // --- Controladores y Parser ---
+    // --- Controladores y Conexión ---
     private var comController: IComController? = null
     private var pedController: IPedController? = null
     private var listeningJob: Job? = null
-    private val messageParser = SerialMessageParser()
+    private val connectionMutex = Mutex()
 
-    private val KEK_SLOT_ID_PRIMARY = 10 // Ejemplo
+
+    private lateinit var messageParser: IMessageParser
+    private lateinit var messageFormatter: IMessageFormatter
 
     init {
+        setupProtocolHandlers()
+
         comController = CommunicationSDKManager.getComController()
         if (comController == null) {
             handleError("Error al obtener controlador de comunicación")
@@ -93,72 +98,111 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Inicializa el parser y formatter correctos según la configuración del sistema.
+     */
+    private fun setupProtocolHandlers() {
+        when (SystemConfig.commProtocolSelected) {
+            CommProtocol.LEGACY -> {
+                messageParser = LegacyMessageParser()
+                messageFormatter = LegacyMessageFormatter
+                Log.i(TAG, "Protocolo de comunicación establecido en: LEGACY")
+            }
+            CommProtocol.FUTUREX -> {
+                messageParser = FuturexMessageParser()
+                messageFormatter = FuturexMessageFormatter
+                Log.i(TAG, "Protocolo de comunicación establecido en: FUTUREX")
+            }
+        }
+    }
+
+    /**
+     * Cambia el protocolo de comunicación y reinicia la conexión de forma segura y sincronizada.
+     */
+    fun setProtocol(protocol: CommProtocol) = viewModelScope.launch {
+        connectionMutex.withLock {
+            if (SystemConfig.commProtocolSelected == protocol) return@launch
+
+            Log.i(TAG, "Solicitud para cambiar protocolo a $protocol.")
+
+            // Detener la conexión actual y esperar a que termine completamente.
+            stopListeningInternal()
+
+            // Actualizar la configuración y los handlers del protocolo.
+            SystemConfig.commProtocolSelected = protocol
+            setupProtocolHandlers()
+
+            _snackbarEvent.emit("Protocolo cambiado a $protocol.")
+            // No reinicia la conexión automáticamente. El usuario debe iniciarla de nuevo.
+            // Esto da un control más predecible. Si se quisiera reiniciar, aquí se llamaría a startListeningInternal().
+        }
+    }
+
     private fun handleError(message: String, e: Exception? = null) {
         Log.e(TAG, message, e)
         _connectionStatus.value = ConnectionStatus.ERROR
-        viewModelScope.launch { _snackbarEvent.emit(message) }
+        viewModelScope.launch { _snackbarEvent.emit("Error: $message") }
     }
 
+    /**
+     * Inicia el ciclo de vida de la conexión de forma segura. Público para ser llamado desde la UI.
+     */
     fun startListening(
         baudRate: EnumCommConfBaudRate = EnumCommConfBaudRate.BPS_9600,
         parity: EnumCommConfParity = EnumCommConfParity.NOPAR,
         dataBits: EnumCommConfDataBits = EnumCommConfDataBits.DB_8
-    ) {
-        if (comController == null) {
-            handleError("No se puede iniciar la escucha: Controlador nulo.")
-            return
+    ) = viewModelScope.launch {
+        connectionMutex.withLock {
+            startListeningInternal(baudRate, parity, dataBits)
         }
+    }
+
+    /**
+     * Detiene el ciclo de vida de la conexión de forma segura. Público para ser llamado desde la UI.
+     */
+    fun stopListening() = viewModelScope.launch {
+        connectionMutex.withLock {
+            stopListeningInternal()
+        }
+    }
+
+    /**
+     * Lógica interna para iniciar la escucha. Debe ser llamado dentro de un Mutex para evitar concurrencia.
+     */
+    private fun startListeningInternal(
+        baudRate: EnumCommConfBaudRate,
+        parity: EnumCommConfParity,
+        dataBits: EnumCommConfDataBits
+    ) {
         if (listeningJob?.isActive == true) {
-            Log.w(TAG, "La escucha ya está activa.")
+            Log.w(TAG, "startListeningInternal llamado pero la escucha ya está activa.")
             return
         }
 
         listeningJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 _connectionStatus.value = ConnectionStatus.INITIALIZING
-                Log.d(TAG, "Inicializando controlador Com...")
-                val initResult = comController!!.init(baudRate, parity, dataBits)
-                if (initResult != 0) throw Exception("Fallo al inicializar ComController: $initResult")
+                Log.i(TAG, "Iniciando conexión...")
+                _snackbarEvent.emit("Iniciando conexión...")
+
+                val initResult = comController?.init(baudRate, parity, dataBits)
+                if (initResult != 0) throw Exception("Fallo al inicializar ComController (código: $initResult)")
 
                 _connectionStatus.value = ConnectionStatus.OPENING
-                Log.d(TAG, "Abriendo puerto...")
-                val openResult = comController!!.open()
-                if (openResult != 0) throw Exception("Fallo al abrir puerto: $openResult")
+                val openResult = comController?.open()
+                if (openResult != 0) throw Exception("Fallo al abrir puerto (código: $openResult)")
 
                 _connectionStatus.value = ConnectionStatus.LISTENING
-                Log.i(TAG, "Puerto abierto y escuchando...")
-                _snackbarEvent.emit("Puerto abierto, escuchando...")
+                Log.i(TAG, "¡Conexión establecida! Escuchando en protocolo ${SystemConfig.commProtocolSelected}.")
+                _snackbarEvent.emit("Conexión establecida.")
 
                 val buffer = ByteArray(1024)
-
                 while (isActive) {
                     val bytesRead = comController!!.readData(buffer.size, buffer, 5000)
                     when {
                         bytesRead > 0 -> {
                             val received = buffer.copyOf(bytesRead)
-
-                            // =================================================================
-                            // ===           LOGGING ADICIONAL PARA DEPURACIÓN             ===
-                            // =================================================================
-                            // Imprime los bytes crudos en formato Hexadecimal para un análisis preciso.
-                            // Se usa Log.v (Verbose) para que no sature el log en modo normal.
                             Log.v(TAG, "RAW_SERIAL_IN (HEX): ${received.toHexString()}")
-
-                            // Intenta imprimir como texto para ver si es legible.
-                            // Usamos 'replace' para no crashear con caracteres inválidos.
-                            val decoder = Charsets.US_ASCII.newDecoder()
-                            decoder.onMalformedInput(java.nio.charset.CodingErrorAction.REPLACE)
-                            decoder.onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPLACE)
-// Usamos el decodificador para convertir los bytes a un string de forma segura
-                            val receivedAsText = decoder.decode(java.nio.ByteBuffer.wrap(received)).toString()
-
-                            Log.v(TAG, "RAW_SERIAL_IN (TXT): $receivedAsText")
-                            // =================================================================
-
-                            // Actualiza el Flow para la UI
-                            _rawReceivedData.value = _rawReceivedData.value + receivedAsText
-
-                            // Pasa los datos al parser para su procesamiento
                             messageParser.appendData(received)
                             var parsedMessage: SerialMessage?
                             do {
@@ -166,37 +210,47 @@ class MainViewModel @Inject constructor(
                                 parsedMessage?.let { processParsedCommand(it) }
                             } while (parsedMessage != null && isActive)
                         }
-                        bytesRead == -6 -> { /* Timeout de lectura, no es un error, solo informativo. */ }
-                        bytesRead < 0 -> throw Exception("Error de lectura: $bytesRead")
+                        bytesRead < 0 && bytesRead != -6 -> { // -6 es timeout, cualquier otro es un error
+                            throw Exception("Error crítico de lectura de puerto (código: $bytesRead)")
+                        }
                     }
-                    delay(20) // Pequeño delay para no sobrecargar el CPU
                 }
             } catch (e: Exception) {
-                if (isActive) {
-                    handleError("Error en bucle de escucha: ${e.message}", e)
+                if (isActive) { // Solo manejar errores si la corutina no fue cancelada explícitamente
+                    handleError("Error de conexión: ${e.message}", e)
                 }
             } finally {
-                if (_connectionStatus.value != ConnectionStatus.CLOSING && _connectionStatus.value != ConnectionStatus.DISCONNECTED) {
-                    Log.d(TAG, "Bucle finalizado, cerrando puerto...")
-                    comController?.close()
+                Log.i(TAG, "Bucle de escucha finalizado. Limpiando recursos...")
+                comController?.close()
+                if (_connectionStatus.value != ConnectionStatus.ERROR) {
                     _connectionStatus.value = ConnectionStatus.DISCONNECTED
                 }
             }
         }
     }
 
-    fun stopListening() {
-        if (listeningJob?.isActive == true) {
-            Log.i(TAG, "Deteniendo la escucha...")
-            _connectionStatus.value = ConnectionStatus.CLOSING
-            listeningJob?.cancel()
-            Log.i(TAG, "Solicitud de cancelación de escucha enviada.")
-        }
-        if (_connectionStatus.value != ConnectionStatus.LISTENING && _connectionStatus.value != ConnectionStatus.DISCONNECTED) {
-            comController?.close()
+    /**
+     * Lógica interna para detener la escucha. Asegura que la corutina termine completamente.
+     */
+    private suspend fun stopListeningInternal() {
+        if (listeningJob?.isActive != true) {
+            Log.d(TAG, "stopListeningInternal llamado pero no hay escucha activa.")
+            comController?.close() // Intenta cerrar por si acaso quedó en un estado inconsistente
             _connectionStatus.value = ConnectionStatus.DISCONNECTED
+            return
         }
+
+        Log.i(TAG, "Deteniendo conexión...")
+        _connectionStatus.value = ConnectionStatus.CLOSING
+        _snackbarEvent.emit("Cerrando conexión...")
+
+        listeningJob?.cancel() // Envía la señal de cancelación
+        listeningJob?.join()   // Espera a que la corutina (incluyendo su bloque finally) termine
+
         listeningJob = null
+        _connectionStatus.value = ConnectionStatus.DISCONNECTED
+        Log.i(TAG, "Conexión detenida y recursos liberados.")
+        _snackbarEvent.emit("Conexión cerrada.")
     }
 
     fun sendData(data: ByteArray) {
@@ -222,71 +276,115 @@ class MainViewModel @Inject constructor(
     }
 
     private fun processParsedCommand(message: SerialMessage) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             Log.i(TAG, "Procesando Comando: ${message.command} | Datos: ${message.fields.joinToString("|")}")
             _snackbarEvent.emit("Recibido CMD: ${message.command}")
-            try {
-                if (pedController == null) {
-                    Log.e(
-                        TAG,
-                        "pedController es nulo, no se puede procesar el comando ${message.command}"
-                    )
 
-                    return@launch
+            when (SystemConfig.commProtocolSelected) {
+                CommProtocol.LEGACY -> {
+                    Log.d(TAG, "Procesando como comando Legacy...")
                 }
+                CommProtocol.FUTUREX -> {
+                    when (message.command) {
+                        "03" -> handleFuturexReadSerial(message)
+                        "04" -> handleFuturexWriteSerial(message)
 
-
-            }catch ( e: PedKeyException){
-
+                        else -> {
+                            Log.w(TAG, "Comando Futurex desconocido recibido: ${message.command}")
+                        }
+                    }
+                }
             }
         }
     }
 
-    private suspend fun handleGetKeyInfo(message: SerialMessage) {
-        val requestCommand = message.command
-        val responseCommandCode = requestCommand.toResponseCode()
-        // ... (resto de la función sin cambios)
+    private fun handleFuturexReadSerial(message: SerialMessage) {
+        Log.d(TAG, "Manejando comando Futurex '03': Read Serial Number.")
+        try {
+            val commandVersion = message.fields.firstOrNull()
+            if (commandVersion != "01") {
+                Log.w(TAG, "Versión de comando '03' no soportada: $commandVersion. Se esperaba '01'.")
+                val errorResponse = messageFormatter.format("03", listOf("02"))
+                sendData(errorResponse)
+                return
+            }
+
+            // --- CORRECCIÓN CLAVE ---
+            // El número de serie ahora tiene 16 caracteres.
+            val serialNumber = "VGT1234567890SNX" // 16 caracteres
+
+            val responsePayloadFields = listOf("00", serialNumber)
+            val successResponse = messageFormatter.format("03", responsePayloadFields)
+
+            sendData(successResponse)
+
+            viewModelScope.launch {
+                _snackbarEvent.emit("Respuesta a CMD '03' enviada.")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al procesar o responder al comando '03'", e)
+            val generalErrorResponse = messageFormatter.format("03", listOf("05"))
+            sendData(generalErrorResponse)
+        }
     }
 
-    private suspend fun handleLoadKek(message: SerialMessage) {
-        val command = message.command
-        val responseCommand = command.toResponseCode()
-        // ... (resto de la función sin cambios)
+    private fun handleFuturexWriteSerial(message: SerialMessage) {
+        Log.d(TAG, "Manejando comando Futurex '04': Write Serial Number.")
+
+        var responseCode = "00" // Código de éxito por defecto
+        var logMessage = "Número de serie actualizado correctamente."
+
+        try {
+            // El payload del mensaje '04' es <VERSION><SERIAL>
+            val payload = message.fields.firstOrNull() ?: ""
+
+            if (payload.length != 18) { // 2 para versión + 16 para serial
+                throw IllegalArgumentException("Longitud de payload para comando '04' incorrecta. Esperado: 18, Recibido: ${payload.length}")
+            }
+
+            val commandVersion = payload.substring(0, 2)
+            if (commandVersion != "01") {
+                throw IllegalArgumentException("Versión de comando '04' no soportada: $commandVersion")
+            }
+
+            val serialToWrite = payload.substring(2)
+            Log.i(TAG, "Solicitud para escribir el serial: $serialToWrite")
+
+            // --- LÓGICA DE ESCRITURA REAL ---
+            // Aquí iría la llamada al SDK del fabricante para guardar el serial.
+            // Por ejemplo: pedController?.writeSerialNumber(serialToWrite)
+            // Como no lo tenemos, simulamos el éxito.
+            if (serialToWrite.contains("ERROR")) { // Simular un error para probar
+                throw Exception("Fallo simulado al escribir en memoria segura.")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al procesar comando '04'", e)
+            logMessage = "Fallo al escribir el número de serie."
+            // Asigna un código de error del manual, ej: 0x0C (Invalid key slot) o uno genérico
+            responseCode = "0C"
+        } finally {
+            // Enviar siempre una respuesta, ya sea de éxito o de error.
+            // La respuesta a '04' es el comando '04' y el código de estado.
+            val response = messageFormatter.format("04", listOf(responseCode))
+            sendData(response)
+            viewModelScope.launch { _snackbarEvent.emit(logMessage) }
+        }
     }
-
-    // ... (El resto de tus funciones handle, map, etc. no necesitan cambios)
-
-    // --- Helper Functions ---
 
 
     override fun onCleared() {
         Log.i(TAG, "ViewModel onCleared: Deteniendo escucha y liberando...")
-        stopListening()
-        comController?.close()
-        pedController?.releasePed()
+        // La llamada a stopListening ahora es síncrona dentro de la corutina
+        viewModelScope.launch {
+            connectionMutex.withLock {
+                stopListeningInternal()
+            }
+            pedController?.releasePed()
+        }
         super.onCleared()
     }
 
     private fun ByteArray.toHexString(): String = joinToString("") { "%02X".format(it) }
-
-    private fun String.hexToByteArray(): ByteArray {
-        check(length % 2 == 0) { "La cadena hexadecimal debe tener una longitud par" }
-        return chunked(2)
-            .map { it.toInt(16).toByte() }
-            .toByteArray()
-    }
-
-    private fun String.toResponseCode(): String {
-        return try {
-            val num = this.toInt()
-            if (this.endsWith("0")) {
-                (num + 1).toString().padStart(4, '0')
-            } else {
-                (num + 10).toString().padStart(4, '0')
-            }
-        } catch (e: NumberFormatException) {
-            Log.w(TAG, "No se pudo convertir comando '$this' a número para generar código de respuesta. Usando fallback.")
-            this + "R"
-        }
-    }
 }
