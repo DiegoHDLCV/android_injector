@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.util.Log
 import com.example.manufacturer.base.controllers.ped.*
 import com.example.manufacturer.base.models.*
+import com.example.manufacturer.base.models.KeyAlgorithm
 import com.urovo.sdk.pinpad.PinPadProviderImpl
 import com.urovo.sdk.pinpad.listener.PinInputListener
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -256,6 +257,16 @@ class UrovoPedController(private val context: Context) : IPedController {
             if (e is PedKeyException) throw e
             throw PedKeyException("Fallo al escribir llave (claro): ${e.message}", e)
         }
+    }
+
+    override suspend fun writeDukptInitialKeyEncrypted(
+        groupIndex: Int,
+        keyAlgorithm: KeyAlgorithm,
+        encryptedIpek: ByteArray,
+        initialKsn: ByteArray,
+        transportKeyIndex: Int
+    ): Boolean {
+        TODO("Not yet implemented")
     }
 
     override suspend fun deleteKey(keyIndex: Int, keyType: GenericKeyType): Boolean {

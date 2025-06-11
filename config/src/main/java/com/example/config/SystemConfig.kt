@@ -12,7 +12,7 @@ enum class CommProtocol {
 }
 
 object SystemConfig {
-    var managerSelected: EnumManufacturer = EnumManufacturer.UROVO
+    var managerSelected: EnumManufacturer = EnumManufacturer.AISINO
     var keyCombinationMethod: KeyCombinationMethod = KeyCombinationMethod.XOR_PLACEHOLDER
 
     // --- NUEVO: Variable para seleccionar el protocolo ---

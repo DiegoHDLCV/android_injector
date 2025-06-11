@@ -27,6 +27,7 @@ import com.pos.device.ped.PinBlockFormat as NewposPinBlockFormat
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
+import com.example.manufacturer.base.models.KeyAlgorithm
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -340,6 +341,16 @@ class NewposPedController(private val context: Context) : IPedController {
             Log.e(TAG, "Error writing key (plaintext)", e)
             throw PedKeyException("Failed to write key (plaintext): ${e.message}", e)
         }
+    }
+
+    override suspend fun writeDukptInitialKeyEncrypted(
+        groupIndex: Int,
+        keyAlgorithm: KeyAlgorithm,
+        encryptedIpek: ByteArray,
+        initialKsn: ByteArray,
+        transportKeyIndex: Int
+    ): Boolean {
+        TODO("Not yet implemented")
     }
 
     override suspend fun deleteKey(keyIndex: Int, keyType: GenericKeyType): Boolean {

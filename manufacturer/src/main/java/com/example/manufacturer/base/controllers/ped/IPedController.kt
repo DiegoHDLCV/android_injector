@@ -36,6 +36,19 @@ interface IPedController {
         kcvBytes: ByteArray?
     ): Boolean
 
+    /**
+     * Escribe una clave inicial DUKPT (IPEK) que está cifrada bajo una clave de transporte (KTK).
+     * El PED usará la KTK especificada para descifrar la IPEK antes de cargarla.
+     */
+    @Throws(PedException::class)
+    suspend fun writeDukptInitialKeyEncrypted(
+        groupIndex: Int,
+        keyAlgorithm: KeyAlgorithm,
+        encryptedIpek: ByteArray,
+        initialKsn: ByteArray,
+        transportKeyIndex: Int // El índice de la KTK que descifrará la IPEK
+    ): Boolean
+
     @Throws(PedException::class)
     suspend fun deleteKey(keyIndex: Int, keyType: KeyType): Boolean
     @Throws(PedException::class)

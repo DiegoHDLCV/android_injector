@@ -96,21 +96,31 @@ class FuturexMessageParser : IMessageParser {
 
     private fun parseInjectSymmetricKey(fullPayload: String): InjectSymmetricKeyCommand {
         val reader = PayloadReader(fullPayload)
-        reader.read(2) // Omitir '02'
+        reader.read(2) // Omitir el código de comando '02'
 
         val version = reader.read(2)
-        val keySlot = reader.read(2).toInt()
-        val ktkSlot = reader.read(2).toInt()
+
+        // --- CORRECCIÓN AQUÍ ---
+        // Convierte de Hexadecimal (base 16) a Entero
+        val keySlot = reader.read(2).toInt(radix = 16)
+        val ktkSlot = reader.read(2).toInt(radix = 16)
+
         val keyType = reader.read(2)
         val encryptionType = reader.read(2)
         val keyChecksum = reader.read(4)
         val ktkChecksum = reader.read(4)
         val ksn = reader.read(20)
-        val keyLength = reader.read(3).toInt()
+
+        // --- CORRECCIÓN AQUÍ ---
+        // Convierte de Hexadecimal (base 16) a Entero
+        val keyLength = reader.read(3).toInt(radix = 16)
+
         val keyHex = reader.read(keyLength)
 
         val ktkHex = if (encryptionType == "02") {
-            val ktkLength = reader.read(3).toInt()
+            // --- CORRECCIÓN AQUÍ ---
+            // Convierte de Hexadecimal (base 16) a Entero
+            val ktkLength = reader.read(3).toInt(radix = 16)
             reader.read(ktkLength)
         } else null
 

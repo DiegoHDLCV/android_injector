@@ -55,7 +55,11 @@ data class InjectSymmetricKeyCommand(
     val ksn: String,
     val keyHex: String,
     val ktkHex: String? // Nullable porque solo existe si encryptionType es "02".
-) : FuturexCommand
+) : FuturexCommand {
+    // Propiedad calculada para saber si es TR-31 (una heurística simple)
+    val isTr31: Boolean
+        get() = keyHex.firstOrNull()?.isLetter() ?: false // Si empieza con A, B, C, o D, es TR-31
+}
 
 /**
  * Modelo para comandos desconocidos o no soportados.
@@ -72,3 +76,19 @@ data class ParseError(
     override val rawPayload: String,
     val error: String
 ) : FuturexCommand
+
+data class Tr31KeyBlock(
+    val rawBlock: String,
+    val versionId: Char,
+    val blockLength: Int,
+    val keyUsage: String,
+    val algorithm: Char,
+    val modeOfUse: Char,
+    val keyVersionNumber: String,
+    val exportability: Char,
+    val optionalBlocks: List<Tr31OptionalBlock>, // Necesitarás una clase para esto también
+    val encryptedPayload: ByteArray, // ¡Esto es lo que realmente necesitas!
+    val mac: ByteArray
+)
+
+data class Tr31OptionalBlock(val id: String, val data: String)
