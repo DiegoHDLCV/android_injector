@@ -25,7 +25,10 @@ class LegacyMessageParser : IMessageParser {
         Log.d(TAG, "Buffer actualizado (${buffer.size} bytes): ${buffer.toByteArray().toHexString()}")
     }
 
-    override fun nextMessage(): SerialMessage? {
+    /**
+     * CORREGIDO: Ahora devuelve el tipo 'ParsedMessage' para cumplir con la interfaz.
+     */
+    override fun nextMessage(): ParsedMessage? {
         while (buffer.isNotEmpty()) {
             val stxIndex = buffer.indexOf(STX)
 
@@ -61,7 +64,7 @@ class LegacyMessageParser : IMessageParser {
             val calculatedLrc = FormatUtils.calculateLrc(bytesForLrc)
 
             if (receivedLrc != calculatedLrc) {
-                Log.e(TAG, "¡Error de LRC! Recibido: ${receivedLrc.toHexString()}, Calculado: ${calculatedLrc.toHexString()}. Mensaje: ${potentialMessageBytes.toHexString()}. Descartando...")
+                Log.e(TAG, "¡Error de LRC! Recibido: ${receivedLrc.toHexString()}, Calculado: ${calculatedLrc.toHexString()}. Descartando...")
                 for (i in 0 until etxIndex + 2) {
                     buffer.removeAt(0)
                 }
@@ -79,7 +82,8 @@ class LegacyMessageParser : IMessageParser {
                 val command = parts[0]
                 val dataFields = if (parts[1].isNotEmpty()) parts[1].split(SEPARATOR) else emptyList()
 
-                val parsedMessage = SerialMessage(command, dataFields)
+                // --- CORRECCIÓN CLAVE: Usa el nuevo 'data class' LegacyMessage ---
+                val parsedMessage = LegacyMessage(command, dataFields)
                 Log.i(TAG, "Mensaje Legacy parseado exitosamente: $parsedMessage")
 
                 for (i in 0 until etxIndex + 2) {
@@ -88,7 +92,7 @@ class LegacyMessageParser : IMessageParser {
                 parsedMessage
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error al parsear contenido del mensaje Legacy: ${e.message}. Mensaje: ${potentialMessageBytes.toHexString()}. Descartando...")
+                Log.e(TAG, "Error al parsear contenido del mensaje Legacy: ${e.message}. Descartando...")
                 for (i in 0 until etxIndex + 2) {
                     buffer.removeAt(0)
                 }

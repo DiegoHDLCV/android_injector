@@ -17,6 +17,7 @@ import com.example.format.base.IMessageParser
 import com.example.manufacturer.KeySDKManager
 import com.example.manufacturer.base.controllers.ped.IPedController
 import com.example.manufacturer.base.controllers.ped.PedKeyException
+import com.example.manufacturer.base.models.KeyAlgorithm
 import com.vigatec.android_injector.ui.events.UiEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.nio.charset.Charset
 import javax.inject.Inject
+
+import com.example.manufacturer.base.models.KeyType as GenericKeyType
+
 
 enum class ConnectionStatus {
     DISCONNECTED,
@@ -184,7 +188,6 @@ class MainViewModel @Inject constructor(
                 _connectionStatus.value = ConnectionStatus.INITIALIZING
                 Log.i(TAG, "Iniciando conexión...")
                 _snackbarEvent.emit("Iniciando conexión...")
-
                 val initResult = comController?.init(baudRate, parity, dataBits)
                 if (initResult != 0) throw Exception("Fallo al inicializar ComController (código: $initResult)")
 
@@ -199,26 +202,31 @@ class MainViewModel @Inject constructor(
                 val buffer = ByteArray(1024)
                 while (isActive) {
                     val bytesRead = comController!!.readData(buffer.size, buffer, 5000)
-                    when {
-                        bytesRead > 0 -> {
-                            val received = buffer.copyOf(bytesRead)
-                            Log.v(TAG, "RAW_SERIAL_IN (HEX): ${received.toHexString()}")
-                            messageParser.appendData(received)
-                            var parsedMessage: SerialMessage?
-                            do {
-                                parsedMessage = messageParser.nextMessage()
-                                parsedMessage?.let { processParsedCommand(it) }
-                            } while (parsedMessage != null && isActive)
-                        }
-                        bytesRead < 0 && bytesRead != -6 -> { // -6 es timeout, cualquier otro es un error
-                            throw Exception("Error crítico de lectura de puerto (código: $bytesRead)")
-                        }
+                    if (bytesRead > 0) {
+                        val received = buffer.copyOf(bytesRead)
+                        Log.v(TAG, "RAW_SERIAL_IN (HEX): ${received.toHexString()}")
+
+                        val receivedAsText = String(received, Charset.defaultCharset())
+                        _rawReceivedData.value += receivedAsText
+
+                        messageParser.appendData(received)
+
+                        // --- CORRECCIÓN AQUÍ ---
+                        // La variable ahora es del tipo de la interfaz base 'ParsedMessage'.
+                        var parsedMessage: ParsedMessage?
+                        do {
+                            parsedMessage = messageParser.nextMessage()
+                            // Ahora 'it' es de tipo ParsedMessage, que es lo que 'processParsedCommand' espera.
+                            parsedMessage?.let { processParsedCommand(it) }
+                        } while (parsedMessage != null && isActive)
+                        // --- FIN DE LA CORRECCIÓN ---
+
+                    } else if (bytesRead < 0 && bytesRead != -6) {
+                        throw Exception("Error crítico de lectura de puerto (código: $bytesRead)")
                     }
                 }
             } catch (e: Exception) {
-                if (isActive) { // Solo manejar errores si la corutina no fue cancelada explícitamente
-                    handleError("Error de conexión: ${e.message}", e)
-                }
+                if (isActive) handleError("Error de conexión: ${e.message}", e)
             } finally {
                 Log.i(TAG, "Bucle de escucha finalizado. Limpiando recursos...")
                 comController?.close()
@@ -228,6 +236,7 @@ class MainViewModel @Inject constructor(
             }
         }
     }
+
 
     /**
      * Lógica interna para detener la escucha. Asegura que la corutina termine completamente.
@@ -275,103 +284,168 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun processParsedCommand(message: SerialMessage) {
+    private fun processParsedCommand(message: ParsedMessage) {
         viewModelScope.launch(Dispatchers.IO) {
-            Log.i(TAG, "Procesando Comando: ${message.command} | Datos: ${message.fields.joinToString("|")}")
-            _snackbarEvent.emit("Recibido CMD: ${message.command}")
+            // Logueamos el objeto completo. Gracias a 'data class', el toString() es muy legible.
+            Log.i(TAG, "Procesando comando tipado: $message")
+            _snackbarEvent.emit("Recibido CMD: ${message::class.simpleName}")
 
-            when (SystemConfig.commProtocolSelected) {
-                CommProtocol.LEGACY -> {
+            // El 'when' ahora es sobre el TIPO de objeto, no sobre un string.
+            // Es más seguro y el compilador nos avisará si falta algún caso.
+            when (message) {
+                is LegacyMessage -> {
                     Log.d(TAG, "Procesando como comando Legacy...")
+                    // Aquí iría tu lógica para comandos Legacy
                 }
-                CommProtocol.FUTUREX -> {
-                    when (message.command) {
-                        "03" -> handleFuturexReadSerial(message)
-                        "04" -> handleFuturexWriteSerial(message)
 
-                        else -> {
-                            Log.w(TAG, "Comando Futurex desconocido recibido: ${message.command}")
-                        }
-                    }
+                // --- MANEJO DE COMANDOS FUTUREX ---
+                is ReadSerialCommand -> handleFuturexReadSerial(message)
+                is WriteSerialCommand -> handleFuturexWriteSerial(message)
+                is InjectSymmetricKeyCommand -> handleFuturexInjectKey(message)
+
+                is UnknownCommand -> {
+                    Log.w(TAG, "Comando Futurex desconocido recibido: ${message.commandCode}")
+                    val errorResponse = messageFormatter.format(message.commandCode, "01") // Invalid Command
+                    sendData(errorResponse)
+                }
+                is ParseError -> {
+                    Log.e(TAG, "Error de parseo para comando Futurex: ${message.error}")
+                    // Aquí podrías decidir enviar una respuesta de error genérico si es necesario
                 }
             }
         }
     }
 
-    private fun handleFuturexReadSerial(message: SerialMessage) {
-        Log.d(TAG, "Manejando comando Futurex '03': Read Serial Number.")
+    private suspend fun handleFuturexInjectKey(command: InjectSymmetricKeyCommand) {
+        Log.d(TAG, "Manejando InjectSymmetricKeyCommand en slot ${command.keySlot}")
+
+        var responseCode = "00" // Éxito por defecto
+        var responseKeyChecksum = "0000" // Checksum de la llave inyectada para la respuesta
+        var logMessage: String
+
         try {
-            val commandVersion = message.fields.firstOrNull()
-            if (commandVersion != "01") {
-                Log.w(TAG, "Versión de comando '03' no soportada: $commandVersion. Se esperaba '01'.")
-                val errorResponse = messageFormatter.format("03", listOf("02"))
-                sendData(errorResponse)
-                return
+            // Paso 1: Validar el tipo de encriptación. Por ahora, solo soportamos "00" (en claro).
+            if (command.encryptionType != "00") {
+                throw PedKeyException("Tipo de encriptación '${command.encryptionType}' no soportado.", PedKeyException("11")) // 0x11 = Invalid key encryption type
             }
 
-            // --- CORRECCIÓN CLAVE ---
-            // El número de serie ahora tiene 16 caracteres.
-            val serialNumber = "VGT1234567890SNX" // 16 caracteres
+            // Paso 2: Mapear el tipo de llave y algoritmo del protocolo a nuestro modelo genérico.
+            val genericKeyType = mapFuturexKeyTypeToGeneric(command.keyType)
+            val genericAlgorithm = KeyAlgorithm.DES_TRIPLE // Asumimos TDES como default. Podría venir del comando en futuras versiones.
 
-            val responsePayloadFields = listOf("00", serialNumber)
-            val successResponse = messageFormatter.format("03", responsePayloadFields)
+            // Paso 3: Convertir la llave de HEX a ByteArray.
+            val keyBytes = command.keyHex.hexToByteArray()
 
-            sendData(successResponse)
-
-            viewModelScope.launch {
-                _snackbarEvent.emit("Respuesta a CMD '03' enviada.")
+            // Paso 4: Validar el checksum de la llave recibida (simulado).
+            // En una implementación real, calcularías el checksum de `keyBytes`.
+            val calculatedKeyChecksum = calculateChecksum(keyBytes)
+            if (calculatedKeyChecksum.uppercase() != command.keyChecksum.uppercase()) {
+                throw PedKeyException("Checksum de la llave no coincide. Recibido: ${command.keyChecksum}, Calculado: $calculatedKeyChecksum", PedKeyException("12")) // 0x12 = Invalid key checksum
             }
 
+            // Paso 5: Llamar al controlador del PED para inyectar la llave.
+            Log.i(TAG, "Inyectando llave en claro: Índice=${command.keySlot}, Tipo=${genericKeyType}, Algoritmo=${genericAlgorithm}")
+
+            pedController!!.writeKeyPlain(
+                keyIndex = command.keySlot,
+                keyType = genericKeyType,
+                keyAlgorithm = genericAlgorithm,
+                keyBytes = keyBytes,
+                kcvBytes = null // El comando 02 no incluye un KCV explícito, el PED lo puede generar.
+            )
+
+            // Paso 6: Si la inyección fue exitosa, calcular el checksum para la respuesta.
+            // El manual especifica cómo se calcula. Lo simulamos aquí.
+            responseKeyChecksum = calculateChecksum(keyBytes).uppercase()
+            logMessage = "Inyección de clave en slot ${command.keySlot} exitosa."
+
+        } catch (e: PedKeyException) {
+            logMessage = e.message ?: "Error desconocido en PED."
+            // Usamos el código de error que encapsulamos en la excepción.
+            responseCode = e.cause?.message ?: "10" // 0x10 = Invalid key type (default)
+            Log.e(TAG, "Error de PED procesando CMD '02': $logMessage (Código: $responseCode)")
         } catch (e: Exception) {
-            Log.e(TAG, "Error al procesar o responder al comando '03'", e)
-            val generalErrorResponse = messageFormatter.format("03", listOf("05"))
-            sendData(generalErrorResponse)
+            logMessage = e.message ?: "Error inesperado."
+            responseCode = "05" // 0x05 = Device is busy (error genérico)
+            Log.e(TAG, "Error general procesando CMD '02': $logMessage", e)
+        }
+
+        // Paso Final: Enviar siempre la respuesta al host.
+        val response = messageFormatter.format("02", listOf(responseCode, responseKeyChecksum))
+        sendData(response)
+        viewModelScope.launch { _snackbarEvent.emit(logMessage) }
+    }
+
+    private fun handleFuturexReadSerial(command: ReadSerialCommand) {
+        Log.d(TAG, "Manejando ReadSerialCommand (v${command.version})")
+
+        if (command.version != "01") {
+            Log.w(TAG, "Versión de comando '03' no soportada: ${command.version}.")
+            sendData(messageFormatter.format("03", listOf("02"))) // Invalid command version
+            return
+        }
+
+        try {
+            val serialNumber = "VGT1234567890SNX" // Valor de prueba
+            val response = messageFormatter.format("03", listOf("00", serialNumber))
+            sendData(response)
+            viewModelScope.launch { _snackbarEvent.emit("Respuesta a CMD '03' enviada.") }
+        } catch (e: Exception) {
+            handleError("Error al responder a CMD '03'", e)
+            sendData(messageFormatter.format("03", listOf("05"))) // Device busy
         }
     }
 
-    private fun handleFuturexWriteSerial(message: SerialMessage) {
-        Log.d(TAG, "Manejando comando Futurex '04': Write Serial Number.")
+    private fun handleFuturexWriteSerial(command: WriteSerialCommand) {
+        Log.d(TAG, "Manejando WriteSerialCommand (v${command.version}) para S/N: ${command.serialNumber}")
 
-        var responseCode = "00" // Código de éxito por defecto
-        var logMessage = "Número de serie actualizado correctamente."
-
+        var responseCode = "00"
         try {
-            // El payload del mensaje '04' es <VERSION><SERIAL>
-            val payload = message.fields.firstOrNull() ?: ""
+            if (command.version != "01") throw IllegalArgumentException("Versión de comando '04' no soportada.")
 
-            if (payload.length != 18) { // 2 para versión + 16 para serial
-                throw IllegalArgumentException("Longitud de payload para comando '04' incorrecta. Esperado: 18, Recibido: ${payload.length}")
-            }
-
-            val commandVersion = payload.substring(0, 2)
-            if (commandVersion != "01") {
-                throw IllegalArgumentException("Versión de comando '04' no soportada: $commandVersion")
-            }
-
-            val serialToWrite = payload.substring(2)
-            Log.i(TAG, "Solicitud para escribir el serial: $serialToWrite")
-
-            // --- LÓGICA DE ESCRITURA REAL ---
-            // Aquí iría la llamada al SDK del fabricante para guardar el serial.
-            // Por ejemplo: pedController?.writeSerialNumber(serialToWrite)
-            // Como no lo tenemos, simulamos el éxito.
-            if (serialToWrite.contains("ERROR")) { // Simular un error para probar
-                throw Exception("Fallo simulado al escribir en memoria segura.")
-            }
+            Log.i(TAG, "SIMULACIÓN: Escribiendo serial '${command.serialNumber}' en el dispositivo.")
+            // Aquí iría la llamada real al SDK: pedController?.writeSerialNumber(command.serialNumber)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error al procesar comando '04'", e)
-            logMessage = "Fallo al escribir el número de serie."
-            // Asigna un código de error del manual, ej: 0x0C (Invalid key slot) o uno genérico
-            responseCode = "0C"
+            handleError("Error al procesar CMD '04'", e)
+            responseCode = "0C" // Invalid key slot (error genérico de escritura)
         } finally {
-            // Enviar siempre una respuesta, ya sea de éxito o de error.
-            // La respuesta a '04' es el comando '04' y el código de estado.
+            // El manual indica que la respuesta a '04' es '04' + código de estado
             val response = messageFormatter.format("04", listOf(responseCode))
             sendData(response)
-            viewModelScope.launch { _snackbarEvent.emit(logMessage) }
         }
     }
+
+    /**
+     * Mapea el código de tipo de llave del protocolo Futurex a un enum genérico.
+     */
+    private fun mapFuturexKeyTypeToGeneric(futurexKeyType: String): GenericKeyType {
+        return when (futurexKeyType) {
+            "01" -> GenericKeyType.MASTER_KEY // Master Session Key
+            "05" -> GenericKeyType.WORKING_PIN_KEY
+            "04" -> GenericKeyType.WORKING_MAC_KEY
+            "0C" -> GenericKeyType.WORKING_DATA_ENCRYPTION_KEY
+            "06" -> GenericKeyType.TRANSPORT_KEY // Key Transfer Key
+            "0F" -> GenericKeyType.MASTER_KEY // Terminal Master Key
+            "03" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT BDK (se inyecta como IPEK)
+            "08" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT 3DES BDK (se inyecta como IPEK)
+            else -> throw PedKeyException("Tipo de llave Futurex no soportado: $futurexKeyType", PedKeyException("10")) // 0x10
+        }
+    }
+
+    /**
+     * Simula el cálculo del checksum de 4 dígitos hexadecimales.
+     * En una implementación real, esto usaría una librería de criptografía.
+     */
+    private fun calculateChecksum(keyBytes: ByteArray): String {
+        // Ejemplo simple: XOR de los primeros 2 bytes, formateado a 4 caracteres hex.
+        if (keyBytes.isEmpty()) return "0000"
+        val byte1 = keyBytes[0].toInt() and 0xFF
+        val byte2 = if (keyBytes.size > 1) keyBytes[1].toInt() and 0xFF else 0
+        val result = byte1 xor byte2
+        return "%04X".format(result and 0xFFFF)
+    }
+
 
 
     override fun onCleared() {
@@ -384,6 +458,16 @@ class MainViewModel @Inject constructor(
             pedController?.releasePed()
         }
         super.onCleared()
+    }
+
+    /**
+     * Convierte un String hexadecimal a un ByteArray.
+     */
+    private fun String.hexToByteArray(): ByteArray {
+        check(length % 2 == 0) { "La cadena HEX debe tener longitud par." }
+        return chunked(2)
+            .map { it.toInt(16).toByte() }
+            .toByteArray()
     }
 
     private fun ByteArray.toHexString(): String = joinToString("") { "%02X".format(it) }

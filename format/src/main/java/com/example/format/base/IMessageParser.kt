@@ -1,9 +1,19 @@
-// com/example/format/base/IMessageParser.kt
 package com.example.format.base
 
-import com.example.format.SerialMessage
+import com.example.format.ParsedMessage
 
+/**
+ * Interfaz para cualquier clase que pueda parsear un flujo de bytes en mensajes estructurados.
+ */
 interface IMessageParser {
+    /**
+     * Añade nuevos datos crudos al buffer interno del parser.
+     */
     fun appendData(newData: ByteArray)
-    fun nextMessage(): SerialMessage?
+
+    /**
+     * Intenta extraer el próximo mensaje completo y válido del buffer.
+     * @return Un objeto que implementa [ParsedMessage], o null si no hay un mensaje completo.
+     */
+    fun nextMessage(): ParsedMessage? // <-- CORRECCIÓN: Ahora devuelve la interfaz base.
 }
