@@ -264,6 +264,17 @@ class UrovoPedController(private val context: Context) : IPedController {
         keyAlgorithm: KeyAlgorithm,
         encryptedIpek: ByteArray,
         initialKsn: ByteArray,
+        transportKeyIndex: Int,
+        keyChecksum: String?
+    ): Boolean {
+        TODO("Not yet implemented")
+    }
+
+     suspend fun writeDukptInitialKeyEncrypted(
+        groupIndex: Int,
+        keyAlgorithm: KeyAlgorithm,
+        encryptedIpek: ByteArray,
+        initialKsn: ByteArray,
         transportKeyIndex: Int
     ): Boolean {
         TODO("Not yet implemented")
@@ -308,6 +319,16 @@ class UrovoPedController(private val context: Context) : IPedController {
     }
 
     override suspend fun writeDukptInitialKey(
+        groupIndex: Int,
+        keyAlgorithm: KeyAlgorithm,
+        keyBytes: ByteArray,
+        initialKsn: ByteArray,
+        keyChecksum: String?
+    ): Boolean {
+        TODO("Not yet implemented")
+    }
+
+     suspend fun writeDukptInitialKey(
         groupIndex: Int,
         keyAlgorithm: GenericKeyAlgorithm,
         keyBytes: ByteArray, // BDK

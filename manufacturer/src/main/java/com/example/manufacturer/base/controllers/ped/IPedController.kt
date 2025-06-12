@@ -46,7 +46,8 @@ interface IPedController {
         keyAlgorithm: KeyAlgorithm,
         encryptedIpek: ByteArray,
         initialKsn: ByteArray,
-        transportKeyIndex: Int // El índice de la KTK que descifrará la IPEK
+        transportKeyIndex: Int, // El índice de la KTK que descifrará la IPEK
+        keyChecksum: String?
     ): Boolean
 
     @Throws(PedException::class)
@@ -64,7 +65,8 @@ interface IPedController {
         groupIndex: Int,
         keyAlgorithm: KeyAlgorithm,
         keyBytes: ByteArray,
-        initialKsn: ByteArray
+        initialKsn: ByteArray,
+        keyChecksum: String?
     ): Boolean
     @Throws(PedException::class)
     suspend fun getDukptInfo(groupIndex: Int): DukptInfo?

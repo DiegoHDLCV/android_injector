@@ -102,8 +102,9 @@ class FuturexMessageParser : IMessageParser {
 
         // --- CORRECCIÓN AQUÍ ---
         // Convierte de Hexadecimal (base 16) a Entero
-        val keySlot = reader.read(2).toInt(radix = 16)
-        val ktkSlot = reader.read(2).toInt(radix = 16)
+
+        val keySlot = reader.read(2).toInt()
+        val ktkSlot = reader.read(2).toInt()
 
         val keyType = reader.read(2)
         val encryptionType = reader.read(2)
@@ -113,14 +114,13 @@ class FuturexMessageParser : IMessageParser {
 
         // --- CORRECCIÓN AQUÍ ---
         // Convierte de Hexadecimal (base 16) a Entero
-        val keyLength = reader.read(3).toInt(radix = 16)
+        val keyLength = reader.read(3).toInt()
 
         val keyHex = reader.read(keyLength)
 
         val ktkHex = if (encryptionType == "02") {
-            // --- CORRECCIÓN AQUÍ ---
-            // Convierte de Hexadecimal (base 16) a Entero
-            val ktkLength = reader.read(3).toInt(radix = 16)
+
+            val ktkLength = reader.read(3).toInt()
             reader.read(ktkLength)
         } else null
 

@@ -323,17 +323,8 @@ class MainViewModel @Inject constructor(
             Log.d(TAG, "Tipo de llave mapeado a PED: $genericKeyType")
             val genericAlgorithm = KeyAlgorithm.DES_TRIPLE
 
-            // Paso 1: Determinar el formato del payload de la clave (TR-31 o Hex simple)
-            // y extraer los bytes de la clave (que aún pueden estar cifrados).
-            val keyDataBytes = if (command.isTr31) {
-                Log.d(TAG, "Detectado bloque de claves TR-31. Parseando...")
-                val tr31Block = parseTr31Block(command.keyHex)
-                Log.d(TAG, "TR-31 Block parsed: $tr31Block")
-                tr31Block.encryptedPayload // Usamos la carga útil del bloque TR-31
-            } else {
-                Log.d(TAG, "Detectada clave hexadecimal simple.")
-                command.keyHex.hexToByteArray()
-            }
+            Log.d(TAG, "Extrayendo bytes de clave desde keyHex.")
+            val keyDataBytes = command.keyHex.hexToByteArray()
             Log.d(TAG, "Bytes de datos de clave extraídos (${keyDataBytes.size} bytes).")
 
 
@@ -352,7 +343,8 @@ class MainViewModel @Inject constructor(
                         groupIndex = command.keySlot,
                         keyAlgorithm = genericAlgorithm,
                         keyBytes = keyDataBytes,
-                        initialKsn = ksnBytes
+                        initialKsn = ksnBytes,
+                        keyChecksum = command.keyChecksum
                     )
                 } else { // encryptionType es "01" o "02"
                     Log.d(TAG, "IPEK cifrada. Llamando a writeDukptInitialKeyEncrypted.")
@@ -378,7 +370,8 @@ class MainViewModel @Inject constructor(
                         keyAlgorithm = genericAlgorithm,
                         encryptedIpek = keyDataBytes,
                         initialKsn = ksnBytes,
-                        transportKeyIndex = command.ktkSlot // Le indicamos qué KTK usar
+                        transportKeyIndex = command.ktkSlot,
+                        keyChecksum = command.keyChecksum
                     )
                 }
             } else {
