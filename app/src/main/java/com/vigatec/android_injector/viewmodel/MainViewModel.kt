@@ -48,7 +48,8 @@ enum class ConnectionStatus {
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val injectedKeyRepository: InjectedKeyRepository, application: Application
+    private val injectedKeyRepository: InjectedKeyRepository,
+    application: Application
 ) : AndroidViewModel(application) {
 
     private val TAG = "MainViewModel"
@@ -273,87 +274,113 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    // --- FUNCIÓN DE INYECCIÓN TOTALMENTE MODIFICADA ---
     private suspend fun handleFuturexInjectKey(command: InjectSymmetricKeyCommand) {
-        // --- INICIO DE LA MODIFICACIÓN ---
-        // 1. VERIFICAR SI EL CONTROLADOR DEL PED ESTÁ LISTO
-        // Esta es la corrección clave para evitar la NullPointerException.
+        // Asegurarse de que el controlador PED esté listo antes de continuar.
         if (!ensurePedControllerIsReady()) {
-            val errorMessage = "Error: El dispositivo no está listo para la inyección."
-            Log.e(TAG, "$errorMessage No se pudo obtener el pedController.")
-
-            // 2. NOTIFICAR AL HOST CON UN CÓDIGO DE ERROR
-            // En lugar de fallar con una excepción, se envía una respuesta clara.
-            // FuturexErrorCode.DEVICE_IS_BUSY ("05") es un buen candidato.
+            handleError("Inyección cancelada: PedController no está listo.")
             val errorResponse = messageFormatter.format("02", listOf(FuturexErrorCode.DEVICE_IS_BUSY.code, "0000"))
             sendData(errorResponse)
-
-            // 3. NOTIFICAR AL USUARIO EN LA UI
-            viewModelScope.launch { _snackbarEvent.emit(errorMessage) }
-
-            // 4. DETENER LA EJECUCIÓN
-            // Se evita que el resto del código se ejecute con un controlador nulo.
             return
         }
-        // --- FIN DE LA MODIFICACIÓN ---
 
         var responseCode = FuturexErrorCode.SUCCESSFUL.code
         var logMessage = ""
         var injectionStatus = "UNKNOWN"
-        // Se usa 'val' ya que no se reasignan, es una buena práctica.
         val genericKeyType = mapFuturexKeyTypeToGeneric(command.keyType)
         val genericAlgorithm = KeyAlgorithm.DES_TRIPLE
 
         val injectionResult = runCatching {
-            if (command.encryptionType == "01" || command.encryptionType == "02") {
-                val ktkFromDb = injectedKeyRepository.getKeyBySlotAndType(command.ktkSlot, GenericKeyType.TRANSPORT_KEY.name)
-                if (ktkFromDb == null) {
-                    if (command.encryptionType == "01") throw PedKeyException("KTK pre-cargada en slot ${command.ktkSlot} no encontrada.", PedKeyException(FuturexErrorCode.MISSING_KTK.code))
-                } else {
-                    if (!ktkFromDb.kcv.take(4).equals(command.ktkChecksum.take(4), ignoreCase = true)) {
-                        throw PedKeyException("El KCV de la KTK no coincide con el registro.", PedKeyException(FuturexErrorCode.INVALID_KTK_CHECKSUM.code))
-                    }
-                }
-            }
+            Log.i(TAG, "handleFuturexInjectKey: Iniciando proceso de inyección para slot ${command.keySlot}")
 
-            val existingKey = injectedKeyRepository.getKeyBySlotAndType(command.keySlot, genericKeyType.name)
-            if (existingKey != null) {
-                if (existingKey.kcv.take(4).equals(command.keyChecksum.take(4), ignoreCase = true)) {
-                    return@runCatching "La misma llave ya existe en el slot ${command.keySlot}. Inyección omitida."
-                } else {
-                    throw PedKeyException("Conflicto de KCV: Se intentó inyectar una llave diferente en un slot ocupado.", PedKeyException(FuturexErrorCode.DUPLICATE_KEY.code))
-                }
-            }
+            // --- INICIO DE LA NUEVA LÓGICA DE VERIFICACIÓN ---
 
-            val keyDataBytes = command.keyHex.hexToByteArray()
-            if (genericKeyType == GenericKeyType.DUKPT_INITIAL_KEY) {
-                val ksnBytes = command.ksn.hexToByteArray()
-                if (command.encryptionType == "00") {
-                    pedController!!.writeDukptInitialKey(command.keySlot, genericAlgorithm, keyDataBytes, ksnBytes, command.keyChecksum)
+            // PASO 1: VERIFICAR EL ESTADO REAL DEL HARDWARE
+            Log.d(TAG, "Verificando hardware: ¿El slot ${command.keySlot} para tipo $genericKeyType está ocupado?")
+            val slotOccupied = pedController!!.isKeyPresent(command.keySlot, genericKeyType)
+            Log.d(TAG, "Respuesta del hardware: slotOccupied = $slotOccupied")
+
+            // PASO 2: VERIFICAR LA BASE DE DATOS LOCAL
+            Log.d(TAG, "Verificando BD local para slot ${command.keySlot} y tipo ${genericKeyType.name}")
+            val keyInDb = injectedKeyRepository.getKeyBySlotAndType(command.keySlot, genericKeyType.name)
+            Log.d(TAG, "Respuesta de la BD: keyInDb = ${keyInDb != null}")
+
+            // PASO 3: LÓGICA DE DECISIÓN
+            if (slotOccupied) {
+                // El hardware dice que el slot está OCUPADO.
+                Log.w(TAG, "Conflicto Potencial: El hardware reporta el slot ${command.keySlot} como OCUPADO.")
+                if (keyInDb == null) {
+                    // Escenario de "Llave Fantasma": Existe en el hardware pero no en nuestra BD.
+                    // Esta es una condición de error grave que debe ser manejada.
+                    throw PedKeyException("Conflicto Crítico: El slot ${command.keySlot} está ocupado en el dispositivo, pero no registrado localmente. Se requiere intervención manual.")
                 } else {
-                    if (command.encryptionType == "02") {
-                        if (command.ktkHex == null) throw PedKeyException("Falta la KTK en claro para el tipo de cifrado 02.", PedKeyException(FuturexErrorCode.MISSING_KTK.code))
-                        pedController!!.writeKeyPlain(command.ktkSlot, GenericKeyType.TRANSPORT_KEY, genericAlgorithm, command.ktkHex!!.hexToByteArray(), null)
+                    // El slot está ocupado y tenemos un registro. ¿Son la misma llave?
+                    // Comparamos usando el Key Checksum Value (KCV).
+                    if (keyInDb.kcv.take(4).equals(command.keyChecksum.take(4), ignoreCase = true)) {
+                        // Es la misma llave. La operación es idempotente. No hacemos nada.
+                        Log.i(TAG, "La misma llave (KCV: ${command.keyChecksum}) ya existe en el slot ${command.keySlot}. Inyección omitida.")
+                        return@runCatching "La misma llave ya existe. Inyección omitida."
+                    } else {
+                        // Se intenta inyectar una LLAVE DIFERENTE en un slot ocupado.
+                        throw PedKeyException("Conflicto de Llave: El slot ${command.keySlot} ya contiene una llave diferente (KCV no coincide).")
                     }
-                    pedController!!.writeDukptInitialKeyEncrypted(command.keySlot, genericAlgorithm, keyDataBytes, ksnBytes, command.ktkSlot, command.keyChecksum)
                 }
             } else {
-                when (command.encryptionType) {
-                    "00" -> pedController!!.writeKeyPlain(command.keySlot, genericKeyType, genericAlgorithm, keyDataBytes, null)
-                    "01" -> pedController!!.writeKey(command.keySlot, genericKeyType, genericAlgorithm, PedKeyData(keyDataBytes), command.ktkSlot, GenericKeyType.TRANSPORT_KEY)
-                    "02" -> {
-                        if (command.ktkHex == null) throw PedKeyException("Falta la KTK en claro para el tipo de cifrado 02.", PedKeyException(FuturexErrorCode.MISSING_KTK.code))
-                        pedController!!.writeKeyPlain(command.ktkSlot, GenericKeyType.TRANSPORT_KEY, genericAlgorithm, command.ktkHex!!.hexToByteArray(), null)
-                        pedController!!.writeKey(command.keySlot, genericKeyType, genericAlgorithm, PedKeyData(keyDataBytes), command.ktkSlot, GenericKeyType.TRANSPORT_KEY)
-                    }
-                    else -> throw PedKeyException("Tipo de encriptación '${command.encryptionType}' no soportado.", PedKeyException(FuturexErrorCode.INVALID_KEY_ENCRYPTION_TYPE.code))
+                // El hardware dice que el slot está LIBRE.
+                Log.i(TAG, "Verificación de hardware OK: El slot ${command.keySlot} está libre.")
+                if (keyInDb != null) {
+                    // La BD está desactualizada. Tenía un registro para un slot que ahora está vacío.
+                    Log.w(TAG, "Inconsistencia de datos detectada: Se encontró un registro obsoleto para el slot ${command.keySlot}. Se eliminará.")
+                    injectedKeyRepository.deleteKey(keyInDb)
                 }
+
+                // --- FIN DE LA NUEVA LÓGICA DE VERIFICACIÓN ---
+
+                // El slot está libre, proceder con la inyección como antes.
+                Log.d(TAG, "Procediendo con la inyección en el slot ${command.keySlot}...")
+                // Validar KTK si la encriptación lo requiere
+                if (command.encryptionType == "01" || command.encryptionType == "02") {
+                    val ktkFromDb = injectedKeyRepository.getKeyBySlotAndType(command.ktkSlot, GenericKeyType.TRANSPORT_KEY.name)
+                    if (ktkFromDb == null) {
+                        if (command.encryptionType == "01") throw PedKeyException("KTK pre-cargada en slot ${command.ktkSlot} no encontrada.")
+                    } else {
+                        if (!ktkFromDb.kcv.take(4).equals(command.ktkChecksum.take(4), ignoreCase = true)) {
+                            throw PedKeyException("El KCV de la KTK en la BD no coincide con el de la solicitud.")
+                        }
+                    }
+                }
+
+                val keyDataBytes = command.keyHex.hexToByteArray()
+                if (genericKeyType == GenericKeyType.DUKPT_INITIAL_KEY) {
+                    val ksnBytes = command.ksn.hexToByteArray()
+                    if (command.encryptionType == "00") {
+                        pedController!!.writeDukptInitialKey(command.keySlot, genericAlgorithm, keyDataBytes, ksnBytes, command.keyChecksum)
+                    } else {
+                        if (command.encryptionType == "02") {
+                            if (command.ktkHex == null) throw PedKeyException("Falta la KTK en claro para el tipo de cifrado 02.")
+                            pedController!!.writeKeyPlain(command.ktkSlot, GenericKeyType.TRANSPORT_KEY, genericAlgorithm, command.ktkHex!!.hexToByteArray(), null)
+                        }
+                        pedController!!.writeDukptInitialKeyEncrypted(command.keySlot, genericAlgorithm, keyDataBytes, ksnBytes, command.ktkSlot, command.keyChecksum)
+                    }
+                } else {
+                    when (command.encryptionType) {
+                        "00" -> pedController!!.writeKeyPlain(command.keySlot, genericKeyType, genericAlgorithm, keyDataBytes, null)
+                        "01" -> pedController!!.writeKey(command.keySlot, genericKeyType, genericAlgorithm, PedKeyData(keyDataBytes), command.ktkSlot, GenericKeyType.TRANSPORT_KEY)
+                        "02" -> {
+                            if (command.ktkHex == null) throw PedKeyException("Falta la KTK en claro para el tipo de cifrado 02.")
+                            pedController!!.writeKeyPlain(command.ktkSlot, GenericKeyType.TRANSPORT_KEY, genericAlgorithm, command.ktkHex!!.hexToByteArray(), null)
+                            pedController!!.writeKey(command.keySlot, genericKeyType, genericAlgorithm, PedKeyData(keyDataBytes), command.ktkSlot, GenericKeyType.TRANSPORT_KEY)
+                        }
+                        else -> throw PedKeyException("Tipo de encriptación '${command.encryptionType}' no soportado.")
+                    }
+                }
+                "Inyección de clave en slot ${command.keySlot} procesada exitosamente."
             }
-            "Inyección de clave en slot ${command.keySlot} procesada exitosamente."
         }
 
         injectionResult.onSuccess { resultMessage ->
             logMessage = resultMessage
-            injectionStatus = "SUCCESSFUL"
+            injectionStatus = if (resultMessage.contains("omitida")) "SKIPPED" else "SUCCESSFUL"
             responseCode = FuturexErrorCode.SUCCESSFUL.code
         }.onFailure { e ->
             logMessage = e.message ?: "Error inesperado."
@@ -362,14 +389,17 @@ class MainViewModel @Inject constructor(
             Log.e(TAG, "Error procesando inyección: $logMessage (Código: $responseCode)", e)
         }
 
-        injectedKeyRepository.recordKeyInjection(
-            keySlot = command.keySlot,
-            keyType = genericKeyType.name,
-            keyAlgorithm = genericAlgorithm.name,
-            kcv = command.keyChecksum,
-            status = injectionStatus
-        )
-        Log.i(TAG, "Resultado de inyección para slot ${command.keySlot} registrado en la BD como: $injectionStatus")
+        // Solo registrar en la BD si la inyección NO se omitió
+        if (injectionStatus != "SKIPPED") {
+            injectedKeyRepository.recordKeyInjection(
+                keySlot = command.keySlot,
+                keyType = genericKeyType.name,
+                keyAlgorithm = genericAlgorithm.name,
+                kcv = command.keyChecksum,
+                status = injectionStatus
+            )
+            Log.i(TAG, "Resultado de inyección para slot ${command.keySlot} registrado en la BD como: $injectionStatus")
+        }
 
         val response = messageFormatter.format("02", listOf(responseCode, "0000"))
         sendData(response)
@@ -395,7 +425,7 @@ class MainViewModel @Inject constructor(
             "06" -> GenericKeyType.TRANSPORT_KEY
             "0F" -> GenericKeyType.MASTER_KEY
             "03", "08" -> GenericKeyType.DUKPT_INITIAL_KEY
-            else -> throw PedKeyException("Tipo de llave Futurex no soportado: $futurexKeyType", PedKeyException(FuturexErrorCode.INVALID_KEY_TYPE.code))
+            else -> throw PedKeyException("Tipo de llave Futurex no soportado: $futurexKeyType")
         }
     }
 
