@@ -1,10 +1,12 @@
 package com.vigatec.android_injector.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.vigatec.android_injector.ui.screens.InjectedKeysScreen
 import com.vigatec.android_injector.ui.screens.LoginScreen
 import com.vigatec.android_injector.ui.screens.MainScreen
 import com.vigatec.android_injector.ui.screens.MasterKeyEntryScreen
@@ -35,9 +37,13 @@ fun AppNavHost(
         }
         // --- Add Composable for MainScreen ---
         composable(Routes.MainScreen.route) {
-            val mainViewModel: MainViewModel = viewModel()
             MainScreen(navController = navController)
         }
+        composable(Routes.InjectedKeysScreen.route) {
+            // InjectedKeysScreen obtiene su propio ViewModel con hiltViewModel()
+            InjectedKeysScreen(navController = navController)
+        }
+
         // Add other composables (like PrintingScreen) if they exist
         // composable(Routes.PrintingScreen.route) { ... }
     }

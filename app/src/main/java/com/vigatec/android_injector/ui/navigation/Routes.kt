@@ -6,6 +6,7 @@ sealed class Routes(val route: String) {
     object PrintingScreen : Routes("printing_screen")
     object MasterKeyEntryScreen : Routes("master_key_entry_screen")
     object MainScreen : Routes("main_screen")
+    object InjectedKeysScreen : Routes("injected_keys_screen")
 
 
 }

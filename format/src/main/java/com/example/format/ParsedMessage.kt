@@ -2,13 +2,11 @@ package com.example.format
 
 /**
  * Interfaz base sellada para cualquier mensaje decodificado de un protocolo.
- * El uso de 'sealed' obliga a que los 'when' que la usan sean exhaustivos,
- * lo que previene que nos olvidemos de manejar un tipo de comando.
  */
 sealed interface ParsedMessage
 
 /**
- * Modelo para los comandos del protocolo "Legacy" (el que usa '|').
+ * Modelo para los comandos del protocolo "Legacy".
  */
 data class LegacyMessage(
     val command: String,
@@ -16,33 +14,27 @@ data class LegacyMessage(
 ) : ParsedMessage
 
 /**
- * Interfaz base sellada para todos los comandos del protocolo Futurex.
- * También hereda de ParsedMessage para poder ser usada en el mismo flujo.
+ * Interfaz base para todos los comandos y respuestas del protocolo Futurex.
  */
-sealed interface FuturexCommand : ParsedMessage {
+sealed interface FuturexMessage : ParsedMessage {
     val rawPayload: String // Guardamos el payload para depuración.
 }
 
-/**
- * Modelo para el comando Futurex "03" (Read Serial Number).
- */
+// --- COMANDOS (Enviados desde el Host al Dispositivo) ---
+
+sealed interface FuturexCommand : FuturexMessage
+
 data class ReadSerialCommand(
     override val rawPayload: String,
     val version: String
 ) : FuturexCommand
 
-/**
- * Modelo para el comando Futurex "04" (Write Serial Number).
- */
 data class WriteSerialCommand(
     override val rawPayload: String,
     val version: String,
     val serialNumber: String
 ) : FuturexCommand
 
-/**
- * Modelo para el comando Futurex "02" (Symmetric Key Injection).
- */
 data class InjectSymmetricKeyCommand(
     override val rawPayload: String,
     val version: String,
@@ -54,29 +46,44 @@ data class InjectSymmetricKeyCommand(
     val ktkChecksum: String,
     val ksn: String,
     val keyHex: String,
-    val ktkHex: String? // Nullable porque solo existe si encryptionType es "02".
+    val ktkHex: String?
 ) : FuturexCommand {
-    // Propiedad calculada para saber si es TR-31 (una heurística simple)
-    val isTr31: Boolean
-        get() = keyHex.firstOrNull()?.isLetter() ?: false // Si empieza con A, B, C, o D, es TR-31
+    val isTr31: Boolean get() = keyHex.firstOrNull()?.isLetter() ?: false
 }
 
+// --- RESPUESTAS (Recibidas desde el Dispositivo) ---
+
+sealed interface FuturexResponse : FuturexMessage
+
 /**
- * Modelo para comandos desconocidos o no soportados.
+ * Modelo para la respuesta al comando "02" (InjectSymmetricKey).
  */
+data class InjectSymmetricKeyResponse(
+    override val rawPayload: String,
+    val responseCode: String,
+    val keyChecksum: String // El checksum devuelto por el dispositivo.
+) : FuturexResponse
+
+/**
+ * Modelo para la respuesta al comando "03" (ReadSerial).
+ * (Añadir si se necesita parsear la respuesta del serial number)
+ */
+// data class ReadSerialResponse(...) : FuturexResponse
+
+
+// --- OTROS ---
+
 data class UnknownCommand(
     override val rawPayload: String,
     val commandCode: String
-) : FuturexCommand
+) : FuturexCommand // Se trata como un comando entrante
 
-/**
- * Modelo para representar un error irrecuperable durante el parseo del payload.
- */
 data class ParseError(
     override val rawPayload: String,
     val error: String
-) : FuturexCommand
+) : FuturexMessage // Puede ser comando o respuesta
 
+// Clases de datos para TR-31 (sin cambios)
 data class Tr31KeyBlock(
     val rawBlock: String,
     val versionId: Char,
@@ -86,8 +93,8 @@ data class Tr31KeyBlock(
     val modeOfUse: Char,
     val keyVersionNumber: String,
     val exportability: Char,
-    val optionalBlocks: List<Tr31OptionalBlock>, // Necesitarás una clase para esto también
-    val encryptedPayload: ByteArray, // ¡Esto es lo que realmente necesitas!
+    val optionalBlocks: List<Tr31OptionalBlock>,
+    val encryptedPayload: ByteArray,
     val mac: ByteArray
 )
 

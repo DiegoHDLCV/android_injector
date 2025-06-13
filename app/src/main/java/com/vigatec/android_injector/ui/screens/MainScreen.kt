@@ -1,3 +1,5 @@
+// Archivo: com/vigatec/android_injector/ui/screens/MainScreen.kt
+
 package com.vigatec.android_injector.ui.screens
 
 import androidx.compose.foundation.background
@@ -27,6 +29,7 @@ import com.example.config.CommProtocol
 import com.example.config.SystemConfig
 import com.vigatec.android_injector.ui.Navigator
 import com.vigatec.android_injector.ui.events.UiEvent
+import com.vigatec.android_injector.ui.navigation.Routes // Asegúrate de tener este import
 import com.vigatec.android_injector.viewmodel.ConnectionStatus
 import com.vigatec.android_injector.viewmodel.MainViewModel
 import kotlinx.coroutines.flow.collectLatest
@@ -39,25 +42,20 @@ fun MainScreen(navController: NavHostController) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
 
-    // Usamos 'remember' para que la UI reaccione a los cambios en la configuración.
-    // Aunque SystemConfig es un objeto, necesitamos un State para que Compose se recomponga.
     var selectedProtocol by remember { mutableStateOf(SystemConfig.commProtocolSelected) }
 
-    // Escucha eventos de Snackbar
     LaunchedEffect(key1 = true) {
         viewModel.snackbarEvent.collectLatest { message ->
             snackbarHostState.showSnackbar(message)
         }
     }
 
-    // Escucha eventos de Navegación
     LaunchedEffect(key1 = true) {
         viewModel.uiEvent.collectLatest { event ->
             Navigator.navigate(navController, event)
         }
     }
 
-    // Efecto para auto-scroll del área de texto
     LaunchedEffect(rawDataReceived) {
         scrollState.animateScrollTo(scrollState.maxValue)
     }
@@ -86,7 +84,6 @@ fun MainScreen(navController: NavHostController) {
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // --- SELECCIÓN DE PROTOCOLO ---
             Text("Protocolo de Comunicación:", style = MaterialTheme.typography.titleMedium)
             Row(Modifier.selectableGroup()) {
                 val isConnectionActive = status != ConnectionStatus.DISCONNECTED && status != ConnectionStatus.ERROR
@@ -101,14 +98,14 @@ fun MainScreen(navController: NavHostController) {
                                     viewModel.setProtocol(protocol)
                                 },
                                 role = Role.RadioButton,
-                                enabled = !isConnectionActive // Deshabilitar si la conexión está activa
+                                enabled = !isConnectionActive
                             )
                             .padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(
                             selected = (selectedProtocol == protocol),
-                            onClick = null, // null recomendado para que el onClick del padre maneje todo
+                            onClick = null,
                             enabled = !isConnectionActive
                         )
                         Text(
@@ -131,7 +128,6 @@ fun MainScreen(navController: NavHostController) {
             Spacer(modifier = Modifier.height(16.dp))
 
 
-            // --- BOTONES DE CONTROL DE CONEXIÓN ---
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = { viewModel.startListening() },
@@ -146,6 +142,17 @@ fun MainScreen(navController: NavHostController) {
                     Text("Detener Escucha")
                 }
             }
+
+            // --- CÓDIGO AÑADIDO ---
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = { navController.navigate(Routes.InjectedKeysScreen.route) },
+                // Habilita el botón siempre que la app no esté en un estado de transición
+                enabled = status == ConnectionStatus.DISCONNECTED || status == ConnectionStatus.LISTENING || status == ConnectionStatus.ERROR
+            ) {
+                Text("Ver Llaves Inyectadas")
+            }
+            // --- FIN DEL CÓDIGO AÑADIDO ---
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -167,3 +174,4 @@ fun MainScreen(navController: NavHostController) {
         }
     }
 }
+

@@ -329,32 +329,51 @@ class AisinoPedController(private val application: Application) : IPedController
 
     @Throws(PedException::class)
     override suspend fun deleteKey(keyIndex: Int, keyType: GenericKeyType): Boolean = withContext(Dispatchers.IO) {
+        // --- LOG AÑADIDO ---
+        Log.i(TAG, "deleteKey: Solicitud recibida para borrar llave en slot $keyIndex, tipo $keyType.")
         val aisinoKeyType = mapToAisinoKeyTypeInt(keyType)
             ?: throw PedKeyException("Unsupported key type for deleteKey: $keyType.")
 
         try {
-            val success = PedApi.PedErase(aisinoKeyType, keyIndex)
+            // --- LOG AÑADIDO ---
+            Log.d(TAG, "deleteKey: Llamando a 'PedApi.PedErase_Api' con KeyType: $aisinoKeyType, Index: $keyIndex.")
+            val success = PedApi.PedErase_Api(aisinoKeyType, keyIndex)
+            // --- LOG AÑADIDO ---
+            Log.d(TAG, "deleteKey: La función nativa 'PedApi.PedErase_Api' devolvió: $success")
+
             if (!success) {
-                Log.w(TAG, "PedErase failed for KeyType: $aisinoKeyType, Index: $keyIndex.")
+                Log.w(TAG, "deleteKey: PedErase_Api falló para KeyType: $aisinoKeyType, Index: $keyIndex.")
                 return@withContext false
             }
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting key", e)
+            Log.e(TAG, "deleteKey: Error al borrar llave [$keyType/$keyIndex]", e)
             throw PedKeyException("Failed to delete key [$keyType/$keyIndex]: ${e.message}", e)
         }
     }
 
     @Throws(PedException::class)
     override suspend fun deleteAllKeys(): Boolean = withContext(Dispatchers.IO) {
+        // --- LOG AÑADIDO ---
+        Log.i(TAG, "deleteAllKeys: Solicitud recibida en el controlador Aisino.")
         try {
-            val success = PedApi.PedErase()
+            // --- LOG AÑADIDO ---
+            Log.d(TAG, "deleteAllKeys: Llamando a la función nativa 'PedApi.PedErase()'...")
+            val success = PedApi.PedErase_Api()
+            // --- LOG AÑADIDO ---
+            Log.d(TAG, "deleteAllKeys: La función nativa 'PedApi.PedErase()' devolvió: $success")
+
             if (!success) {
+                // --- LOG AÑADIDO ---
+                Log.w(TAG, "deleteAllKeys: PedApi.PedErase() falló. Lanzando PedKeyException.")
                 throw PedKeyException("Failed to delete all keys (PedErase returned false).")
             }
+
+            // --- LOG AÑADIDO ---
+            Log.i(TAG, "deleteAllKeys: Borrado en hardware completado con éxito.")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting all keys", e)
+            Log.e(TAG, "deleteAllKeys: Error al llamar a la API de borrado de Aisino.", e)
             throw PedKeyException("Failed to delete all keys: ${e.message}", e)
         }
     }

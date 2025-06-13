@@ -19,43 +19,38 @@ class FuturexMessageParser : IMessageParser {
         Log.d(TAG, "Buffer actualizado (${buffer.size} bytes): ${buffer.toByteArray().toHexString()}")
     }
 
-    /**
-     * REFACTORIZADO: Ahora devuelve un objeto 'FuturexCommand' específico,
-     * no un 'SerialMessage' genérico.
-     */
-    override fun nextMessage(): FuturexCommand? {
+    override fun nextMessage(): FuturexMessage? { // Devuelve la interfaz base FuturexMessage
         while (buffer.isNotEmpty()) {
             val (payloadBytes, messageLength) = findAndValidateFrame() ?: continue
-
-            // Si findAndValidateFrame devuelve un payload, significa que el marco y el LRC son válidos.
-            // Ahora, procedemos a parsear el contenido del payload.
 
             val fullPayload = String(payloadBytes, Charsets.US_ASCII)
             val commandCode = if (fullPayload.length >= 2) fullPayload.substring(0, 2) else ""
 
-            val parsedCommand = try {
-                when (commandCode) {
-                    "02" -> parseInjectSymmetricKey(fullPayload)
-                    "03" -> parseReadSerial(fullPayload)
-                    "04" -> parseWriteSerial(fullPayload)
-                    else -> UnknownCommand(fullPayload, commandCode)
+            val parsedMessage = try {
+                // Heurística para diferenciar comando de respuesta para el código "02"
+                // El comando de inyección siempre es largo, la respuesta es corta.
+                if (commandCode == "02" && fullPayload.length <= 8) {
+                    parseInjectSymmetricKeyResponse(fullPayload)
+                } else {
+                    // Lógica para parsear comandos enviados al dispositivo
+                    when (commandCode) {
+                        "02" -> parseInjectSymmetricKeyCommand(fullPayload)
+                        "03" -> parseReadSerialCommand(fullPayload)
+                        "04" -> parseWriteSerialCommand(fullPayload)
+                        else -> UnknownCommand(fullPayload, commandCode)
+                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error parseando payload para comando '$commandCode'", e)
+                Log.e(TAG, "Error parseando payload para comando/respuesta '$commandCode'", e)
                 ParseError(fullPayload, e.message ?: "Error desconocido durante el parseo.")
             }
 
-            // Consumir el mensaje del buffer y devolver el comando parseado
             for (i in 0 until messageLength) buffer.removeAt(0)
-            return parsedCommand
+            return parsedMessage
         }
         return null
     }
 
-    /**
-     * Busca un marco STX...ETX, valida el LRC y devuelve el payload interno.
-     * @return Un Pair con los bytes del payload y la longitud total del marco, o null si no es válido.
-     */
     private fun findAndValidateFrame(): Pair<ByteArray, Int>? {
         val stxIndex = buffer.indexOf(STX)
         if (stxIndex == -1) { buffer.clear(); return null }
@@ -81,45 +76,35 @@ class FuturexMessageParser : IMessageParser {
         return Pair(payloadBytes, frameSize)
     }
 
-    // --- Métodos de parseo movidos aquí desde el antiguo FuturexCommandParser ---
+    // --- PARSERS DE COMANDOS (Host -> Dispositivo) ---
 
-    private fun parseReadSerial(fullPayload: String) = ReadSerialCommand(
+    private fun parseReadSerialCommand(fullPayload: String) = ReadSerialCommand(
         rawPayload = fullPayload,
         version = fullPayload.substring(2, 4)
     )
 
-    private fun parseWriteSerial(fullPayload: String) = WriteSerialCommand(
+    private fun parseWriteSerialCommand(fullPayload: String) = WriteSerialCommand(
         rawPayload = fullPayload,
         version = fullPayload.substring(2, 4),
         serialNumber = fullPayload.substring(4, 20)
     )
 
-    private fun parseInjectSymmetricKey(fullPayload: String): InjectSymmetricKeyCommand {
+    private fun parseInjectSymmetricKeyCommand(fullPayload: String): InjectSymmetricKeyCommand {
         val reader = PayloadReader(fullPayload)
-        reader.read(2) // Omitir el código de comando '02'
+        reader.read(2) // Omitir código de comando
 
         val version = reader.read(2)
-
-        // --- CORRECCIÓN AQUÍ ---
-        // Convierte de Hexadecimal (base 16) a Entero
-
-        val keySlot = reader.read(2).toInt()
-        val ktkSlot = reader.read(2).toInt()
-
+        val keySlot = reader.read(2).toInt(16) // Hex a Int
+        val ktkSlot = reader.read(2).toInt(16) // Hex a Int
         val keyType = reader.read(2)
         val encryptionType = reader.read(2)
         val keyChecksum = reader.read(4)
         val ktkChecksum = reader.read(4)
         val ksn = reader.read(20)
-
-        // --- CORRECCIÓN AQUÍ ---
-        // Convierte de Hexadecimal (base 16) a Entero
-        val keyLength = reader.read(3).toInt()
-
+        val keyLength = reader.read(3).toInt() // Decimal a Int
         val keyHex = reader.read(keyLength)
 
         val ktkHex = if (encryptionType == "02") {
-
             val ktkLength = reader.read(3).toInt()
             reader.read(ktkLength)
         } else null
@@ -127,7 +112,22 @@ class FuturexMessageParser : IMessageParser {
         return InjectSymmetricKeyCommand(fullPayload, version, keySlot, ktkSlot, keyType, encryptionType, keyChecksum, ktkChecksum, ksn, keyHex, ktkHex)
     }
 
-    // Clase interna para facilitar la lectura del payload
+    // --- PARSERS DE RESPUESTAS (Dispositivo -> Host) ---
+
+    private fun parseInjectSymmetricKeyResponse(fullPayload: String): InjectSymmetricKeyResponse {
+        val reader = PayloadReader(fullPayload)
+        reader.read(2) // Omitir código de comando '02'
+
+        val responseCode = reader.read(2)
+        val keyChecksum = reader.read(4)
+
+        return InjectSymmetricKeyResponse(
+            rawPayload = fullPayload,
+            responseCode = responseCode,
+            keyChecksum = keyChecksum
+        )
+    }
+
     private class PayloadReader(private val payload: String) {
         private var cursor = 0
         fun read(length: Int): String {
