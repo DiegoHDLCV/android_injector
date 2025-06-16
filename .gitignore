@@ -1,15 +1,24 @@
+# IntelliJ IDEA / Android Studio module files
 *.iml
-.gradle
+
+# IntelliJ IDEA / Android Studio project-specific files
+# It's generally recommended to ignore the entire .idea directory
+/.idea/
+
+# Gradle
+/.gradle/
+/build/
+
+# Local configuration (sensitive or machine-specific)
+# This file should only be in the project root.
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
+
+# Android Studio captures
+/captures/
+
+# NDK build intermediate files and directories
+.externalNativeBuild/
+.cxx/
+
+# Mac OS specific files
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
