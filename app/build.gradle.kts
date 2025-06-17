@@ -74,6 +74,7 @@ dependencies {
 
     implementation(libs.hilt.android)
     implementation(project(":format"))
+    implementation(project(":utils"))
     ksp(libs.hilt.compiler)
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 

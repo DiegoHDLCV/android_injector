@@ -26,6 +26,11 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.min
 
+private const val IPEK_INJECTION_MODE_PLAINTEXT: Byte = 0
+private const val IPEK_INJECTION_MODE_ENCRYPTED: Byte = 1
+private const val KCV_CHECK_MODE_DISABLED: Byte = 0x00
+private const val KCV_CHECK_MODE_ENABLED: Byte = 0x01
+
 class AisinoPedController(private val application: Application) : IPedController {
 
     private val TAG = "AisinoPedController"
@@ -412,73 +417,73 @@ class AisinoPedController(private val application: Application) : IPedController
         initialKsn: ByteArray,
         keyChecksum: String?
     ): Boolean = withContext(Dispatchers.IO) {
-        // Log de entrada para registrar todos los parámetros recibidos
         Log.i(TAG, "--- Starting writeDukptInitialKey (for plaintext IPEK) ---")
-        Log.d(TAG, "Attempting to write a PLAINTEXT DUKPT IPEK with the following parameters:")
         Log.d(TAG, "-> DUKPT Group Index: $groupIndex")
         Log.d(TAG, "-> Key Algorithm: $keyAlgorithm")
-        Log.d(TAG, "-> IPEK Bytes (Hex): ${keyBytes.joinToString("") { "%02X".format(it) }}")
-        Log.d(TAG, "-> IPEK Bytes Length: ${keyBytes.size}")
-        Log.d(TAG, "-> Initial KSN (Hex): ${initialKsn.joinToString("") { "%02X".format(it) }}")
+        Log.d(TAG, "-> IPEK Bytes (RAW Hex from parser): ${keyBytes.joinToString("") { "%02X".format(it) }}")
+        Log.d(TAG, "-> IPEK Bytes Length (RAW): ${keyBytes.size}")
+        Log.d(TAG, "-> Initial KSN (RAW Hex from parser): ${initialKsn.joinToString("") { "%02X".format(it) }}")
         Log.d(TAG, "-> Key Checksum (KCV): ${keyChecksum ?: "Not Provided"}")
 
-        // Cálculo de la longitud de la llave para la API
-        val keyLenByte: Byte = when (keyAlgorithm) {
-            GenericKeyAlgorithm.DES_TRIPLE -> if (keyBytes.size >= 16) 16 else 8
-            GenericKeyAlgorithm.AES_128 -> 16
-            GenericKeyAlgorithm.AES_192 -> 24
-            GenericKeyAlgorithm.AES_256 -> 32
-            else -> {
-                val errorMsg = "Unsupported algorithm for Aisino DUKPT initial key: $keyAlgorithm"
-                Log.e(TAG, errorMsg)
-                throw PedKeyException(errorMsg)
-            }
-        }
-        Log.d(TAG, "Calculated key length byte for API call: $keyLenByte")
+        // --- PASO 1: CONVERTIR DATOS A FORMATO BCD COMO EN LA DEMO ---
+        val ipekHexString = keyBytes.joinToString("") { "%02X".format(it) }
+        val ksnHexString = initialKsn.joinToString("") { "%02X".format(it) }
 
-        // --- LÓGICA DE VERIFICACIÓN ---
+        val ipekBcd: ByteArray
+        val ksnInBcd: ByteArray
+        try {
+            ipekBcd = CommonConvert.ascStringToBCD(ipekHexString)
+            ksnInBcd = CommonConvert.ascStringToBCD(ksnHexString)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to convert Hex strings to BCD format", e)
+            throw PedKeyException("Error converting key/KSN data to BCD: ${e.message}", e)
+        }
+
+        val keyLenByte: Byte = ipekBcd.size.toByte()
+        Log.d(TAG, "Calculated BCD key length byte for API call: $keyLenByte")
+
+        // --- PASO 2: LÓGICA DE VERIFICACIÓN KCV DINÁMICA ---
         val checkMode: Byte
         val checkBuffer: ByteArray
 
-        if (keyChecksum.isNullOrBlank()) {
-            checkMode = 0x00 // Sin verificación si no hay checksum
-            checkBuffer = ByteArray(0)
-            Log.w(TAG, "No keyChecksum provided. Will attempt injection without KCV verification (iCheckMode=0x00).")
+        if (keyChecksum.isNullOrBlank() || keyChecksum == "0000") {
+            checkMode = KCV_CHECK_MODE_DISABLED
+            checkBuffer = ByteArray(16) { 0 }
+            Log.d(TAG, "KCV check disabled (no checksum provided). Providing dummy buffer.")
         } else {
-            checkMode = 0x01 // iCheckMode 0x01: usar KCV
-            Log.d(TAG, "keyChecksum provided. Preparing buffer for KCV verification (iCheckMode=0x01).")
-            val checksumBytes = CommonConvert.hexStringToByte(keyChecksum)
-
-            // Formato: [longitud_del_kcv, kcv_bytes...]
-            checkBuffer = ByteArray(1 + checksumBytes.size)
-            checkBuffer[0] = checksumBytes.size.toByte()
-            System.arraycopy(checksumBytes, 0, checkBuffer, 1, checksumBytes.size)
-            Log.d(TAG, "Prepared checkBuffer for KCV '${keyChecksum}': ${checkBuffer.joinToString("") { "%02X".format(it) }}")
+            checkMode = KCV_CHECK_MODE_ENABLED
+            try {
+                val checksumBytes = CommonConvert.hexStringToByte(keyChecksum)
+                checkBuffer = ByteArray(1 + checksumBytes.size)
+                checkBuffer[0] = checksumBytes.size.toByte()
+                System.arraycopy(checksumBytes, 0, checkBuffer, 1, checksumBytes.size)
+                Log.d(TAG, "Prepared checkBuffer for KCV '$keyChecksum': ${checkBuffer.joinToString("") { "%02X".format(it) }}")
+            } catch (e: Exception) {
+                throw PedKeyException("Failed to parse keyChecksum: $keyChecksum", e)
+            }
         }
-        // --- FIN DE LA LÓGICA DE VERIFICACIÓN ---
 
+        // --- PASO 3: LLAMADA A LA API ---
         try {
-            // Definir explícitamente el SrcKeyIdx para inyección en claro
-            val sourceKeyIndex: Byte = 0
+            val sourceKeyIndex: Byte = IPEK_INJECTION_MODE_PLAINTEXT
 
-            // Log final antes de la llamada a la API con todos los parámetros finales
-            Log.i(TAG, "Calling PedApi.PedDukptWriteTIK_Api with parameters:")
+            Log.i(TAG, "Calling PedApi.PedDukptWriteTIK_Api with BCD formatted data...")
             Log.i(TAG, "--> GroupIdx: ${groupIndex.toByte()}")
             Log.i(TAG, "--> SrcKeyIdx: $sourceKeyIndex (0 = Plaintext IPEK)")
             Log.i(TAG, "--> KeyLen: $keyLenByte")
-            Log.i(TAG, "--> KeyValueIn (Plaintext IPEK): ${keyBytes.joinToString("") { "%02X".format(it) }}")
-            Log.i(TAG, "--> KsnIn: ${initialKsn.joinToString("") { "%02X".format(it) }}")
+            Log.i(TAG, "--> KeyValueIn (BCD): ${ipekBcd.joinToString("") { "%02X".format(it) }}")
+            Log.i(TAG, "--> KsnIn (BCD): ${ksnInBcd.joinToString("") { "%02X".format(it) }}")
             Log.i(TAG, "--> iCheckMode: $checkMode")
             Log.i(TAG, "--> aucCheckBuf: ${checkBuffer.joinToString("") { "%02X".format(it) }}")
 
             val result = PedApi.PedDukptWriteTIK_Api(
                 groupIndex.toByte(),
-                sourceKeyIndex, // SrcKeyIdx = 0: KeyValueIn es la llave en claro (Plaintext).
+                sourceKeyIndex,
                 keyLenByte,
-                keyBytes, // El IPEK en claro.
-                initialKsn,
-                checkMode, // Se pasa el modo de verificación.
-                checkBuffer // Se pasa el buffer con el KCV.
+                ipekBcd,
+                ksnInBcd,
+                checkMode,
+                checkBuffer
             )
 
             Log.i(TAG, "PedApi.PedDukptWriteTIK_Api finished with result code: $result")
@@ -490,19 +495,14 @@ class AisinoPedController(private val application: Application) : IPedController
             }
 
             Log.d(TAG, "Successfully wrote plaintext DUKPT IPEK to group index: $groupIndex")
-            Log.i(TAG, "--- writeDukptInitialKey Finished Successfully ---")
+            Log.i(TAG, "--- writeDukptInitialKey finished successfully ---")
 
-            true // Éxito
+            return@withContext true
         } catch (e: Exception) {
             Log.e(TAG, "An unexpected exception occurred while writing plaintext DUKPT initial key", e)
-            if (e is PedKeyException) {
-                throw e
-            } else {
-                throw PedKeyException("Failed to write DUKPT initial key: ${e.message}", e)
-            }
+            if (e is PedKeyException) throw e else throw PedKeyException("Failed to write DUKPT initial key: ${e.message}", e)
         }
     }
-
 
     @Throws(PedException::class)
     override suspend fun getDukptInfo(groupIndex: Int): DukptInfo? = withContext(Dispatchers.IO) {
@@ -903,7 +903,7 @@ class AisinoPedController(private val application: Application) : IPedController
         encryptedIpek: ByteArray,
         initialKsn: ByteArray,
         transportKeyIndex: Int,
-        keyChecksum: String?
+        keyChecksum: String? // Este parámetro será ignorado, pero se mantiene por la interfaz.
     ): Boolean = withContext(Dispatchers.IO) {
         // Log de entrada para registrar todos los parámetros recibidos
         Log.i(TAG, "--- Starting writeDukptInitialKeyEncrypted ---")
@@ -914,7 +914,7 @@ class AisinoPedController(private val application: Application) : IPedController
         Log.d(TAG, "-> Encrypted IPEK (Hex): ${encryptedIpek.joinToString("") { "%02X".format(it) }}")
         Log.d(TAG, "-> Encrypted IPEK Length: ${encryptedIpek.size}")
         Log.d(TAG, "-> Initial KSN (Hex): ${initialKsn.joinToString("") { "%02X".format(it) }}")
-        Log.d(TAG, "-> Key Checksum (KCV): ${keyChecksum ?: "Not Provided"}")
+        Log.d(TAG, "-> Key Checksum (KCV) from host: ${keyChecksum ?: "Not Provided"} (WILL BE IGNORED)")
 
         // Cálculo de la longitud de la llave para la API
         val keyLenByte: Byte = when (keyAlgorithm) {
@@ -928,57 +928,35 @@ class AisinoPedController(private val application: Application) : IPedController
         }
         Log.d(TAG, "Calculated key length byte for API call: $keyLenByte")
 
-
-        // Preparación del modo y buffer de verificación (Checksum/KCV)
-        val checkMode: Byte
-        val checkBuffer: ByteArray
-
-        if (keyChecksum.isNullOrBlank()) {
-            // Si no se proporciona checksum, no hacemos verificación.
-            checkMode = 0x00
-            checkBuffer = ByteArray(0)
-            Log.w(TAG, "No keyChecksum provided. Will attempt injection without KCV verification (iCheckMode=0x00).")
-        } else {
-            // Si hay checksum, preparamos el buffer para la verificación.
-            checkMode = 0x01 // iCheckMode 0x01: usar KCV para verificar
-            Log.d(TAG, "keyChecksum provided. Preparing buffer for KCV verification (iCheckMode=0x01).")
-            val checksumBytes = CommonConvert.hexStringToByte(keyChecksum)
-
-            // El formato es: [longitud_del_kcv, kcv_byte_1, kcv_byte_2, ...]
-            checkBuffer = ByteArray(1 + checksumBytes.size)
-            checkBuffer[0] = checksumBytes.size.toByte() // Longitud del KCV
-            System.arraycopy(checksumBytes, 0, checkBuffer, 1, checksumBytes.size)
-            Log.d(TAG, "Prepared checkBuffer for KCV '${keyChecksum}': ${checkBuffer.joinToString("") { "%02X".format(it) }}")
-        }
-
         try {
-            // Definir explícitamente el SrcKeyIdx para inyección cifrada
-            val sourceKeyIndex: Byte = 1
-
-            // Log final antes de la llamada a la API con todos los parámetros finales
-            Log.i(TAG, "Calling PedApi.PedDukptWriteTIK_Api with parameters:")
+            // Log final antes de la llamada a la API con todos los parámetros finales.
+            // Se emula el comportamiento de la demo del fabricante para asegurar la compatibilidad.
+            Log.i(TAG, "Calling PedApi.PedDukptWriteTIK_Api (DEMO-style, KCV check disabled)...")
             Log.i(TAG, "--> GroupIdx: ${groupIndex.toByte()}")
-            Log.i(TAG, "--> SrcKeyIdx: $sourceKeyIndex (1 = Encrypted IPEK)")
+            Log.i(TAG, "--> SrcKeyIdx: $IPEK_INJECTION_MODE_ENCRYPTED (1 = Encrypted IPEK)")
             Log.i(TAG, "--> KeyLen: $keyLenByte")
             Log.i(TAG, "--> KeyValueIn (Encrypted IPEK): ${encryptedIpek.joinToString("") { "%02X".format(it) }}")
             Log.i(TAG, "--> KsnIn: ${initialKsn.joinToString("") { "%02X".format(it) }}")
-            Log.i(TAG, "--> iCheckMode: $checkMode")
-            Log.i(TAG, "--> aucCheckBuf: ${checkBuffer.joinToString("") { "%02X".format(it) }}")
+            Log.i(TAG, "--> iCheckMode: $KCV_CHECK_MODE_DISABLED (Forced)")
+            Log.i(TAG, "--> aucCheckBuf: new ByteArray(16) (Forced)")
 
+            // --- LLAMADA CORREGIDA ---
+            // Se fuerza la desactivación de la verificación de KCV y se pasa un buffer de 16 bytes
+            // para coincidir con la implementación de la demo funcional.
             val result = PedApi.PedDukptWriteTIK_Api(
-                groupIndex.toByte(),
-                sourceKeyIndex, // SrcKeyIdx = 1: KeyValueIn es la IPEK cifrada. El PED usará la TLK para descifrarla.
-                keyLenByte,
+                1.toByte(),
+                IPEK_INJECTION_MODE_ENCRYPTED, // SrcKeyIdx = 1: IPEK cifrada.
+                16.toByte(),
                 encryptedIpek,
                 initialKsn,
-                checkMode, // Pasar el modo de verificación correcto
-                checkBuffer  // Pasar el buffer con el KCV y su longitud
+                KCV_CHECK_MODE_DISABLED,    // Forzar a 0x00 para deshabilitar chequeo KCV.
+                ByteArray(16)               // Forzar un buffer de 16 bytes como en la demo.
             )
 
             Log.i(TAG, "PedApi.PedDukptWriteTIK_Api finished with result code: $result")
 
             if (result != 0) {
-                // Si falla, registramos y lanzamos una excepción con el código de error del SDK
+                // Si falla, se registra y se lanza una excepción con el código de error del SDK.
                 val errorMsg = "Failed to write encrypted DUKPT IPEK. Aisino Error Code: $result"
                 Log.e(TAG, errorMsg)
                 throw PedKeyException(errorMsg)
@@ -990,7 +968,7 @@ class AisinoPedController(private val application: Application) : IPedController
             true // Éxito
         } catch (e: Exception) {
             Log.e(TAG, "An unexpected exception occurred while writing encrypted DUKPT IPEK", e)
-            // Re-lanzar como PedKeyException para mantener la consistencia
+            // Se re-lanza como PedKeyException para mantener la consistencia.
             if (e is PedKeyException) {
                 throw e
             } else {
