@@ -6,11 +6,9 @@ import android.os.Bundle
 import android.util.Log
 import com.example.manufacturer.base.controllers.ped.*
 import com.example.manufacturer.base.models.*
-import com.example.manufacturer.base.models.KeyAlgorithm
 import com.urovo.sdk.pinpad.PinPadProviderImpl
 import com.urovo.sdk.pinpad.listener.PinInputListener
 import kotlinx.coroutines.suspendCancellableCoroutine
-import java.util.Arrays
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import com.example.manufacturer.base.models.KeyType as GenericKeyType
@@ -28,10 +26,10 @@ class UrovoPedController(private val context: Context) : IPedController {
 
     private fun mapToUrovoKeyType(generic: GenericKeyType): Int {
         return when (generic) {
-            GenericKeyType.MASTER_KEY -> UrovoConstants.KeyType.MAIN_KEY
-            GenericKeyType.WORKING_MAC_KEY -> UrovoConstants.KeyType.MAC_KEY
-            GenericKeyType.WORKING_PIN_KEY -> UrovoConstants.KeyType.PIN_KEY
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> UrovoConstants.KeyType.TD_KEY
+            GenericKeyType.MASTER_KEY -> UrovoConstants.KeyType.MAIN_KEY //
+            GenericKeyType.WORKING_MAC_KEY -> UrovoConstants.KeyType.MAC_KEY //
+            GenericKeyType.WORKING_PIN_KEY -> UrovoConstants.KeyType.PIN_KEY //
+            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> UrovoConstants.KeyType.TD_KEY //
             GenericKeyType.DUKPT_INITIAL_KEY, GenericKeyType.DUKPT_WORKING_KEY -> {
                 Log.w(TAG, "DUKPT KeyType mapped to TD_KEY for Urovo ops.")
                 UrovoConstants.KeyType.TD_KEY
@@ -43,9 +41,9 @@ class UrovoPedController(private val context: Context) : IPedController {
 
     private fun mapToUrovoDukptKeyTypeParam(generic: GenericKeyType): Int {
         return when (generic) {
-            GenericKeyType.WORKING_PIN_KEY -> UrovoConstants.DukptKeyTypeParam.PIN
-            GenericKeyType.WORKING_MAC_KEY -> UrovoConstants.DukptKeyTypeParam.MAC
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> UrovoConstants.DukptKeyTypeParam.TRACK_DATA
+            GenericKeyType.WORKING_PIN_KEY -> UrovoConstants.DukptKeyTypeParam.PIN //
+            GenericKeyType.WORKING_MAC_KEY -> UrovoConstants.DukptKeyTypeParam.MAC //
+            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> UrovoConstants.DukptKeyTypeParam.TRACK_DATA //
             else -> throw PedKeyException("Unsupported generic KeyType for Urovo DUKPT Param: $generic")
         }
     }
@@ -60,13 +58,13 @@ class UrovoPedController(private val context: Context) : IPedController {
     }
 
     private fun mapToUrovoDesParams(alg: GenericKeyAlgorithm, mode: GenericBlockCipherMode?, encrypt: Boolean): Pair<Int, Int> {
-        val desMode = if (encrypt) UrovoConstants.DesMode.ENC else UrovoConstants.DesMode.DEC
+        val desMode = if (encrypt) UrovoConstants.DesMode.ENC else UrovoConstants.DesMode.DEC //
         val algorithm = when (alg) {
             GenericKeyAlgorithm.DES_SINGLE, GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE ->
-                if (mode == GenericBlockCipherMode.CBC) UrovoConstants.Algorithm.DES_CBC else UrovoConstants.Algorithm.DES_ECB
-            GenericKeyAlgorithm.SM4 -> UrovoConstants.Algorithm.SM4
+                if (mode == GenericBlockCipherMode.CBC) UrovoConstants.Algorithm.DES_CBC else UrovoConstants.Algorithm.DES_ECB //
+            GenericKeyAlgorithm.SM4 -> UrovoConstants.Algorithm.SM4 //
             GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 ->
-                if (mode == GenericBlockCipherMode.CBC) UrovoConstants.Algorithm.AES_CBC else UrovoConstants.Algorithm.AES_ECB
+                if (mode == GenericBlockCipherMode.CBC) UrovoConstants.Algorithm.AES_CBC else UrovoConstants.Algorithm.AES_ECB //
             else -> throw PedCryptoException("Unsupported algorithm for Urovo 'calculateDes': $alg")
         }
         return Pair(desMode, algorithm)
@@ -74,29 +72,29 @@ class UrovoPedController(private val context: Context) : IPedController {
 
     private fun mapToUrovoMacMode(generic: GenericMacAlgorithm): Int {
         return when (generic) {
-            GenericMacAlgorithm.CBC_MAC_ISO9797_1_M1 -> UrovoConstants.MacMode.ANSI_X9_9
-            GenericMacAlgorithm.RETAIL_MAC_ANSI_X9_19 -> UrovoConstants.MacMode.ANSI_X9_19
-            GenericMacAlgorithm.UNIONPAY_CBC_MAC -> UrovoConstants.MacMode.XOR
-            GenericMacAlgorithm.CMAC_AES -> UrovoConstants.MacMode.CMAC
+            GenericMacAlgorithm.CBC_MAC_ISO9797_1_M1 -> UrovoConstants.MacMode.ANSI_X9_9 //
+            GenericMacAlgorithm.RETAIL_MAC_ANSI_X9_19 -> UrovoConstants.MacMode.ANSI_X9_19 //
+            GenericMacAlgorithm.UNIONPAY_CBC_MAC -> UrovoConstants.MacMode.XOR //
+            GenericMacAlgorithm.CMAC_AES -> UrovoConstants.MacMode.CMAC //
             else -> throw PedCryptoException("Unsupported generic MacAlgorithm for Urovo: $generic")
         }
     }
 
     private fun mapToUrovoKeyAlgorithm(generic: GenericKeyAlgorithm): Int {
         return when (generic) {
-            GenericKeyAlgorithm.DES_SINGLE, GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> UrovoConstants.KeyAlgorithm.DES
-            GenericKeyAlgorithm.SM4 -> UrovoConstants.KeyAlgorithm.SM4
-            GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> UrovoConstants.KeyAlgorithm.AES
+            GenericKeyAlgorithm.DES_SINGLE, GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> UrovoConstants.KeyAlgorithm.DES //
+            GenericKeyAlgorithm.SM4 -> UrovoConstants.KeyAlgorithm.SM4 //
+            GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> UrovoConstants.KeyAlgorithm.AES //
             else -> UrovoConstants.KeyAlgorithm.DES // Default
         }
     }
 
     private fun mapToUrovoAesDukptWorkKeyType(generic: GenericKeyAlgorithm): Int {
         return when (generic) {
-            GenericKeyAlgorithm.DES_TRIPLE -> UrovoConstants.DukptAesWorkKeyType._3TDEA
-            GenericKeyAlgorithm.AES_128 -> UrovoConstants.DukptAesWorkKeyType._AES128
-            GenericKeyAlgorithm.AES_192 -> UrovoConstants.DukptAesWorkKeyType._AES192
-            GenericKeyAlgorithm.AES_256 -> UrovoConstants.DukptAesWorkKeyType._AES256
+            GenericKeyAlgorithm.DES_TRIPLE -> UrovoConstants.DukptAesWorkKeyType._3TDEA //
+            GenericKeyAlgorithm.AES_128 -> UrovoConstants.DukptAesWorkKeyType._AES128 //
+            GenericKeyAlgorithm.AES_192 -> UrovoConstants.DukptAesWorkKeyType._AES192 //
+            GenericKeyAlgorithm.AES_256 -> UrovoConstants.DukptAesWorkKeyType._AES256 //
             else -> throw PedKeyException("Unsupported KeyAlgorithm for Urovo AES DUKPT WorkKeyType: $generic")
         }
     }
@@ -140,7 +138,7 @@ class UrovoPedController(private val context: Context) : IPedController {
     override suspend fun writeKey(
         keyIndex: Int, // Índice de la nueva llave a cargar (wkId)
         keyType: GenericKeyType, // Tipo de la nueva llave a cargar
-        keyAlgorithm: GenericKeyAlgorithm, // Algoritmo de la nueva llave (no usado directamente por loadWorkKey/loadEncryptMainKey pero sí por setKeyAlgorithm)
+        keyAlgorithm: GenericKeyAlgorithm, // Algoritmo de la nueva llave
         keyData: PedKeyData, // Datos de la nueva llave (cifrada) y su KCV (en claro)
         transportKeyIndex: Int?, // Índice de la llave que cifra (mkId o tekId)
         transportKeyType: GenericKeyType? // Tipo de la llave que cifra
@@ -149,15 +147,12 @@ class UrovoPedController(private val context: Context) : IPedController {
             throw PedKeyException("La carga de llaves cifradas requiere transportKeyIndex y transportKeyType")
         }
 
-        // Establecer el algoritmo GLOBAL del Pinpad ANTES de la operación de carga de llave.
-        // El SDK de Urovo usa un estado global mAlg.
         setKeyAlgorithm(keyAlgorithm)
 
         try {
             // CASO 1: Cargando una Llave Maestra (ej. TMK) cifrada por otra Maestra/Transporte (ej. KEK)
             if (keyType == GenericKeyType.MASTER_KEY) {
                 Log.d(TAG, "Cargando Main Key Cifrada: MK_ID(KEK_ID)=$transportKeyIndex, WK_ID(TMK_ID)=$keyIndex, KCV=${keyData.kcv != null}")
-                // El SDK de Urovo usa tekId para la llave de cifrado de una Main Key
                 val result = pinpadInstance.loadEncryptMainKey(
                     transportKeyIndex, // tekId (índice de la KEK)
                     keyIndex,          // keyId (índice de la nueva TMK)
@@ -175,15 +170,11 @@ class UrovoPedController(private val context: Context) : IPedController {
                 keyType == GenericKeyType.WORKING_MAC_KEY ||
                 keyType == GenericKeyType.WORKING_DATA_ENCRYPTION_KEY) {
 
-                // La validación original sobre transportKeyType.
-                // Si la TMK se cargó como MASTER_KEY, esto está bien.
                 if (transportKeyType != GenericKeyType.MASTER_KEY) {
-                    // Podrías flexibilizar esto si tu TMK puede ser de otro tipo genérico pero funciona como MK.
                     throw PedKeyException("Urovo loadWorkKey espera que la llave de transporte (TMK) sea de tipo MASTER_KEY")
                 }
 
-                val npKeyType = mapToUrovoKeyType(keyType) // Convierte WORKING_PIN_KEY a 2, WORKING_MAC_KEY a 1, etc.
-                // según la especificación de Urovo para el parámetro keyType de loadWorkKey
+                val npKeyType = mapToUrovoKeyType(keyType)
                 Log.d(TAG, "Cargando Work Key: Type(SDK)=$npKeyType, MK_ID(TMK_ID)=$transportKeyIndex, WK_ID=$keyIndex, KCV=${keyData.kcv != null}")
 
                 val result = pinpadInstance.loadWorkKey(
@@ -199,19 +190,16 @@ class UrovoPedController(private val context: Context) : IPedController {
                 }
                 return true
             }
-            // Otros tipos de llave cifrada no soportados por esta lógica
             else {
                 throw PedKeyException("Tipo de llave '${keyType}' no soportado para carga cifrada con esta función.")
             }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error al escribir llave cifrada ($keyType)", e)
-            if (e is PedKeyException) throw e // Re-lanzar si ya es PedKeyException
+            if (e is PedKeyException) throw e
             throw PedKeyException("Fallo al escribir llave cifrada ($keyType): ${e.message}", e)
         }
     }
-
-    // En UrovoPedController.kt
 
     override suspend fun writeKeyPlain(
         keyIndex: Int,
@@ -220,25 +208,20 @@ class UrovoPedController(private val context: Context) : IPedController {
         keyBytes: ByteArray,
         kcvBytes: ByteArray?
     ): Boolean {
-        // Permitir MASTER_KEY o TRANSPORT_KEY para carga en claro.
-        // Ambas representan llaves de alto nivel y el SDK las maneja de forma similar para carga en claro.
         if (keyType != GenericKeyType.MASTER_KEY && keyType != GenericKeyType.TRANSPORT_KEY) {
             throw PedKeyException("Carga en claro (writeKeyPlain) implementada solo para MASTER_KEY o TRANSPORT_KEY.")
         }
 
         try {
-            setKeyAlgorithm(keyAlgorithm) // Establecer el algoritmo antes de cargar
+            setKeyAlgorithm(keyAlgorithm)
 
-            val keyPurposeDescription = if (keyType == GenericKeyType.TRANSPORT_KEY) "Transport Key (KEK)" else "Main Key"
+            val keyPurposeDescription = if (keyType == GenericKeyType.TRANSPORT_KEY) "Transport Key (TEK)" else "Main Key"
             Log.d(TAG, "Cargando $keyPurposeDescription (Claro): ID=$keyIndex, Alg=$keyAlgorithm, KCV presente: ${kcvBytes != null}")
 
-            // PinPadProviderImpl.loadMainKey() y loadTEK() son funcionalmente equivalentes para carga en claro.
-            // Podemos seguir usando loadMainKey() o usar loadTEK() si keyType es TRANSPORT_KEY
-            // para mayor alineación semántica con el SDK, aunque su implementación interna es casi idéntica.
             val result = if (keyType == GenericKeyType.TRANSPORT_KEY) {
-                pinpadInstance.loadTEK(keyIndex, keyBytes, kcvBytes) // Usar loadTEK para KEKs
+                pinpadInstance.loadTEK(keyIndex, keyBytes, kcvBytes) //
             } else {
-                pinpadInstance.loadMainKey(keyIndex, keyBytes, kcvBytes) // Usar loadMainKey para otras Master Keys
+                pinpadInstance.loadMainKey(keyIndex, keyBytes, kcvBytes) //
             }
 
             if (!result) {
@@ -253,7 +236,7 @@ class UrovoPedController(private val context: Context) : IPedController {
             }
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Error al escribir llave ($keyType - claro)", e) // Loguear el tipo genérico
+            Log.e(TAG, "Error al escribir llave ($keyType - claro)", e)
             if (e is PedKeyException) throw e
             throw PedKeyException("Fallo al escribir llave (claro): ${e.message}", e)
         }
@@ -261,31 +244,22 @@ class UrovoPedController(private val context: Context) : IPedController {
 
     override suspend fun writeDukptInitialKeyEncrypted(
         groupIndex: Int,
-        keyAlgorithm: KeyAlgorithm,
+        keyAlgorithm: GenericKeyAlgorithm,
         encryptedIpek: ByteArray,
         initialKsn: ByteArray,
         transportKeyIndex: Int,
         keyChecksum: String?
     ): Boolean {
-        TODO("Not yet implemented")
-    }
-
-     suspend fun writeDukptInitialKeyEncrypted(
-        groupIndex: Int,
-        keyAlgorithm: KeyAlgorithm,
-        encryptedIpek: ByteArray,
-        initialKsn: ByteArray,
-        transportKeyIndex: Int
-    ): Boolean {
-        TODO("Not yet implemented")
+        TODO("Not yet implemented for Urovo")
     }
 
     override suspend fun deleteKey(keyIndex: Int, keyType: GenericKeyType): Boolean {
         val npKeyType = mapToUrovoKeyType(keyType)
         try {
             Log.d(TAG, "Borrando Llave: Type=$npKeyType, ID=$keyIndex")
-            val result = pinpadInstance.deleteKey(npKeyType, keyIndex)
-            if (result == UrovoConstants.ErrorCode.SUCCESS || result == UrovoConstants.ErrorCode.KEY_NOT_EXIST) {
+            val result = pinpadInstance.deleteKey(npKeyType, keyIndex) //
+            // El resultado 23 (key is not exist) también se considera éxito.
+            if (result == UrovoConstants.ErrorCode.SUCCESS || result == 23) {
                 return true
             } else {
                 throw PedKeyException("Fallo al borrar llave. Urovo Error Code: $result")
@@ -304,7 +278,7 @@ class UrovoPedController(private val context: Context) : IPedController {
     override suspend fun isKeyPresent(keyIndex: Int, keyType: GenericKeyType): Boolean {
         val npKeyType = mapToUrovoKeyType(keyType)
         return try {
-            pinpadInstance.isKeyExist(npKeyType, keyIndex)
+            pinpadInstance.isKeyExist(npKeyType, keyIndex) //
         } catch (e: Exception) {
             Log.e(TAG, "Error verificando presencia de llave", e)
             throw PedException("Fallo al verificar presencia de llave: ${e.message}", e)
@@ -320,39 +294,31 @@ class UrovoPedController(private val context: Context) : IPedController {
 
     override suspend fun writeDukptInitialKey(
         groupIndex: Int,
-        keyAlgorithm: KeyAlgorithm,
-        keyBytes: ByteArray,
-        initialKsn: ByteArray,
-        keyChecksum: String?
-    ): Boolean {
-        TODO("Not yet implemented")
-    }
-
-     suspend fun writeDukptInitialKey(
-        groupIndex: Int,
         keyAlgorithm: GenericKeyAlgorithm,
-        keyBytes: ByteArray, // BDK
-        initialKsn: ByteArray // KSN
+        keyBytes: ByteArray, // IPEK
+        initialKsn: ByteArray,
+        keyChecksum: String? // No es soportado por la API de Urovo
     ): Boolean {
         if (groupIndex < 1 || groupIndex > 4) {
             throw PedKeyException("Índice de grupo DUKPT Urovo debe ser entre 1 y 4.")
         }
-        // TODO: La API `downloadKeyDukpt` requiere IPEK. ¿Cómo se obtiene o se pasa?
-        // La API `DukptAesInitial` también puede requerir IPEK.
-        // ASUNCIÓN: La API puede manejar IPEK nulo si BDK se proporciona. ¡¡VERIFICAR!!
-        Log.w(TAG, "writeDukptInitialKey: La API de Urovo puede requerir IPEK, intentando con null.")
+        Log.d(TAG, "Cargando DUKPT IPEK (Claro): Index=$groupIndex, Alg=$keyAlgorithm, KSN=${initialKsn.toHexString()}")
 
         try {
+            setKeyAlgorithm(keyAlgorithm)
             val result = when (keyAlgorithm) {
                 GenericKeyAlgorithm.DES_TRIPLE, GenericKeyAlgorithm.DES_DOUBLE -> {
-                    pinpadInstance.downloadKeyDukpt(groupIndex, keyBytes, keyBytes.size, initialKsn, initialKsn.size, null, 0)
+                    // Pasamos los keyBytes como IPEK (bsIpek) y el BDK como nulo.
+                    pinpadInstance.downloadKeyDukpt(groupIndex, null, 0, initialKsn, initialKsn.size, keyBytes, keyBytes.size) //
                 }
                 GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> {
                     val deriveKeyType = mapToUrovoAesDukptWorkKeyType(keyAlgorithm)
-                    pinpadInstance.DukptAesInitial(groupIndex, keyBytes, keyBytes.size, null, 0, deriveKeyType, initialKsn, initialKsn.size)
+                    // La API también espera IPEK, no BDK, para carga directa.
+                    pinpadInstance.DukptAesInitial(groupIndex, null, 0, keyBytes, keyBytes.size, deriveKeyType, initialKsn, initialKsn.size) //
                 }
                 else -> throw PedKeyException("Algoritmo DUKPT no soportado: $keyAlgorithm")
             }
+
             if (result != 0) {
                 throw PedKeyException("Fallo al escribir llave inicial DUKPT. Urovo Error: $result")
             }
@@ -364,21 +330,20 @@ class UrovoPedController(private val context: Context) : IPedController {
     }
 
     override suspend fun getDukptInfo(groupIndex: Int): DukptInfo? {
-        val ksnOut = ByteArray(12) // Buffer grande
+        val ksnOut = ByteArray(12) // Buffer grande para TDES (10) o AES (12)
         return try {
-            var result = pinpadInstance.DukptAesGetKsn(groupIndex, ksnOut)
+            var result = pinpadInstance.DukptGetKsn(groupIndex, ksnOut) //
+            var ksnSize = 10
+
             if (result != 0) {
-                result = pinpadInstance.DukptGetKsn(groupIndex, ksnOut) // Intenta TDES
+                result = pinpadInstance.DukptAesGetKsn(groupIndex, ksnOut) // Intenta AES
+                ksnSize = 12
             }
 
             if (result == 0) {
-                // La API no devuelve la longitud real, KSN TDES es 10, AES puede ser 12.
-                // TODO: ¿Cómo saber la longitud real o si es TDES/AES? Asumimos 10 para TDES y 12 para AES si el primer intento funcionó.
-                // Por simplicidad, si DukptGetKsn funcionó, usamos 10 bytes. Si DukptAesGetKsn funcionó, 12.
-                // Aquí, si llega con result==0, no sabemos cuál funcionó. Es un problema.
-                // Devolvemos 10 bytes como la opción más probable para TDES.
-                Log.w(TAG, "Obtenido KSN, pero longitud exacta y tipo (TDES/AES) ambiguos. Devolviendo 10 bytes.")
-                DukptInfo(ksnOut.copyOf(10), null)
+                val finalKsn = ksnOut.copyOf(ksnSize)
+                Log.d(TAG, "KSN DUKPT obtenido para índice $groupIndex: ${finalKsn.toHexString()}")
+                DukptInfo(finalKsn, null)
             } else {
                 Log.w(TAG, "Fallo al obtener KSN DUKPT para índice $groupIndex. Error: $result")
                 null
@@ -392,8 +357,8 @@ class UrovoPedController(private val context: Context) : IPedController {
     override suspend fun incrementDukptKsn(groupIndex: Int): Boolean {
         val ksnOut = ByteArray(12)
         return try {
-            Log.w(TAG, "Intentando incrementar KSN DUKPT AES (puede ser automático).")
-            pinpadInstance.DukptAesUpdateKsn(groupIndex, ksnOut) == 0
+            Log.w(TAG, "Intentando incrementar KSN DUKPT AES (TDES lo hace automático).")
+            pinpadInstance.DukptAesUpdateKsn(groupIndex, ksnOut) == 0 //
         } catch (e: Exception) {
             Log.e(TAG, "Error al incrementar KSN DUKPT (solo AES soportado explícitamente)", e)
             false
@@ -431,9 +396,8 @@ class UrovoPedController(private val context: Context) : IPedController {
                 desMode, algorithm, npKeyType, request.keyIndex, request.data, dataOut
             )
             if (result == 0) {
-                // Urovo no devuelve longitud. Esto es un problema.
-                // Asumimos que la salida tiene la misma longitud que la entrada (ECB) o múltiplo (CBC).
-                // TODO: ¡VERIFICAR ESTA LÓGICA! Es muy probable que se necesite manejo de padding.
+                // La API de Urovo no devuelve la longitud real. Asumimos que la salida tiene la misma longitud que la entrada para ECB.
+                // Para CBC con padding, el tamaño puede variar. Este es un riesgo con esta API.
                 Log.w(TAG, "Cifrado simétrico exitoso, pero longitud de salida es incierta. Asumiendo longitud de entrada.")
                 return PedCipherResult(dataOut.copyOf(request.data.size))
             } else {
@@ -450,31 +414,38 @@ class UrovoPedController(private val context: Context) : IPedController {
         val npDukptKeyType = mapToUrovoDukptKeyTypeParam(request.keyType)
         val iv = request.iv ?: ByteArray(8)
         val dataOut = ByteArray(request.data.size + 16)
-        val outLen = IntArray(1) { dataOut.size } // Inicializar con tamaño máximo
+        val outLen = IntArray(1) { dataOut.size }
         val outKsn = ByteArray(12)
         val ksnLen = IntArray(1) { outKsn.size }
 
         try {
+            setKeyAlgorithm(request.algorithm)
             val isAes = request.algorithm.name.startsWith("AES")
             val result: Int
 
             if (isAes) {
                 val workKeyType = mapToUrovoAesDukptWorkKeyType(request.algorithm)
-                val encMode = if (request.mode == GenericBlockCipherMode.CBC) UrovoConstants.DukptAesEncMode.CBC_ENCRYPT else UrovoConstants.DukptAesEncMode.ECB_ENCRYPT
-                val cipherMode = if (request.encrypt) encMode else encMode + 0x10 // +0x10 para descifrar
-                val keyTypeForAlg = (npDukptKeyType or (0x00 shl 8)) // 0x00 = Data encryption
+                val encMode = if (request.encrypt) {
+                    if (request.mode == GenericBlockCipherMode.CBC) UrovoConstants.DukptAesEncMode.CBC_ENCRYPT else UrovoConstants.DukptAesEncMode.ECB_ENCRYPT //
+                } else {
+                    if (request.mode == GenericBlockCipherMode.CBC) UrovoConstants.DukptAesEncMode.CBC_DECRYPT else UrovoConstants.DukptAesEncMode.ECB_DECRYPT //
+                }
+                val keyTypeForAlg = (npDukptKeyType or (0x00 shl 8)) // 0x00 = Data encryption/decryption
 
                 result = pinpadInstance.DukptAesEncryptDataIV(
-                    keyTypeForAlg, groupIndex, cipherMode, workKeyType,
+                    keyTypeForAlg, groupIndex, encMode, workKeyType,
                     iv, iv.size, request.data, request.data.size,
                     dataOut, outLen, outKsn, ksnLen
                 )
             } else { // TDES
-                val encMode = if (request.mode == GenericBlockCipherMode.CBC) UrovoConstants.DukptEncModeTdes.CBC_ENCRYPT else UrovoConstants.DukptEncModeTdes.ECB_ENCRYPT
-                val cipherMode = if (request.encrypt) encMode else encMode + 0x10 // +0x10 para descifrar
+                val encMode = if (request.encrypt) {
+                    if (request.mode == GenericBlockCipherMode.CBC) UrovoConstants.DukptEncModeTdes.CBC_ENCRYPT else UrovoConstants.DukptEncModeTdes.ECB_ENCRYPT //
+                } else {
+                    if (request.mode == GenericBlockCipherMode.CBC) UrovoConstants.DukptEncModeTdes.CBC_DECRYPT else UrovoConstants.DukptEncModeTdes.ECB_DECRYPT //
+                }
 
                 result = pinpadInstance.DukptEncryptDataIV(
-                    npDukptKeyType, groupIndex, cipherMode,
+                    npDukptKeyType, groupIndex, encMode,
                     iv, iv.size, request.data, request.data.size,
                     dataOut, outLen, outKsn, ksnLen
                 )
@@ -503,20 +474,19 @@ class UrovoPedController(private val context: Context) : IPedController {
     private suspend fun calculateStandardMac(request: PedMacRequest): PedMacResult {
         val npMacMode = mapToUrovoMacMode(request.algorithm)
         try {
-            // La línea `setKeyAlgorithm(request.algorithm)` ha sido eliminada.
+            setKeyAlgorithm(GenericKeyAlgorithm.DES_TRIPLE) // MAC es usualmente TDES
             Log.d(TAG, "Calculando MAC Estándar: ID=${request.keyIndex}, Mode=$npMacMode")
-            val mac = pinpadInstance.calcMAC(request.keyIndex, request.data, npMacMode)
+            val mac = pinpadInstance.calcMAC(request.keyIndex, request.data, npMacMode) //
             if (mac != null) {
                 return PedMacResult(mac)
             } else {
-                throw PedCryptoException("Cálculo de MAC estándar falló (null).")
+                throw PedCryptoException("Cálculo de MAC estándar falló (resultado nulo).")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error calculando MAC estándar", e)
             throw PedCryptoException("Cálculo de MAC estándar falló: ${e.message}", e)
         }
     }
-
 
     private suspend fun calculateDukptMac(request: PedMacRequest): PedMacResult {
         val groupIndex = request.dukptGroupIndex ?: throw PedCryptoException("Índice de grupo DUKPT requerido")
@@ -526,40 +496,15 @@ class UrovoPedController(private val context: Context) : IPedController {
         val ksnLen = IntArray(1) { outKsn.size }
 
         try {
-            val isAes = request.algorithm.name.contains("AES") || request.algorithm == GenericMacAlgorithm.CMAC_AES
-            val result: Int
+            setKeyAlgorithm(GenericKeyAlgorithm.DES_TRIPLE) // El MAC DUKPT Retail es TDES
+            val keySetNum = UrovoConstants.DukptKeySetNum.MAC_SET
+            Log.d(TAG, "Calculando MAC DUKPT TDES: Index=$groupIndex, KeySet=$keySetNum")
 
-            if (isAes) {
-                // Establece el algoritmo base a AES
-                setKeyAlgorithm(GenericKeyAlgorithm.AES_128) // O AES_192 / AES_256 si se sabe
-                val workKeyType = mapToUrovoAesDukptWorkKeyType(GenericKeyAlgorithm.AES_128) // O el específico
-                val macAlg = when (request.algorithm) {
-                    GenericMacAlgorithm.RETAIL_MAC_ANSI_X9_19 -> UrovoConstants.DukptAesMacMode.MAC_ALG_X9_19
-                    // TODO: Mapear CMAC_AES si Urovo lo soporta via DukptAesEncryptDataIV
-                    else -> throw PedCryptoException("Algoritmo MAC AES DUKPT no soportado.")
-                }
-                val keyTypeForAlg = (UrovoConstants.DukptKeyTypeParam.MAC or (0x01 shl 8)) // 0x02, 0x01 = Generación
-
-                Log.d(TAG, "Calculando MAC DUKPT AES: Index=$groupIndex, Mode=$macAlg")
-                result = pinpadInstance.DukptAesEncryptDataIV(
-                    keyTypeForAlg, groupIndex, macAlg, workKeyType,
-                    request.iv ?: ByteArray(8), (request.iv ?: ByteArray(8)).size,
-                    request.data, request.data.size,
-                    dataOut, outDataLen, outKsn, ksnLen
-                )
-            } else { // TDES
-                // Establece el algoritmo base a TDES
-                setKeyAlgorithm(GenericKeyAlgorithm.DES_TRIPLE)
-                // Se asume que calculateMACOfDUKPTExtend usa TDES por defecto y el keySetNum correcto.
-                val keySetNum = mapToUrovoDukptKeySetNum(GenericKeyType.WORKING_MAC_KEY) // 0x04
-
-                Log.d(TAG, "Calculando MAC DUKPT TDES: Index=$groupIndex, KeySet=$keySetNum")
-                result = pinpadInstance.calculateMACOfDUKPTExtend(
-                    keySetNum, // Usa keySetNum 0x04 para MAC DUKPT
-                    request.data, request.data.size,
-                    dataOut, outDataLen, outKsn, ksnLen
-                )
-            }
+            val result = pinpadInstance.calculateMACOfDUKPTExtend(
+                keySetNum,
+                request.data, request.data.size,
+                dataOut, outDataLen, outKsn, ksnLen
+            ) //
 
             if (result == 0) {
                 val mac = dataOut.copyOf(outDataLen[0])
@@ -577,25 +522,25 @@ class UrovoPedController(private val context: Context) : IPedController {
 
     override suspend fun getPinBlock(request: PedPinRequest): PedPinResult {
         val bundle = Bundle()
-        bundle.putString("card_no", request.pan ?: "")
-        bundle.putInt("TimeoutMs", request.timeoutSeconds * 1000)
-        // La API espera un ShortArray para supportPinLen, pero la doc dice String. Usamos String. [cite: 25]
-        bundle.putString("supportPinLen", request.pinLengthConstraints) // "0,4,5,6,7,8,9,10,11,12"
-        bundle.putBoolean("Bypass", request.allowBypass)
-        bundle.putString("title", request.promptMessage ?: "Enter PIN")
-        bundle.putBoolean("sound", true)
-        bundle.putBoolean("FullScreen", true)
-        // TODO: Añadir más opciones del bundle si es necesario (random, colores, etc.)
+
+        bundle.putBoolean("OnlinePin", true) //
+        bundle.putString("message", request.promptMessage ?: "Enter PIN") //
+        bundle.putString("card_no", request.pan ?: "") //
+        bundle.putLong("timeoutMs", (request.timeoutSeconds * 1000).toLong()) //
+        bundle.putString("supportPinLen", request.pinLengthConstraints) //
+        bundle.putBoolean("Bypass", request.allowBypass) //
+        bundle.putString("title", request.promptMessage ?: "Enter PIN") //
+        bundle.putBoolean("sound", true) //
+        bundle.putBoolean("FullScreen", true) //
 
         return suspendCancellableCoroutine { continuation ->
-            // Asegúrate de que PinInputListener es la interfaz correcta
-            val listener = object : com.urovo.sdk.pinpad.listener.PinInputListener { // Usamos el FQN para claridad
-                override fun onInput(len: Int, key: Int) { Log.d(TAG, "PIN Input: L=$len") }
-                override fun onCancel() { if (continuation.isActive) continuation.resumeWithException(PedCancellationException("Cancelado por usuario.")) }
-                override fun onTimeOut() { if (continuation.isActive) continuation.resumeWithException(PedTimeoutException("Timeout PIN.")) }
-                override fun onError(errorCode: Int) { if (continuation.isActive) continuation.resumeWithException(PedException("Error PIN: $errorCode")) }
+            val listener = object : PinInputListener {
+                override fun onInput(len: Int, key: Int) { Log.d(TAG, "PIN Input: L=$len") } //
+                override fun onCancel() { if (continuation.isActive) continuation.resumeWithException(PedCancellationException("Cancelado por usuario.")) } //
+                override fun onTimeOut() { if (continuation.isActive) continuation.resumeWithException(PedTimeoutException("Timeout PIN.")) } //
+                override fun onError(errorCode: Int) { if (continuation.isActive) continuation.resumeWithException(PedException("Error PIN: $errorCode")) } //
 
-                override fun onConfirm(data: ByteArray?, isNonePin: Boolean) {
+                override fun onConfirm(data: ByteArray?, isNonePin: Boolean) { //
                     if (continuation.isActive) {
                         when {
                             isNonePin && request.allowBypass -> continuation.resumeWithException(PedCancellationException("Bypass PIN."))
@@ -605,10 +550,7 @@ class UrovoPedController(private val context: Context) : IPedController {
                     }
                 }
 
-                // --- CORRECCIÓN ---
-                // Se corrigió el nombre de 'onConfim_dukpt' a 'onConfirm_dukpt' para coincidir con la interfaz.
-                override fun onConfirm_dukpt(pinBlock: ByteArray?, ksn: ByteArray?) {
-                    // --- FIN CORRECCIÓN ---
+                override fun onConfirm_dukpt(pinBlock: ByteArray?, ksn: ByteArray?) { //
                     if (continuation.isActive) {
                         when {
                             pinBlock != null && ksn != null -> continuation.resume(PedPinResult(pinBlock, DukptInfo(ksn, null)))
@@ -620,24 +562,32 @@ class UrovoPedController(private val context: Context) : IPedController {
             }
 
             try {
-                // setKeyAlgorithm(request.algorithm) // <--- LÍNEA ELIMINADA (Resuelto en paso anterior)
+                setKeyAlgorithm(request.algorithm)
                 when {
-                    // Ahora `request.algorithm` existe gracias a la modificación de PedPinRequest
                     request.isDukpt && request.algorithm.name.startsWith("AES") -> {
-                        bundle.putInt("WorkKeyType", mapToUrovoAesDukptWorkKeyType(request.algorithm))
+                        bundle.putInt("WorkKeyType", mapToUrovoAesDukptWorkKeyType(request.algorithm)) //
                         bundle.putInt("PINKeyNo", request.dukptGroupIndex ?: throw PedException("Índice DUKPT requerido"))
                         Log.d(TAG, "Pidiendo PinBlock DUKPT AES...")
-                        pinpadInstance.GetDukptAesPinBlock(bundle, listener)
+                        pinpadInstance.GetDukptAesPinBlock(bundle, listener) //
                     }
                     request.isDukpt -> {
-                        bundle.putInt("PINKeyNo", request.dukptGroupIndex ?: throw PedException("Índice DUKPT requerido"))
+                        bundle.putInt("PINKeyNo", request.dukptGroupIndex ?: throw PedException("Índice DUKPT requerido")) //
                         Log.d(TAG, "Pidiendo PinBlock DUKPT TDES...")
-                        pinpadInstance.GetDukptPinBlock(bundle, listener)
+                        pinpadInstance.GetDukptPinBlock(bundle, listener) //
                     }
                     else -> {
-                        bundle.putInt("PINKeyNo", request.keyIndex)
-                        Log.d(TAG, "Pidiendo PinBlock MK/SK...")
-                        pinpadInstance.getPinBlockEx(bundle, listener)
+                        bundle.putInt("PINKeyNo", request.keyIndex) //
+
+                        // --- ARREGLO: Mapear el formato de PinBlock a pinAlgMode para getPinBlockEx ---
+                        val pinAlgMode = when (request.format) {
+                            GenericPinBlockFormatType.ISO9564_0 -> 0
+                            GenericPinBlockFormatType.ISO9564_3 -> 1
+                            else -> 0 // Por defecto, usar formato 0
+                        }
+                        bundle.putInt("pinAlgMode", pinAlgMode)
+                        Log.d(TAG, "Pidiendo PinBlock MK/SK (getPinBlockEx) con pinAlgMode: $pinAlgMode")
+
+                        pinpadInstance.getPinBlockEx(bundle, listener) //
                     }
                 }
             } catch (e: Exception) {
@@ -655,7 +605,7 @@ class UrovoPedController(private val context: Context) : IPedController {
     override fun cancelPinEntry() {
         try {
             Log.d(TAG, "Cancelando PIN entry via EndPinInputEvent.")
-            pinpadInstance.EndPinInputEvent(UrovoConstants.PinInputEvent.CANCEL)
+            pinpadInstance.EndPinInputEvent(UrovoConstants.PinInputEvent.CANCEL) //
         } catch (e: Exception) {
             Log.e(TAG, "Error al cancelar PIN entry", e)
         }
@@ -679,7 +629,7 @@ class UrovoPedController(private val context: Context) : IPedController {
     private fun setKeyAlgorithm(keyAlgorithm: GenericKeyAlgorithm) {
         val urovoAlg = mapToUrovoKeyAlgorithm(keyAlgorithm)
         try {
-            pinpadInstance.setKeyAlgorithm(urovoAlg)
+            pinpadInstance.setKeyAlgorithm(urovoAlg) //
             Log.d(TAG, "Algoritmo de Llave establecido a: $urovoAlg")
         } catch (e: Exception) {
             Log.e(TAG, "Fallo al establecer algoritmo de llave", e)

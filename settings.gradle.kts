@@ -36,3 +36,4 @@ include(":manufacturer")
 include(":config")
 include(":communication")
 include(":format")
+

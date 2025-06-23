@@ -81,13 +81,8 @@ interface IPedController {
     @Throws(PedException::class)
     suspend fun calculateMac(request: PedMacRequest): PedMacResult
     @Throws(PedException::class)
-    suspend fun verifyMac(request: PedMacRequest, expectedMac: ByteArray): Boolean {
-        val calculatedResult = calculateMac(request)
-        return calculatedResult.mac.contentEquals(expectedMac)
-    }
 
     // --- PIN Operations ---
-    @Throws(PedException::class, PedTimeoutException::class, PedCancellationException::class)
     suspend fun getPinBlock(request: PedPinRequest): PedPinResult
     fun cancelPinEntry()
 

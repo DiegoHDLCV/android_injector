@@ -65,7 +65,9 @@ data class InjectSymmetricKeyCommand(
     val ktkChecksum: String,
     val ksn: String,
     val keyHex: String,
-    val ktkHex: String?
+    val ktkHex: String?,
+    val isTr31Block: Boolean = false // Nuevo campo
+
 ) : FuturexCommand {
     val isTr31: Boolean get() = keyHex.firstOrNull()?.isLetter() ?: false
 

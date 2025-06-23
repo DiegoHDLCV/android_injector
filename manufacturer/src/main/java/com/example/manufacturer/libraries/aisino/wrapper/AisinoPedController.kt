@@ -198,68 +198,56 @@ class AisinoPedController(private val application: Application) : IPedController
         transportKeyIndex: Int?,
         transportKeyType: GenericKeyType?
     ): Boolean = withContext(Dispatchers.IO) {
-        // Log de entrada para registrar todos los parámetros recibidos
         Log.i(TAG, "--- Starting writeKey (for encrypted key) ---")
         Log.d(TAG, "Attempting to write an encrypted key with the following parameters:")
         Log.d(TAG, "-> Destination Key Index (keyIndex): $keyIndex")
         Log.d(TAG, "-> Destination Key Type (keyType): $keyType")
         Log.d(TAG, "-> Key Algorithm: $keyAlgorithm")
         Log.d(TAG, "-> Encrypted Key Data (Hex): ${keyData.keyBytes.joinToString("") { "%02X".format(it) }}")
-        Log.d(TAG, "-> Encrypted Key Data Length: ${keyData.keyBytes.size}")
         Log.d(TAG, "-> Transport Key Index (transportKeyIndex): $transportKeyIndex")
         Log.d(TAG, "-> Transport Key Type (transportKeyType): $transportKeyType")
 
-
-        // Validación de parámetros de la llave de transporte
         if (transportKeyIndex == null || transportKeyType == null) {
-            val errorMsg = "Aisino requires transport key details for encrypted key loading. transportKeyIndex or transportKeyType is null."
-            Log.e(TAG, errorMsg)
-            throw PedKeyException(errorMsg)
+            throw PedKeyException("Aisino requires transport key details for encrypted key loading.")
         }
 
-        // Mapeo del tipo de llave de destino
         val aisinoDKeyType = mapToAisinoKeyTypeInt(keyType)
             ?: throw PedKeyException("Unsupported destination key type for writeKey: $keyType.")
         Log.d(TAG, "Mapped destination key type '$keyType' to Aisino type '$aisinoDKeyType'.")
 
-        // Advertencia si la llave de transporte no es una Master Key
         if (transportKeyType != GenericKeyType.MASTER_KEY) {
-            Log.w(TAG, "Aisino PEDWriteKey_Api typically uses a Master Key (MASTER_KEY) as the transport key. Current transport key type is: $transportKeyType")
+            Log.w(TAG, "Aisino PEDWriteKey_Api typically uses a Master Key as the transport key. Current: $transportKeyType")
         }
 
-        // Se asume el modo 0x83 para descifrado 3DES
         val aisinoMode = 0x83 // Corresponde a 3DES Decrypt
-        Log.d(TAG, "Using hardcoded Aisino mode '0x83' for 3DES Decryption.")
+        Log.d(TAG, "Using hardcoded Aisino mode '0x83' (3DES Decrypt) for key injection.")
 
         try {
-            // Log justo antes de invocar la API del hardware con los parámetros finales
             Log.i(TAG, "Calling PedApi.PEDWriteKey_Api with SKeyIndex: $transportKeyIndex, DKeyIndex: $keyIndex, DKeyType: $aisinoDKeyType, Mode: $aisinoMode")
 
+            // CORRECCIÓN: Se pasa un array de bytes con 0xFF para deshabilitar la verificación de KCV
+            // en lugar de null o un array vacío, que causaba el crash.
+            val kvrDataNoVerify = byteArrayOf(0xFF.toByte())
+
             val result = PedApi.PEDWriteKey_Api(
-                transportKeyIndex,      // SKeyIndex (Source Key)
+                transportKeyIndex,      // SKeyIndex (Source/Transport Key)
                 keyIndex,               // DKeyIndex (Destination Key)
                 keyData.keyBytes,       // DKey (Encrypted key data)
                 aisinoDKeyType,         // DKeyType (Destination key type)
                 aisinoMode,             // Mode for 3DES Decrypt
-                ByteArray(0)       // KVRData (Not used in this scenario)
+                kvrDataNoVerify         // KVRData para deshabilitar explícitamente la verificación
             )
 
             Log.i(TAG, "PedApi.PEDWriteKey_Api finished with result code: $result")
 
-            // Verificación del resultado
             if (result != 0) {
-                val errorMsg = "Failed to write key (encrypted). Aisino Error Code: $result"
-                Log.e(TAG, errorMsg)
-                throw PedKeyException(errorMsg)
+                throw PedKeyException("Failed to write key (encrypted). Aisino Error Code: $result")
             }
 
-            // Log de éxito
-            Log.d(TAG, "Successfully wrote encrypted key to index: $keyIndex using transport key from index: $transportKeyIndex")
+            Log.d(TAG, "Successfully wrote encrypted key to index: $keyIndex")
             Log.i(TAG, "--- writeKey Finished Successfully ---")
-
             true
         } catch (e: Exception) {
-            // Captura de cualquier otra excepción durante el proceso
             Log.e(TAG, "An unexpected exception occurred during encrypted key writing", e)
             throw PedKeyException("Failed to write key (encrypted): ${e.message}", e)
         }
@@ -274,58 +262,33 @@ class AisinoPedController(private val application: Application) : IPedController
         keyBytes: ByteArray,
         kcvBytes: ByteArray?
     ): Boolean = withContext(Dispatchers.IO) {
-        // Log de entrada para registrar los parámetros recibidos
         Log.i(TAG, "--- Starting writeKeyPlain ---")
-        Log.d(TAG, "Attempting to write a plaintext key with the following parameters:")
-        Log.d(TAG, "-> Key Index: $keyIndex")
-        Log.d(TAG, "-> Key Type: $keyType")
-        Log.d(TAG, "-> Key Algorithm: $keyAlgorithm")
-        Log.d(TAG, "-> Key Bytes (Hex): ${keyBytes.joinToString("") { "%02X".format(it) }}")
-        Log.d(TAG, "-> Key Bytes Length: ${keyBytes.size}")
-        Log.d(TAG, "-> KCV Bytes (Hex): ${kcvBytes?.joinToString("") { "%02X".format(it) } ?: "Not Provided"}")
+        Log.d(TAG, "-> Key Index: $keyIndex, Type: $keyType, Algorithm: $keyAlgorithm")
 
-        // Validación de tipo de llave
         if (keyType != GenericKeyType.MASTER_KEY && keyType != GenericKeyType.TRANSPORT_KEY) {
-            val errorMsg = "Plaintext loading via writeKeyPlain is only for MASTER_KEY or TRANSPORT_KEY on Aisino. Received: $keyType"
-            Log.e(TAG, errorMsg)
-            throw PedKeyException(errorMsg)
+            throw PedKeyException("Plaintext loading via writeKeyPlain is only for MASTER_KEY or TRANSPORT_KEY. Received: $keyType")
         }
 
-        // Mapeo del algoritmo al modo específico del SDK de Aisino
         val aisinoMode = when (keyAlgorithm) {
             GenericKeyAlgorithm.DES_SINGLE -> 0x01
             GenericKeyAlgorithm.DES_TRIPLE -> 0x03
-            else -> {
-                val errorMsg = "Unsupported algorithm for plaintext Master/Transport Key: $keyAlgorithm"
-                Log.e(TAG, errorMsg)
-                throw PedKeyException(errorMsg)
-            }
+            else -> throw PedKeyException("Unsupported algorithm for plaintext Master/Transport Key: $keyAlgorithm")
         }
         Log.d(TAG, "Mapped generic algorithm '$keyAlgorithm' to Aisino mode '$aisinoMode'.")
 
         try {
-            // Log justo antes de invocar la API del hardware
             Log.i(TAG, "Calling PedApi.PEDWriteMKey_Api with index: $keyIndex, mode: $aisinoMode")
-
             val result = PedApi.PEDWriteMKey_Api(keyIndex, aisinoMode, keyBytes)
-
             Log.i(TAG, "PedApi.PEDWriteMKey_Api finished with result code: $result")
 
-            // Verificación del resultado
             if (result != 0) {
-                val errorMsg = "Failed to write key (plaintext). Aisino Error Code: $result"
-                Log.e(TAG, errorMsg) // Registrar el error antes de lanzar la excepción
-                throw PedKeyException(errorMsg)
+                throw PedKeyException("Failed to write key (plaintext). Aisino Error Code: $result")
             }
 
-            // Log de éxito
-            val kcvHex = kcvBytes?.joinToString("") { "%02X".format(it) } ?: "N/A"
-            Log.d(TAG, "Successfully wrote key (plaintext). Index: $keyIndex, KCV (for reference): $kcvHex")
+            Log.d(TAG, "Successfully wrote key (plaintext) to index: $keyIndex")
             Log.i(TAG, "--- writeKeyPlain Finished Successfully ---")
-
             true
         } catch (e: Exception) {
-            // Captura de cualquier otra excepción durante el proceso
             Log.e(TAG, "An unexpected exception occurred during plaintext key writing", e)
             throw PedKeyException("Failed to write key (plaintext): ${e.message}", e)
         }
@@ -334,51 +297,34 @@ class AisinoPedController(private val application: Application) : IPedController
 
     @Throws(PedException::class)
     override suspend fun deleteKey(keyIndex: Int, keyType: GenericKeyType): Boolean = withContext(Dispatchers.IO) {
-        // --- LOG AÑADIDO ---
-        Log.i(TAG, "deleteKey: Solicitud recibida para borrar llave en slot $keyIndex, tipo $keyType.")
+        Log.i(TAG, "deleteKey: Request to delete key in slot $keyIndex, type $keyType.")
         val aisinoKeyType = mapToAisinoKeyTypeInt(keyType)
             ?: throw PedKeyException("Unsupported key type for deleteKey: $keyType.")
 
         try {
-            // --- LOG AÑADIDO ---
-            Log.d(TAG, "deleteKey: Llamando a 'PedApi.PedErase_Api' con KeyType: $aisinoKeyType, Index: $keyIndex.")
+            Log.d(TAG, "deleteKey: Calling 'PedApi.PedErase_Api' with KeyType: $aisinoKeyType, Index: $keyIndex.")
             val success = PedApi.PedErase_Api(aisinoKeyType, keyIndex)
-            // --- LOG AÑADIDO ---
-            Log.d(TAG, "deleteKey: La función nativa 'PedApi.PedErase_Api' devolvió: $success")
-
-            if (!success) {
-                Log.w(TAG, "deleteKey: PedErase_Api falló para KeyType: $aisinoKeyType, Index: $keyIndex.")
-                return@withContext false
-            }
-            true
+            Log.d(TAG, "deleteKey: Native function 'PedApi.PedErase_Api' returned: $success")
+            return@withContext success
         } catch (e: Exception) {
-            Log.e(TAG, "deleteKey: Error al borrar llave [$keyType/$keyIndex]", e)
+            Log.e(TAG, "deleteKey: Error deleting key [$keyType/$keyIndex]", e)
             throw PedKeyException("Failed to delete key [$keyType/$keyIndex]: ${e.message}", e)
         }
     }
 
     @Throws(PedException::class)
     override suspend fun deleteAllKeys(): Boolean = withContext(Dispatchers.IO) {
-        // --- LOG AÑADIDO ---
-        Log.i(TAG, "deleteAllKeys: Solicitud recibida en el controlador Aisino.")
+        Log.i(TAG, "deleteAllKeys: Request received.")
         try {
-            // --- LOG AÑADIDO ---
-            Log.d(TAG, "deleteAllKeys: Llamando a la función nativa 'PedApi.PedErase()'...")
+            Log.d(TAG, "deleteAllKeys: Calling native function 'PedApi.PedErase_Api()'...")
             val success = PedApi.PedErase_Api()
-            // --- LOG AÑADIDO ---
-            Log.d(TAG, "deleteAllKeys: La función nativa 'PedApi.PedErase()' devolvió: $success")
-
+            Log.d(TAG, "deleteAllKeys: Native function 'PedApi.PedErase()' returned: $success")
             if (!success) {
-                // --- LOG AÑADIDO ---
-                Log.w(TAG, "deleteAllKeys: PedApi.PedErase() falló. Lanzando PedKeyException.")
                 throw PedKeyException("Failed to delete all keys (PedErase returned false).")
             }
-
-            // --- LOG AÑADIDO ---
-            Log.i(TAG, "deleteAllKeys: Borrado en hardware completado con éxito.")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "deleteAllKeys: Error al llamar a la API de borrado de Aisino.", e)
+            Log.e(TAG, "deleteAllKeys: Error calling Aisino erase API.", e)
             throw PedKeyException("Failed to delete all keys: ${e.message}", e)
         }
     }
@@ -399,7 +345,6 @@ class AisinoPedController(private val application: Application) : IPedController
         Log.w(TAG, "Aisino API does not support getting key details. Checking for presence only.")
         if (isKeyPresent(keyIndex, keyType)) {
             Log.i(TAG, "Key is PRESENT at index=$keyIndex. Returning basic PedKeyInfo.")
-            // Algorithm cannot be determined from the device
             PedKeyInfo(index = keyIndex, type = keyType, algorithm = null)
         } else {
             Log.i(TAG, "Key is NOT PRESENT at index=$keyIndex. Returning null.")
@@ -418,14 +363,8 @@ class AisinoPedController(private val application: Application) : IPedController
         keyChecksum: String?
     ): Boolean = withContext(Dispatchers.IO) {
         Log.i(TAG, "--- Starting writeDukptInitialKey (for plaintext IPEK) ---")
-        Log.d(TAG, "-> DUKPT Group Index: $groupIndex")
-        Log.d(TAG, "-> Key Algorithm: $keyAlgorithm")
-        Log.d(TAG, "-> IPEK Bytes (RAW Hex from parser): ${keyBytes.joinToString("") { "%02X".format(it) }}")
-        Log.d(TAG, "-> IPEK Bytes Length (RAW): ${keyBytes.size}")
-        Log.d(TAG, "-> Initial KSN (RAW Hex from parser): ${initialKsn.joinToString("") { "%02X".format(it) }}")
-        Log.d(TAG, "-> Key Checksum (KCV): ${keyChecksum ?: "Not Provided"}")
+        Log.d(TAG, "-> DUKPT Group Index: $groupIndex, Algorithm: $keyAlgorithm")
 
-        // --- PASO 1: CONVERTIR DATOS A FORMATO BCD COMO EN LA DEMO ---
         val ipekHexString = keyBytes.joinToString("") { "%02X".format(it) }
         val ksnHexString = initialKsn.joinToString("") { "%02X".format(it) }
 
@@ -435,21 +374,19 @@ class AisinoPedController(private val application: Application) : IPedController
             ipekBcd = CommonConvert.ascStringToBCD(ipekHexString)
             ksnInBcd = CommonConvert.ascStringToBCD(ksnHexString)
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to convert Hex strings to BCD format", e)
             throw PedKeyException("Error converting key/KSN data to BCD: ${e.message}", e)
         }
 
         val keyLenByte: Byte = ipekBcd.size.toByte()
         Log.d(TAG, "Calculated BCD key length byte for API call: $keyLenByte")
 
-        // --- PASO 2: LÓGICA DE VERIFICACIÓN KCV DINÁMICA ---
         val checkMode: Byte
         val checkBuffer: ByteArray
 
         if (keyChecksum.isNullOrBlank() || keyChecksum == "0000") {
             checkMode = KCV_CHECK_MODE_DISABLED
             checkBuffer = ByteArray(16) { 0 }
-            Log.d(TAG, "KCV check disabled (no checksum provided). Providing dummy buffer.")
+            Log.d(TAG, "KCV check disabled.")
         } else {
             checkMode = KCV_CHECK_MODE_ENABLED
             try {
@@ -457,50 +394,29 @@ class AisinoPedController(private val application: Application) : IPedController
                 checkBuffer = ByteArray(1 + checksumBytes.size)
                 checkBuffer[0] = checksumBytes.size.toByte()
                 System.arraycopy(checksumBytes, 0, checkBuffer, 1, checksumBytes.size)
-                Log.d(TAG, "Prepared checkBuffer for KCV '$keyChecksum': ${checkBuffer.joinToString("") { "%02X".format(it) }}")
             } catch (e: Exception) {
                 throw PedKeyException("Failed to parse keyChecksum: $keyChecksum", e)
             }
         }
 
-        // --- PASO 3: LLAMADA A LA API ---
         try {
             val sourceKeyIndex: Byte = IPEK_INJECTION_MODE_PLAINTEXT
 
             Log.i(TAG, "Calling PedApi.PedDukptWriteTIK_Api with BCD formatted data...")
-            Log.i(TAG, "--> GroupIdx: ${groupIndex.toByte()}")
-            Log.i(TAG, "--> SrcKeyIdx: $sourceKeyIndex (0 = Plaintext IPEK)")
-            Log.i(TAG, "--> KeyLen: $keyLenByte")
-            Log.i(TAG, "--> KeyValueIn (BCD): ${ipekBcd.joinToString("") { "%02X".format(it) }}")
-            Log.i(TAG, "--> KsnIn (BCD): ${ksnInBcd.joinToString("") { "%02X".format(it) }}")
-            Log.i(TAG, "--> iCheckMode: $checkMode")
-            Log.i(TAG, "--> aucCheckBuf: ${checkBuffer.joinToString("") { "%02X".format(it) }}")
-
             val result = PedApi.PedDukptWriteTIK_Api(
-                groupIndex.toByte(),
-                sourceKeyIndex,
-                keyLenByte,
-                ipekBcd,
-                ksnInBcd,
-                checkMode,
-                checkBuffer
+                groupIndex.toByte(), sourceKeyIndex, keyLenByte, ipekBcd, ksnInBcd, checkMode, checkBuffer
             )
-
             Log.i(TAG, "PedApi.PedDukptWriteTIK_Api finished with result code: $result")
 
             if (result != 0) {
-                val errorMsg = "Failed to write DUKPT initial key (plaintext). Aisino Error Code: $result"
-                Log.e(TAG, errorMsg)
-                throw PedKeyException(errorMsg)
+                throw PedKeyException("Failed to write DUKPT initial key (plaintext). Aisino Error Code: $result")
             }
 
             Log.d(TAG, "Successfully wrote plaintext DUKPT IPEK to group index: $groupIndex")
-            Log.i(TAG, "--- writeDukptInitialKey finished successfully ---")
-
             return@withContext true
         } catch (e: Exception) {
-            Log.e(TAG, "An unexpected exception occurred while writing plaintext DUKPT initial key", e)
-            if (e is PedKeyException) throw e else throw PedKeyException("Failed to write DUKPT initial key: ${e.message}", e)
+            Log.e(TAG, "An unexpected exception occurred while writing plaintext DUKPT key", e)
+            throw e as? PedKeyException ?: PedKeyException("Failed to write DUKPT initial key", e)
         }
     }
 
@@ -513,7 +429,6 @@ class AisinoPedController(private val application: Application) : IPedController
                 Log.w(TAG, "Failed to get DUKPT KSN for group $groupIndex. Aisino Error: $result")
                 return@withContext null
             }
-            // Counter is embedded in KSN
             DukptInfo(ksn = ksnOut, counter = null)
         } catch (e: Exception) {
             Log.e(TAG, "Error getting DUKPT info", e)
@@ -597,20 +512,23 @@ class AisinoPedController(private val application: Application) : IPedController
         val groupIndex = request.dukptGroupIndex ?: throw PedCryptoException("DUKPT group index required")
 
         if (request.algorithm !in listOf(GenericKeyAlgorithm.DES_SINGLE, GenericKeyAlgorithm.DES_TRIPLE)) {
-            throw PedCryptoException("Aisino only supports DES/TDES for DUKPT cipher via PedCalcDESDukpt_Api, requested: ${request.algorithm}")
+            throw PedCryptoException("Aisino only supports DES/TDES for DUKPT cipher, requested: ${request.algorithm}")
         }
 
-        val keyVarType: Byte = when(request.dukptKeyVariant) {
-            GenericDukptKeyVariant.PIN -> 0x02 // PED PIN KEY ECB
-            GenericDukptKeyVariant.MAC -> 0x00 // PED MAC KEY
-            GenericDukptKeyVariant.DATA_ENCRYPT, GenericDukptKeyVariant.DATA_DECRYPT -> 0x01 // PED DES KEY
-            null -> 0x01 // Default to DES KEY
+        val keyVarType: Byte = when (request.dukptKeyVariant) {
+            GenericDukptKeyVariant.PIN -> 0x02
+            GenericDukptKeyVariant.MAC -> 0x00
+            GenericDukptKeyVariant.DATA_ENCRYPT, GenericDukptKeyVariant.DATA_DECRYPT -> 0x01
+            else -> {
+                Log.w(TAG, "Unsupported or null DukptKeyVariant: ${request.dukptKeyVariant}. Defaulting to DATA key (0x01).")
+                0x01
+            }
         }
 
         val aisinoMode: Byte = when(request.mode) {
             GenericBlockCipherMode.ECB -> if(request.encrypt) 0x01 else 0x00
             GenericBlockCipherMode.CBC -> if(request.encrypt) 0x03 else 0x02
-            null -> throw PedCryptoException("Block cipher mode (ECB/CBC) is required for DUKPT DES cipher.")
+            else -> throw PedCryptoException("Block cipher mode (ECB/CBC) is required for DUKPT DES cipher.")
         }
 
         if (keyVarType == 0x02.toByte() && aisinoMode != 0x01.toByte()) {
@@ -620,21 +538,53 @@ class AisinoPedController(private val application: Application) : IPedController
         val blockSize = 8
         val outputBufferSize = if (request.data.isNotEmpty()) ((request.data.size + blockSize - 1) / blockSize) * blockSize else 0
         val dataOut = ByteArray(outputBufferSize)
-        val ksnOut = ByteArray(10)
+        val ksnUsed = ByteArray(10)
+
+        val effectiveIv = request.iv ?: ByteArray(blockSize) { 0 }
 
         try {
-            val result = PedApi.PedCalcDESDukpt_Api(groupIndex.toByte(), keyVarType, request.iv, request.data, aisinoMode, dataOut, ksnOut)
+            Log.d(TAG, "Calling PedCalcDESDukpt_Api with params: groupIndex=${groupIndex}, keyVarType=${keyVarType}, aisinoMode=${aisinoMode}, dataLen=${request.data.size}, ivLen=${effectiveIv.size}")
+
+            // Paso 1: Realizar la operación criptográfica.
+            val result = PedApi.PedCalcDESDukpt_Api(
+                groupIndex.toByte(),
+                keyVarType,
+                effectiveIv,
+                request.data,
+                aisinoMode,
+                dataOut,
+                ksnUsed
+            )
             if (result != 0) {
                 throw PedCryptoException("DUKPT cipher operation failed. Aisino Error Code: $result")
             }
+
+            // CORRECCIÓN: Incrementar explícitamente el KSN para la siguiente transacción.
+            Log.d(TAG, "DUKPT cipher successful. Now incrementing KSN for group $groupIndex.")
+            val incrementResult = PedApi.PedDukptIncreaseKsn_Api(groupIndex.toByte())
+            if(incrementResult != 0) {
+                throw PedCryptoException("DUKPT cipher succeeded but FAILED to increment KSN. Error: $incrementResult")
+            }
+
+            // Paso 3: Obtener el KSN actualizado para devolverlo.
+            val newKsnOut = ByteArray(10)
+            val getNewKsnResult = PedApi.PedGetDukptKSN_Api(groupIndex.toByte(), newKsnOut)
+            if (getNewKsnResult != 0) {
+                throw PedCryptoException("Failed to retrieve new KSN after increment. Error: $getNewKsnResult")
+            }
+
             val actualResultData = dataOut.copyOf(outputBufferSize)
-            val finalDukpt = DukptInfo(ksn = ksnOut, counter = null)
+            val finalDukpt = DukptInfo(ksn = newKsnOut, counter = null) // Devolver el KSN para la *próxima* transacción.
             return PedCipherResult(actualResultData, finalDukpt)
+
         } catch (e: Exception) {
             Log.e(TAG, "Error performing DUKPT cipher", e)
             throw PedCryptoException("DUKPT cipher failed: ${e.message}", e)
         }
     }
+
+
+
 
     @Throws(PedException::class)
     private fun performRsaCipherInternal(request: PedCipherRequest): PedCipherResult {
@@ -685,13 +635,11 @@ class AisinoPedController(private val application: Application) : IPedController
             if (result != 0) {
                 throw PedCryptoException("Standard MAC calculation failed. Aisino Error Code: $result")
             }
-            // Añadir 'return' aquí
             return PedMacResult(macOut)
         } catch (e: Exception) {
             Log.e(TAG, "Error calculating standard MAC", e)
             throw PedCryptoException("Standard MAC calculation failed: ${e.message}", e)
         }
-        // El 'return' vacío se elimina de aquí
     }
 
     @Throws(PedException::class)
@@ -715,13 +663,11 @@ class AisinoPedController(private val application: Application) : IPedController
                 throw PedCryptoException("DUKPT MAC calculation failed. Aisino Error Code: $result")
             }
             val finalDukpt = DukptInfo(ksn = ksnOut, counter = null)
-            // Añadir 'return' aquí
             return PedMacResult(macOut, finalDukpt)
         } catch (e: Exception) {
             Log.e(TAG, "Error calculating DUKPT MAC", e)
             throw PedCryptoException("DUKPT MAC calculation failed: ${e.message}", e)
         }
-        // El 'return' vacío se elimina de aquí
     }
 
     // --- PIN Operations ---
@@ -896,84 +842,92 @@ class AisinoPedController(private val application: Application) : IPedController
         }
     }
 
-    @Throws(PedException::class)
+    @Throws(PedKeyException::class)
     override suspend fun writeDukptInitialKeyEncrypted(
         groupIndex: Int,
         keyAlgorithm: GenericKeyAlgorithm,
-        encryptedIpek: ByteArray,
-        initialKsn: ByteArray,
+        encryptedIpek: ByteArray, // Viene como bytes crudos del parser
+        initialKsn: ByteArray,    // Viene como bytes crudos del parser
         transportKeyIndex: Int,
-        keyChecksum: String? // Este parámetro será ignorado, pero se mantiene por la interfaz.
+        keyChecksum: String?      // KCV de la IPEK en claro
     ): Boolean = withContext(Dispatchers.IO) {
-        // Log de entrada para registrar todos los parámetros recibidos
         Log.i(TAG, "--- Starting writeDukptInitialKeyEncrypted ---")
-        Log.d(TAG, "Attempting to write an ENCRYPTED DUKPT IPEK with the following parameters:")
-        Log.d(TAG, "-> DUKPT Group Index: $groupIndex")
-        Log.d(TAG, "-> Key Algorithm: $keyAlgorithm")
-        Log.d(TAG, "-> Transport Key Index (KEK/TLK): $transportKeyIndex")
-        Log.d(TAG, "-> Encrypted IPEK (Hex): ${encryptedIpek.joinToString("") { "%02X".format(it) }}")
-        Log.d(TAG, "-> Encrypted IPEK Length: ${encryptedIpek.size}")
-        Log.d(TAG, "-> Initial KSN (Hex): ${initialKsn.joinToString("") { "%02X".format(it) }}")
-        Log.d(TAG, "-> Key Checksum (KCV) from host: ${keyChecksum ?: "Not Provided"} (WILL BE IGNORED)")
+        Log.d(TAG, "Input Parameters:")
+        Log.d(TAG, "  groupIndex: $groupIndex")
+        Log.d(TAG, "  keyAlgorithm: $keyAlgorithm")
+        Log.d(TAG, "  encryptedIpek (length): ${encryptedIpek.size} bytes")
+        Log.d(TAG, "  initialKsn (length): ${initialKsn.size} bytes")
+        Log.d(TAG, "  transportKeyIndex: $transportKeyIndex")
+        Log.d(TAG, "  keyChecksum: ${keyChecksum ?: "null"}")
 
-        // Cálculo de la longitud de la llave para la API
+        val encryptedIpekHexString = encryptedIpek.joinToString("") { "%02X".format(it) }
+        val ksnHexString = initialKsn.joinToString("") { "%02X".format(it) }
+        Log.d(TAG, "Converted encryptedIpek to hex string: $encryptedIpekHexString")
+        Log.d(TAG, "Converted initialKsn to hex string: $ksnHexString")
+
+        val encryptedIpekBcd: ByteArray
+        val ksnInBcd: ByteArray
+        try {
+            encryptedIpekBcd = CommonConvert.ascStringToBCD(encryptedIpekHexString)
+            ksnInBcd = CommonConvert.ascStringToBCD(ksnHexString)
+            Log.d(TAG, "Successfully converted input data to BCD format for encrypted injection.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error converting data to BCD for encrypted injection.", e)
+            throw PedKeyException("Error converting data to BCD for encrypted injection.", e)
+        }
+
         val keyLenByte: Byte = when (keyAlgorithm) {
-            GenericKeyAlgorithm.DES_TRIPLE -> if(encryptedIpek.size >= 16) 16 else 8
-            GenericKeyAlgorithm.AES_128 -> 16
+            GenericKeyAlgorithm.DES_TRIPLE -> 16
             else -> {
-                val errorMsg = "Unsupported algorithm for encrypted DUKPT IPEK: $keyAlgorithm"
-                Log.e(TAG, errorMsg)
-                throw PedKeyException(errorMsg)
+                throw PedKeyException("Unsupported algorithm for DUKPT IPEK: $keyAlgorithm")
             }
         }
-        Log.d(TAG, "Calculated key length byte for API call: $keyLenByte")
+        Log.d(TAG, "Key length byte for API (plaintext length): $keyLenByte")
+
+        val checkMode: Byte
+        val checkBuffer: ByteArray
+
+        if (keyChecksum.isNullOrBlank() || keyChecksum == "0000") {
+            checkMode = KCV_CHECK_MODE_DISABLED
+            checkBuffer = ByteArray(16) // Buffer dummy
+            Log.w(TAG, "KCV check is disabled. This is not recommended for encrypted injection.")
+        } else {
+            checkMode = KCV_CHECK_MODE_ENABLED
+            try {
+                val checksumBytes = CommonConvert.hexStringToByte(keyChecksum)
+                checkBuffer = ByteArray(1 + checksumBytes.size)
+                checkBuffer[0] = checksumBytes.size.toByte()
+                System.arraycopy(checksumBytes, 0, checkBuffer, 1, checksumBytes.size)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to parse keyChecksum '$keyChecksum' for encrypted injection.", e)
+                throw PedKeyException("Failed to parse keyChecksum for encrypted injection: $keyChecksum", e)
+            }
+        }
 
         try {
-            // Log final antes de la llamada a la API con todos los parámetros finales.
-            // Se emula el comportamiento de la demo del fabricante para asegurar la compatibilidad.
-            Log.i(TAG, "Calling PedApi.PedDukptWriteTIK_Api (DEMO-style, KCV check disabled)...")
-            Log.i(TAG, "--> GroupIdx: ${groupIndex.toByte()}")
-            Log.i(TAG, "--> SrcKeyIdx: $IPEK_INJECTION_MODE_ENCRYPTED (1 = Encrypted IPEK)")
-            Log.i(TAG, "--> KeyLen: $keyLenByte")
-            Log.i(TAG, "--> KeyValueIn (Encrypted IPEK): ${encryptedIpek.joinToString("") { "%02X".format(it) }}")
-            Log.i(TAG, "--> KsnIn: ${initialKsn.joinToString("") { "%02X".format(it) }}")
-            Log.i(TAG, "--> iCheckMode: $KCV_CHECK_MODE_DISABLED (Forced)")
-            Log.i(TAG, "--> aucCheckBuf: new ByteArray(16) (Forced)")
-
-            // --- LLAMADA CORREGIDA ---
-            // Se fuerza la desactivación de la verificación de KCV y se pasa un buffer de 16 bytes
-            // para coincidir con la implementación de la demo funcional.
+            Log.i(TAG, "Calling PedApi.PedDukptWriteTIK_Api for encrypted key...")
             val result = PedApi.PedDukptWriteTIK_Api(
-                1.toByte(),
-                IPEK_INJECTION_MODE_ENCRYPTED, // SrcKeyIdx = 1: IPEK cifrada.
-                16.toByte(),
-                encryptedIpek,
-                initialKsn,
-                KCV_CHECK_MODE_DISABLED,    // Forzar a 0x00 para deshabilitar chequeo KCV.
-                ByteArray(16)               // Forzar un buffer de 16 bytes como en la demo.
+                groupIndex.toByte(),
+                IPEK_INJECTION_MODE_ENCRYPTED,
+                keyLenByte,
+                encryptedIpekBcd,
+                ksnInBcd,
+                checkMode,
+                checkBuffer
             )
 
             Log.i(TAG, "PedApi.PedDukptWriteTIK_Api finished with result code: $result")
 
             if (result != 0) {
-                // Si falla, se registra y se lanza una excepción con el código de error del SDK.
-                val errorMsg = "Failed to write encrypted DUKPT IPEK. Aisino Error Code: $result"
-                Log.e(TAG, errorMsg)
-                throw PedKeyException(errorMsg)
+                throw PedKeyException("Failed to write encrypted DUKPT IPEK. Vanstone/Aisino Error Code: $result")
             }
 
-            Log.d(TAG, "Successfully wrote encrypted DUKPT IPEK to group index: $groupIndex")
             Log.i(TAG, "--- writeDukptInitialKeyEncrypted Finished Successfully ---")
+            return@withContext true
 
-            true // Éxito
         } catch (e: Exception) {
-            Log.e(TAG, "An unexpected exception occurred while writing encrypted DUKPT IPEK", e)
-            // Se re-lanza como PedKeyException para mantener la consistencia.
-            if (e is PedKeyException) {
-                throw e
-            } else {
-                throw PedKeyException("Failed to write encrypted DUKPT IPEK: ${e.message}", e)
-            }
+            Log.e(TAG, "Unexpected exception in writeDukptInitialKeyEncrypted", e)
+            throw e as? PedKeyException ?: PedKeyException("Generic failure in encrypted key injection", e)
         }
     }
 

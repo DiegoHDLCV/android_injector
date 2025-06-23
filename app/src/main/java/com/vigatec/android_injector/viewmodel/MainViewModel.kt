@@ -301,8 +301,10 @@ class MainViewModel @Inject constructor(
                     if (ktkFromDb == null) throw PedKeyException("KTK pre-cargada en slot ${command.ktkSlot} no encontrada.")
                     if (!ktkFromDb.kcv.take(4).equals(command.ktkChecksum.take(4), ignoreCase = true)) throw PedKeyException("El KCV de la KTK en BD no coincide.")
 
-                    val tr31Block = parseTr31Block(command.keyHex)
-                    val encryptedKey = unwrapTr31Payload(tr31Block.encryptedPayload)
+                    //val tr31Block = parseTr31Block(command.keyHex)
+                    //val encryptedKey = unwrapTr31Payload(tr31Block.encryptedPayload)
+                    val encryptedKey = command.keyHex.hexToByteArray()
+
 
                     pedController!!.writeDukptInitialKeyEncrypted(command.keySlot, genericAlgorithm, encryptedKey, command.ksn.hexToByteArray(), command.ktkSlot, command.keyChecksum)
                 }
