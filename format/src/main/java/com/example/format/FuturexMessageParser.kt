@@ -5,6 +5,8 @@ import com.example.format.base.IMessageParser
 import com.vigatec.utils.FormatUtils
 import java.nio.charset.Charset
 
+
+
 class FuturexMessageParser : IMessageParser {
     private val TAG = "FuturexMessageParser"
     private val buffer = mutableListOf<Byte>()
@@ -38,7 +40,10 @@ class FuturexMessageParser : IMessageParser {
                     "00", "01" -> parseLegacyCommands(fullPayload, commandCode)
                     "03" -> parseReadSerialCommand(fullPayload)
                     "04" -> parseWriteSerialCommand(fullPayload)
-                    "05" -> parseDeleteKeyCommand(fullPayload)
+                    "05" -> parseDeleteKeyCommand(fullPayload) // Comando para borrado total
+                    // --- INICIO: NUEVO CASO PARA BORRADO ESPECÍFICO ---
+                    "06" -> parseDeleteSingleKeyCommand(fullPayload)
+                    // --- FIN: NUEVO CASO PARA BORRADO ESPECÍFICO ---
                     else -> UnknownCommand(fullPayload, commandCode)
                 }
             } catch (e: Exception) {
@@ -98,7 +103,6 @@ class FuturexMessageParser : IMessageParser {
         val keyChecksum = reader.read(4).also { Log.d(TAG, "[FuturexParser] KeyChecksum: '$it'") }
         val ktkChecksum = reader.read(4).also { Log.d(TAG, "[FuturexParser] KtkChecksum: '$it'") }
 
-        // El campo KSN es opcional y depende del KeyType
         Log.d(TAG, "Leyendo campo KSN de 20 caracteres (obligatorio en comando 02)...")
         val ksn = reader.read(20).also { Log.d(TAG, "[FuturexParser] KSN: '$it'") }
 
@@ -110,7 +114,6 @@ class FuturexMessageParser : IMessageParser {
         val keyHex = reader.read(keyLengthChars)
         Log.d(TAG, "[FuturexParser] KeyHex: ${keyHex.take(64)}...")
 
-        // El KTK en claro solo existe si EncryptionType es "02"
         val ktkHex = if (encryptionType == "02") {
             Log.d(TAG, "EncryptionType es '02', parseando KTK en claro.")
             val ktkLengthStr = reader.read(3)
@@ -146,6 +149,20 @@ class FuturexMessageParser : IMessageParser {
     private fun parseReadSerialCommand(fullPayload: String) = ReadSerialCommand(fullPayload, fullPayload.substring(2, 4))
     private fun parseWriteSerialCommand(fullPayload: String) = WriteSerialCommand(fullPayload, fullPayload.substring(2, 4), fullPayload.substring(4, 20))
     private fun parseDeleteKeyCommand(fullPayload: String) = DeleteKeyCommand(fullPayload, fullPayload.substring(2, 4))
+
+    // --- INICIO: NUEVA FUNCIÓN DE PARSEO ---
+    private fun parseDeleteSingleKeyCommand(fullPayload: String): DeleteSingleKeyCommand {
+        Log.d(TAG, "Parseando Comando Personalizado de Borrado Específico '06'")
+        val reader = PayloadReader(fullPayload)
+        reader.read(2) // Omitir Command "06"
+
+        val version = reader.read(2)
+        val keySlot = reader.read(2).toInt(16) // Lee el slot y lo convierte a Int
+        val keyTypeHex = reader.read(2) // Lee el tipo de llave como string HEX
+
+        return DeleteSingleKeyCommand(fullPayload, version, keySlot, keyTypeHex)
+    }
+    // --- FIN: NUEVA FUNCIÓN DE PARSEO ---
 
     private fun parseInjectSymmetricKeyResponse(fullPayload: String): InjectSymmetricKeyResponse {
         val reader = PayloadReader(fullPayload)

@@ -62,7 +62,6 @@ class MainViewModel @Inject constructor(
     private val _connectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
     val connectionStatus = _connectionStatus.asStateFlow()
 
-    // --- PROPIEDAD AÑADIDA QUE FALTABA ---
     private val _rawReceivedData = MutableStateFlow("")
     val rawReceivedData = _rawReceivedData.asStateFlow()
 
@@ -114,7 +113,6 @@ class MainViewModel @Inject constructor(
         Log.i(TAG, "Protocolo de comunicación establecido en: ${SystemConfig.commProtocolSelected}")
     }
 
-    // --- FUNCIÓN AÑADIDA QUE FALTABA ---
     fun setProtocol(protocol: CommProtocol) = viewModelScope.launch {
         connectionMutex.withLock {
             if (SystemConfig.commProtocolSelected == protocol) return@launch
@@ -132,7 +130,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { _snackbarEvent.emit("Error: $message") }
     }
 
-    // --- FUNCIÓN AÑADIDA QUE FALTABA ---
     fun startListening(
         baudRate: EnumCommConfBaudRate = EnumCommConfBaudRate.BPS_9600,
         parity: EnumCommConfParity = EnumCommConfParity.NOPAR,
@@ -175,7 +172,7 @@ class MainViewModel @Inject constructor(
                     if (bytesRead > 0) {
                         val received = buffer.copyOf(bytesRead)
                         val receivedString = String(received, Charsets.US_ASCII)
-                        _rawReceivedData.value += receivedString // Actualiza el log en la UI
+                        _rawReceivedData.value += receivedString
                         Log.v(TAG, "RAW_SERIAL_IN (HEX): ${received.toHexString(true)} (ASCII: '$receivedString')")
                         messageParser.appendData(received)
                         var parsedMessage: ParsedMessage?
@@ -242,7 +239,18 @@ class MainViewModel @Inject constructor(
                     _snackbarEvent.emit("Recibido CMD: Inyectar Llave")
                     handleFuturexInjectKey(message)
                 }
-                //... otros casos
+                is ReadSerialCommand -> {
+                    _snackbarEvent.emit("Recibido CMD: Leer Serial")
+                    handleReadSerial(message)
+                }
+                is DeleteKeyCommand -> {
+                    _snackbarEvent.emit("Recibido CMD: Eliminar TODAS las Llaves")
+                    handleDeleteAllKeys(message)
+                }
+                is DeleteSingleKeyCommand -> {
+                    _snackbarEvent.emit("Recibido CMD: Eliminar Llave en Slot ${message.keySlot}")
+                    handleDeleteSingleKey(message)
+                }
                 else -> {
                     Log.d(TAG, "Comando ${message::class.simpleName} recibido pero no manejado.")
                 }
@@ -257,6 +265,7 @@ class MainViewModel @Inject constructor(
         }
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                Log.v(TAG, "RAW_SERIAL_OUT (HEX): ${data.toHexString(true)} (ASCII: '${String(data, Charsets.US_ASCII).replace("\u0002", "<STX>").replace("\u0003", "<ETX>")}')")
                 comController!!.write(data, 1000)
             } catch (e: Exception) {
                 handleError("Excepción al enviar datos", e)
@@ -264,6 +273,94 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private suspend fun handleDeleteAllKeys(command: DeleteKeyCommand) {
+        if (!ensurePedControllerIsReady()) {
+            handleError("Eliminación cancelada: PedController no está listo.")
+            val errorResponse = messageFormatter.format("05", listOf(FuturexErrorCode.DEVICE_IS_BUSY.code))
+            sendData(errorResponse)
+            return
+        }
+
+        var responseCode = FuturexErrorCode.SUCCESSFUL.code
+        var logMessage = ""
+
+        val deletionResult = runCatching {
+            Log.i(TAG, "handleDeleteAllKeys: Iniciando proceso para eliminar TODAS las llaves (Comando ${command.rawPayload}).")
+            pedController!!.deleteAllKeys()
+        }
+
+        deletionResult.onSuccess { success ->
+            if (success) {
+                logMessage = "Todas las llaves han sido eliminadas exitosamente del PED."
+                responseCode = FuturexErrorCode.SUCCESSFUL.code
+                Log.i(TAG, logMessage)
+
+                Log.d(TAG, "Sincronizando la base de datos local: eliminando todos los registros de llaves.")
+                injectedKeyRepository.deleteAllKeys()
+
+            } else {
+                logMessage = "El PED informó que la eliminación de llaves no fue exitosa (retornó false)."
+                responseCode = FuturexErrorCode.KEY_DELETION_FAILED.code
+                Log.w(TAG, logMessage)
+            }
+        }.onFailure { e ->
+            logMessage = "Error durante la eliminación de llaves: ${e.message}"
+            responseCode = when(e) {
+                is PedKeyException -> FuturexErrorCode.KEY_DELETION_FAILED.code
+                else -> FuturexErrorCode.DEVICE_IS_BUSY.code
+            }
+            Log.e(TAG, "Excepción procesando borrado total: $logMessage", e)
+        }
+
+        val response = messageFormatter.format("05", listOf(responseCode))
+        sendData(response)
+        viewModelScope.launch { _snackbarEvent.emit(logMessage) }
+    }
+
+    private suspend fun handleDeleteSingleKey(command: DeleteSingleKeyCommand) {
+        if (!ensurePedControllerIsReady()) {
+            handleError("Eliminación cancelada: PedController no está listo.")
+            val errorResponse = messageFormatter.format("06", listOf(FuturexErrorCode.DEVICE_IS_BUSY.code))
+            sendData(errorResponse)
+            return
+        }
+
+        var logMessage: String
+        var responseCode = FuturexErrorCode.SUCCESSFUL.code
+
+        try {
+            Log.i(TAG, "handleDeleteSingleKey: Solicitud para borrar llave en slot ${command.keySlot} tipo ${command.keyTypeHex}.")
+
+            val genericKeyType = mapFuturexKeyTypeToGeneric(command.keyTypeHex)
+
+            val keyInDb = injectedKeyRepository.getKeyBySlotAndType(command.keySlot, genericKeyType.name)
+                ?: throw PedKeyException("No se encontró registro en BD para la llave en slot ${command.keySlot} tipo ${genericKeyType.name}.")
+
+            val successPed = pedController!!.deleteKey(command.keySlot, genericKeyType)
+            if (!successPed) {
+                throw PedKeyException("El PED retornó 'false' al intentar borrar la llave del slot ${command.keySlot}.")
+            }
+
+            injectedKeyRepository.deleteKey(keyInDb)
+
+            logMessage = "Llave en slot ${command.keySlot} eliminada exitosamente del PED y la BD."
+            Log.i(TAG, logMessage)
+
+        } catch (e: Exception) {
+            logMessage = e.message ?: "Error inesperado durante el borrado específico."
+            responseCode = when(e) {
+                is PedKeyException -> FuturexErrorCode.KEY_DELETION_FAILED.code
+                else -> FuturexErrorCode.DEVICE_IS_BUSY.code
+            }
+            Log.e(TAG, "Falló la eliminación de la llave en el slot ${command.keySlot}", e)
+        }
+
+        val response = messageFormatter.format("06", listOf(responseCode))
+        sendData(response)
+        viewModelScope.launch { _snackbarEvent.emit(logMessage) }
+    }
+
+    // --- INICIO: FUNCIÓN CORREGIDA ---
     private suspend fun handleFuturexInjectKey(command: InjectSymmetricKeyCommand) {
         if (!ensurePedControllerIsReady()) {
             handleError("Inyección cancelada: PedController no está listo.")
@@ -281,32 +378,61 @@ class MainViewModel @Inject constructor(
         val injectionResult = runCatching {
             Log.i(TAG, "handleFuturexInjectKey: Iniciando proceso para slot ${command.keySlot} | Tipo: $genericKeyType | Encryption: ${command.encryptionType}")
 
-            // --- Lógica de Verificación (puedes añadirla aquí) ---
-
             Log.d(TAG, "Procediendo con la inyección en slot ${command.keySlot}...")
 
             when (command.encryptionType) {
                 "00" -> {
                     Log.d(TAG, "Manejando EncryptionType 00: Carga en Claro")
                     val keyDataBytes = command.keyHex.hexToByteArray()
-                    if (genericKeyType == GenericKeyType.DUKPT_INITIAL_KEY) {
-                        pedController!!.writeDukptInitialKey(command.keySlot, genericAlgorithm, keyDataBytes, command.ksn.hexToByteArray(), command.keyChecksum)
-                    } else {
-                        pedController!!.writeKeyPlain(command.keySlot, genericKeyType, genericAlgorithm, keyDataBytes, command.keyChecksum?.hexToByteArray())
+
+                    when (genericKeyType) {
+                        GenericKeyType.MASTER_KEY, GenericKeyType.TRANSPORT_KEY -> {
+                            Log.d(TAG, "Inyectando Master/Transport Key en claro usando writeKeyPlain.")
+                            pedController!!.writeKeyPlain(command.keySlot, genericKeyType, genericAlgorithm, keyDataBytes, command.keyChecksum?.hexToByteArray())
+                        }
+                        GenericKeyType.DUKPT_INITIAL_KEY -> {
+                            Log.d(TAG, "Inyectando DUKPT Initial Key en claro usando writeDukptInitialKey.")
+                            pedController!!.writeDukptInitialKey(command.keySlot, genericAlgorithm, keyDataBytes, command.ksn.hexToByteArray(), command.keyChecksum)
+                        }
+                        else -> {
+                            throw PedKeyException("Rechazado: Intento de cargar una llave de trabajo (${genericKeyType.name}) en claro (EncryptionType 00). Las llaves de trabajo deben venir cifradas.")
+                        }
                     }
                 }
                 "01" -> {
                     Log.d(TAG, "Manejando EncryptionType 01: Cifrado bajo KTK pre-cargada")
                     val ktkFromDb = injectedKeyRepository.getKeyBySlotAndType(command.ktkSlot, GenericKeyType.TRANSPORT_KEY.name) ?: injectedKeyRepository.getKeyBySlotAndType(command.ktkSlot, GenericKeyType.MASTER_KEY.name)
                     if (ktkFromDb == null) throw PedKeyException("KTK pre-cargada en slot ${command.ktkSlot} no encontrada.")
-                    if (!ktkFromDb.kcv.take(4).equals(command.ktkChecksum.take(4), ignoreCase = true)) throw PedKeyException("El KCV de la KTK en BD no coincide.")
+                    if (!ktkFromDb.kcv.take(4).equals(command.ktkChecksum.take(4), ignoreCase = true)) throw PedKeyException("El KCV de la KTK en BD ('${ktkFromDb.kcv.take(4)}') no coincide con el del comando ('${command.ktkChecksum.take(4)}').")
 
-                    //val tr31Block = parseTr31Block(command.keyHex)
-                    //val encryptedKey = unwrapTr31Payload(tr31Block.encryptedPayload)
-                    val encryptedKey = command.keyHex.hexToByteArray()
+                    val encryptedKeyBytes = command.keyHex.hexToByteArray()
 
-
-                    pedController!!.writeDukptInitialKeyEncrypted(command.keySlot, genericAlgorithm, encryptedKey, command.ksn.hexToByteArray(), command.ktkSlot, command.keyChecksum)
+                    // --- INICIO: LÓGICA CORREGIDA ---
+                    // Seleccionar la función del PED Controller basada en el tipo de llave a inyectar.
+                    when (genericKeyType) {
+                        GenericKeyType.DUKPT_INITIAL_KEY -> {
+                            Log.d(TAG, "Llamando a 'writeDukptInitialKeyEncrypted' para una llave DUKPT.")
+                            pedController!!.writeDukptInitialKeyEncrypted(command.keySlot, genericAlgorithm, encryptedKeyBytes, command.ksn.hexToByteArray(), command.ktkSlot, command.keyChecksum)
+                        }
+                        GenericKeyType.WORKING_PIN_KEY,
+                        GenericKeyType.WORKING_MAC_KEY,
+                        GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> {
+                            Log.d(TAG, "Llamando a 'writeKey' para una llave de trabajo cifrada.")
+                            val keyData = PedKeyData(keyBytes = encryptedKeyBytes, kcv = command.keyChecksum?.hexToByteArray())
+                            pedController!!.writeKey(
+                                keyIndex = command.keySlot,
+                                keyType = genericKeyType,
+                                keyAlgorithm = genericAlgorithm,
+                                keyData = keyData,
+                                transportKeyIndex = command.ktkSlot,
+                                transportKeyType = GenericKeyType.TRANSPORT_KEY // O la que corresponda
+                            )
+                        }
+                        else -> {
+                            throw PedKeyException("Tipo de llave cifrada no manejado: $genericKeyType")
+                        }
+                    }
+                    // --- FIN: LÓGICA CORREGIDA ---
                 }
                 "02" -> {
                     Log.d(TAG, "Manejando EncryptionType 02: Cifrado con KTK en claro")
@@ -354,6 +480,32 @@ class MainViewModel @Inject constructor(
         val response = messageFormatter.format("02", listOf(responseCode, command.keyChecksum))
         sendData(response)
         viewModelScope.launch { _snackbarEvent.emit(logMessage) }
+    }
+    // --- FIN: FUNCIÓN CORREGIDA ---
+
+    private fun handleReadSerial(command: ReadSerialCommand) {
+        viewModelScope.launch(Dispatchers.IO) {
+            Log.i(TAG, "Manejando comando para leer número de serie: $command")
+
+            val deviceSerialNumber = "123456789ABCDEFG"
+
+            if (deviceSerialNumber.length != 16) {
+                Log.e(TAG, "El número de serie del dispositivo no tiene 16 caracteres. No se puede responder.")
+                return@launch
+            }
+
+            val responsePayload = messageFormatter.format(
+                "03",
+                listOf(
+                    FuturexErrorCode.SUCCESSFUL.code, // "00"
+                    deviceSerialNumber
+                )
+            )
+
+            sendData(responsePayload)
+            _snackbarEvent.emit("Respondiendo con N/S: $deviceSerialNumber")
+            Log.i(TAG, "Respuesta de número de serie enviada.")
+        }
     }
 
     private fun unwrapTr31Payload(encryptedPayload: ByteArray): ByteArray {
