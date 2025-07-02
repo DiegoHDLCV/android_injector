@@ -1,0 +1,23 @@
+[
+    {
+        "kcv": "52E0",
+        "key_hex": "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+        "is_universal": true,
+        "timestamp": "2025-07-02T17:44:53.617808+00:00",
+        "id": 1
+    },
+    {
+        "kcv": "AC8C",
+        "key_hex": "B6A8C78C6419D643C70EFD64E601700E",
+        "is_universal": true,
+        "timestamp": "2025-07-02T18:11:54.579866+00:00",
+        "id": 2
+    },
+    {
+        "kcv": "BB1EE5",
+        "key_hex": "B6A8C78C6419D643C70EFD64E601700E",
+        "is_universal": true,
+        "timestamp": "2025-07-02T19:13:30.794322+00:00",
+        "id": 3
+    }
+]

@@ -1,0 +1,8 @@
+Flask==2.3.2
+Flask-CORS==4.0.0
+Flask-Login==0.6.3
+pyserial==3.5
+bcrypt==4.0.1
+pytz==2023.3
+requests==2.31.0
+pycryptodome==3.19.0
