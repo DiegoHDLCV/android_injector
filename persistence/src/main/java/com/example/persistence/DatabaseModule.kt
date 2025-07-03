@@ -26,7 +26,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "pos_database"
         )
-            .fallbackToDestructiveMigration(false) // Recuerda esto para producción
+            .fallbackToDestructiveMigration() // Recuerda esto para producción
             .build()
     }
 

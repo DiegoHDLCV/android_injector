@@ -37,3 +37,4 @@ include(":config")
 include(":communication")
 include(":format")
 
+include(":injector")
