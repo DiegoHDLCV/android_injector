@@ -24,6 +24,7 @@ class InjectedKeyRepository @Inject constructor(
         keyType: String,
         keyAlgorithm: String,
         kcv: String,
+        keyData: String = "",
         status: String
     ) {
         val newRecord = InjectedKeyEntity(
@@ -31,6 +32,7 @@ class InjectedKeyRepository @Inject constructor(
             keyType = keyType,
             keyAlgorithm = keyAlgorithm,
             kcv = kcv,
+            keyData = keyData,
             status = status
         )
         injectedKeyDao.insertOrUpdate(newRecord)
@@ -73,5 +75,12 @@ class InjectedKeyRepository @Inject constructor(
 
     suspend fun updateKeyStatus(key: InjectedKeyEntity, newStatus: String) {
         injectedKeyDao.updateKeyStatusById(key.id, newStatus)
+    }
+
+    /**
+     * Busca una llave específica por su KCV (Key Check Value).
+     */
+    suspend fun getKeyByKcv(kcv: String): InjectedKeyEntity? {
+        return injectedKeyDao.getKeyByKcv(kcv)
     }
 }

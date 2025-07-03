@@ -7,6 +7,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.persistence.dao.InjectedKeyDao // Importa el nuevo DAO
 import com.example.persistence.dao.KeyDao
+import com.example.persistence.dao.ProfileDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -39,6 +40,10 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideInjectedKeyDao(appDatabase: AppDatabase): InjectedKeyDao = appDatabase.injectedKeyDao()
+
+    @Provides
+    @Singleton
+    fun provideProfileDao(appDatabase: AppDatabase): ProfileDao = appDatabase.profileDao()
 
     // El repositorio se inyecta automáticamente gracias a @Inject constructor,
     // por lo que no necesitas un @Provides para él a menos que sea una interfaz.

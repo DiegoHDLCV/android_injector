@@ -54,4 +54,10 @@ interface InjectedKeyDao {
 
     @Query("UPDATE injected_keys SET status = :newStatus WHERE id = :keyId")
     suspend fun updateKeyStatusById(keyId: Long, newStatus: String)
+
+    /**
+     * Busca una llave específica por su KCV (Key Check Value).
+     */
+    @Query("SELECT * FROM injected_keys WHERE kcv = :kcv LIMIT 1")
+    suspend fun getKeyByKcv(kcv: String): InjectedKeyEntity?
 }

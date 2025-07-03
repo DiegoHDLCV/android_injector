@@ -10,5 +10,4 @@ sealed class MainScreen(val route: String) {
     object KeyVault : MainScreen("key_vault")
     object Ceremony : MainScreen("ceremony")
     object Profiles : MainScreen("profiles")
-    object Connection : MainScreen("connection")
 } 

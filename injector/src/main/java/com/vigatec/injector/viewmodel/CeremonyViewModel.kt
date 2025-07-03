@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.persistence.repository.InjectedKeyRepository
 import com.vigatec.utils.KcvCalculator
+import com.vigatec.utils.KeyStoreManager
+import com.vigatec.utils.KcvCalculator.toHexString
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,7 +35,7 @@ class CeremonyViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(CeremonyState(component = "E59D620E1A6D311F19342054AB01ABF7"))
     val uiState = _uiState.asStateFlow()
 
-    private fun addToLog(message: String) {
+    fun addToLog(message: String) {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
         _uiState.value = _uiState.value.copy(log = _uiState.value.log + "[$timestamp] $message\n")
     }
@@ -93,24 +95,36 @@ class CeremonyViewModel @Inject constructor(
         )
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     fun finalizeCeremony() {
+        addToLog("Botón 'Finalizar y Guardar Llave' presionado")
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             addToLog("Finalizando ceremonia...")
             try {
                 val finalComponents = _uiState.value.components + _uiState.value.component
+                addToLog("Componentes recolectados: ${finalComponents.size} de ${_uiState.value.numCustodians}")
+                
                 if (finalComponents.size != _uiState.value.numCustodians) {
-                    throw IllegalStateException("Número incorrecto de componentes.")
+                    throw IllegalStateException("Número incorrecto de componentes: ${finalComponents.size} vs ${_uiState.value.numCustodians}")
                 }
 
+                addToLog("Procesando componentes...")
                 val finalKeyBytes = finalComponents
                     .map { KcvCalculator.hexStringToByteArray(it) }
                     .reduce { acc, bytes -> KcvCalculator.xorByteArrays(acc, bytes) }
 
                 val finalKeyHex = finalKeyBytes.toHexString()
-                val finalKcv = KcvCalculator.calculateKcv(finalKeyHex)
+                addToLog("Llave final generada: ${finalKeyHex.take(16)}...")
 
+                val finalKcv = KcvCalculator.calculateKcv(finalKeyHex)
+                addToLog("KCV calculado: $finalKcv")
+
+                // Guardar la llave maestra en el Keystore
+                addToLog("Guardando llave en Keystore...")
+                KeyStoreManager.storeMasterKey("master_transport_key", finalKeyBytes)
+                addToLog("Llave Maestra de Transporte (MKT) guardada de forma segura en el Keystore.")
+
+                addToLog("Registrando inyección en base de datos...")
                 injectedKeyRepository.recordKeyInjection(
                     keySlot = 0, // Slot no se usa en ceremonia, se asigna en perfil
                     keyType = "MASTER_KEY_FROM_CEREMONY",
@@ -118,6 +132,7 @@ class CeremonyViewModel @Inject constructor(
                     kcv = finalKcv,
                     status = "GENERATED"
                 )
+                addToLog("Registro en base de datos completado")
 
                 _uiState.value = _uiState.value.copy(
                     currentStep = 3,
@@ -125,10 +140,11 @@ class CeremonyViewModel @Inject constructor(
                     isCeremonyFinished = true,
                     isLoading = false
                 )
-                addToLog("Ceremonia completada. Llave guardada. KCV Final: $finalKcv")
+                addToLog("Ceremonia completada exitosamente. KCV Final de la MKT: $finalKcv")
 
             } catch (e: Exception) {
                 addToLog("Error al finalizar la ceremonia: ${e.message}")
+                e.printStackTrace()
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
         }
@@ -138,4 +154,4 @@ class CeremonyViewModel @Inject constructor(
         addToLog("Ceremonia cancelada.")
         _uiState.value = CeremonyState() // Resetea al estado inicial
     }
-} 
+}

@@ -45,6 +45,36 @@ fun CeremonyScreen(viewModel: CeremonyViewModel = hiltViewModel()) {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
+                
+                // Indicador de estado
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (state.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Procesando...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Text(
+                            text = "Estado: ${when(state.currentStep) {
+                                1 -> "Configuración"
+                                2 -> "Custodios"
+                                3 -> "Completado"
+                                else -> "Desconocido"
+                            }}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+                
                 Spacer(modifier = Modifier.height(16.dp))
 
                 when (state.currentStep) {
@@ -130,19 +160,60 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
         if (state.partialKCV.isNotBlank()) {
             Text("KCV: ${state.partialKCV}", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
+        }
 
-            if (state.currentCustodian < state.numCustodians) {
-                Button(onClick = { viewModel.nextCustodian() }) {
-                    Text("Siguiente Custodio")
+        // Botones de navegación
+        if (state.currentCustodian < state.numCustodians) {
+            Button(
+                onClick = { viewModel.nextCustodian() },
+                enabled = state.partialKCV.isNotBlank() && !state.isLoading
+            ) {
+                Text("Siguiente Custodio")
+            }
+        } else {
+            // Último custodio completado
+            if (state.component.isNotBlank()) {
+                Button(
+                    onClick = { viewModel.finalizeCeremony() },
+                    enabled = !state.isLoading
+                ) {
+                    if (state.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Procesando...")
+                    } else {
+                        Text("Finalizar y Guardar Llave")
+                    }
                 }
             } else {
-                Button(onClick = { viewModel.finalizeCeremony() }) {
-                    Text("Finalizar y Guardar Llave")
-                }
+                Text(
+                    text = "Ingresa el componente del custodio ${state.currentCustodian} para continuar",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+        
+        // Botón de debug temporal
+        Button(
+            onClick = { 
+                viewModel.addToLog("Test: Verificando estado actual")
+                viewModel.addToLog("Componentes: ${viewModel.uiState.value.components.size}")
+                viewModel.addToLog("Componente actual: ${viewModel.uiState.value.component}")
+                viewModel.addToLog("Custodio actual: ${viewModel.uiState.value.currentCustodian}")
+                viewModel.addToLog("Total custodios: ${viewModel.uiState.value.numCustodians}")
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+        ) {
+            Text("Debug Estado")
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = { viewModel.cancelCeremony() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
             Text("Cancelar Ceremonia")
         }

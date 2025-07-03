@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,6 +31,8 @@ data class BottomBarDestination(
 val bottomBarDestinations = listOf(
     BottomBarDestination(MainScreen.Dashboard.route, Icons.Default.Dashboard, "Dashboard"),
     BottomBarDestination(MainScreen.KeyVault.route, Icons.Default.VpnKey, "Llaves"),
+    BottomBarDestination(MainScreen.Ceremony.route, Icons.Default.Security, "Ceremonia"),
+    BottomBarDestination(MainScreen.Profiles.route, Icons.Default.List, "Perfiles")
 )
 
 @Composable

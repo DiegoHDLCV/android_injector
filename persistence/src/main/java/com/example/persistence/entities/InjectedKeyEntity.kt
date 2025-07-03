@@ -25,6 +25,9 @@ data class InjectedKeyEntity(
     val keyAlgorithm: String,   // El algoritmo (ej: "DES_TRIPLE", "AES").
     val kcv: String,            // El Key Checksum Value (en formato HEX) para verificación.
 
+    // Datos de la llave (en formato HEX)
+    val keyData: String = "",   // Los datos de la llave en formato hexadecimal
+
     // Metadatos de auditoría
     val injectionTimestamp: Long = System.currentTimeMillis(),
     val status: String          // Estado de la última operación (ej: "SUCCESSFUL", "FAILED").

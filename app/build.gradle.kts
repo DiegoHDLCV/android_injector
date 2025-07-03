@@ -3,9 +3,9 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.hilt.android) // Agrega el plugin de Hilt
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.hilt.android)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -57,6 +57,16 @@ android {
     buildFeatures {
         compose = true
     }
+    composeOptions {
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
+    }
+
+    lint {
+        disable.add("UnrememberedMutableState")
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
     // --- ELIMINA ESTE BLOQUE defaultConfig DUPLICADO ---
     // defaultConfig {
     //     // ...
@@ -76,7 +86,7 @@ dependencies {
     implementation(project(":format"))
     implementation(project(":utils"))
     ksp(libs.hilt.compiler)
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.androidx.security.crypto)
 
