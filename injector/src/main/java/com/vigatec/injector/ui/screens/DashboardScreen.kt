@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.vigatec.injector.ui.components.StatCardSkeleton
+import com.vigatec.injector.viewmodel.DashboardState
 import com.vigatec.injector.viewmodel.DashboardViewModel
 import com.vigatec.injector.viewmodel.SystemStats
 
@@ -31,7 +33,7 @@ fun DashboardScreen(
     navController: NavController,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
-    val systemStats by viewModel.systemStats.collectAsState()
+    val dashboardState by viewModel.state.collectAsState()
 
     LazyColumn(
         modifier = Modifier
@@ -41,9 +43,54 @@ fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { WelcomeCard(username = username) }
-        item { DashboardStats(stats = systemStats) }
+        item { 
+            if (dashboardState.isLoading) {
+                DashboardStatsSkeleton()
+            } else {
+                DashboardStats(stats = dashboardState.stats)
+            }
+        }
         item { QuickActionsCard(navController) }
         item { SystemHealthCard() }
+    }
+}
+
+@Composable
+fun DashboardStatsSkeleton() {
+    Column {
+        // Título esqueleto
+        Box(
+            modifier = Modifier
+                .width(150.dp)
+                .height(20.dp)
+                .background(
+                    color = Color.LightGray.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(4.dp)
+                )
+                .padding(vertical = 8.dp)
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Primera fila de estadísticas esqueleto
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            StatCardSkeleton(modifier = Modifier.weight(1f))
+            StatCardSkeleton(modifier = Modifier.weight(1f))
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Segunda fila de estadísticas esqueleto
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            StatCardSkeleton(modifier = Modifier.weight(1f))
+            StatCardSkeleton(modifier = Modifier.weight(1f))
+        }
     }
 }
 

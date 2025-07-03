@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.persistence.entities.InjectedKeyEntity
 import com.example.persistence.entities.KeyConfiguration
 import com.example.persistence.entities.ProfileEntity
+import com.vigatec.injector.ui.components.ProfileCardSkeleton
 import com.vigatec.injector.viewmodel.ProfileFormData
 import com.vigatec.injector.viewmodel.ProfileViewModel
 import com.vigatec.injector.viewmodel.KeyInjectionViewModel
@@ -44,36 +45,18 @@ fun ProfilesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Gestión de Perfiles",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        )
-                        Text(
-                            text = "Administra perfiles de aplicaciones y sus configuraciones",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        )
+                title = { Text("Perfiles de Inyección", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = { viewModel.onShowCreateModal() }) {
+                        Icon(Icons.Default.Add, contentDescription = "Crear Perfil")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    titleContentColor = MaterialTheme.colorScheme.onSurface,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { viewModel.onShowCreateModal() },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Crear Perfil")
-            }
         }
     ) { padding ->
         Box(
@@ -82,7 +65,7 @@ fun ProfilesScreen(
                 .padding(padding)
         ) {
             if (state.isLoading) {
-                LoadingScreen()
+                ProfilesSkeletonScreen()
             } else if (state.profiles.isEmpty()) {
                 EmptyStateScreen(onCreateProfile = { viewModel.onShowCreateModal() })
             } else {
@@ -115,7 +98,91 @@ fun ProfilesScreen(
 }
 
 @Composable
-private fun LoadingScreen() {
+fun ProfilesSkeletonScreen() {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Header con estadísticas esqueleto
+        item {
+            StatisticsHeaderSkeleton()
+        }
+        
+        // Lista de perfiles esqueleto
+        items(5) {
+            ProfileCardSkeleton()
+        }
+    }
+}
+
+@Composable
+fun StatisticsHeaderSkeleton() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            repeat(3) {
+                StatisticItemSkeleton()
+            }
+        }
+    }
+}
+
+@Composable
+fun StatisticItemSkeleton() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        // Icono esqueleto
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(
+                    color = Color.LightGray.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(24.dp)
+                )
+                .padding(12.dp)
+        )
+        
+        // Valor esqueleto
+        Box(
+            modifier = Modifier
+                .width(30.dp)
+                .height(20.dp)
+                .background(
+                    color = Color.LightGray.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(4.dp)
+                )
+                .padding(vertical = 4.dp)
+        )
+        
+        // Label esqueleto
+        Box(
+            modifier = Modifier
+                .width(60.dp)
+                .height(12.dp)
+                .background(
+                    color = Color.LightGray.copy(alpha = 0.3f),
+                    shape = RoundedCornerShape(4.dp)
+                )
+                .padding(vertical = 2.dp)
+        )
+    }
+}
+
+@Composable
+fun LoadingScreen() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -125,12 +192,11 @@ private fun LoadingScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(48.dp)
+                color = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = "Cargando perfiles...",
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
         }
@@ -138,73 +204,56 @@ private fun LoadingScreen() {
 }
 
 @Composable
-private fun EmptyStateScreen(onCreateProfile: () -> Unit) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+fun EmptyStateScreen(onCreateProfile: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.padding(32.dp)
+        Icon(
+            Icons.Rounded.FolderOpen,
+            contentDescription = null,
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "No hay perfiles configurados",
+            style = MaterialTheme.typography.headlineSmall.copy(
+                fontWeight = FontWeight.Medium
+            ),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = "Crea tu primer perfil para comenzar a inyectar llaves criptográficas en dispositivos POS.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Button(
+            onClick = onCreateProfile,
+            modifier = Modifier.height(48.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
         ) {
-            // Icono animado
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(RoundedCornerShape(60.dp))
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                                Color.Transparent
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.FolderOpen,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
-                )
-            }
-            
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = "No hay perfiles configurados",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Comienza creando un nuevo perfil de aplicación para gestionar tus configuraciones de llaves",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
-            
-            Button(
-                onClick = onCreateProfile,
-                modifier = Modifier.height(48.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Crear Primer Perfil")
-            }
+            Icon(
+                Icons.Default.Add,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Crear Primer Perfil")
         }
     }
 }
@@ -393,7 +442,7 @@ fun ProfileCard(
                 ) {
                     Text(
                         text = profile.name,
-                        style = MaterialTheme.typography.headlineSmall.copy(
+                        style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold
                         ),
                         color = MaterialTheme.colorScheme.onSurface
@@ -408,8 +457,8 @@ fun ProfileCard(
                     )
                     
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         // Badge del tipo de aplicación
                         Surface(
@@ -544,51 +593,53 @@ fun ProfileCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Botón principal de inyección
+                OutlinedButton(
+                    onClick = onEdit,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Editar")
+                }
+                
+                OutlinedButton(
+                    onClick = onDelete,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Eliminar")
+                }
+                
                 Button(
                     onClick = onInject,
                     modifier = Modifier.weight(1f),
                     enabled = isReady,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                        containerColor = if (isReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
                     )
                 ) {
                     Icon(
                         Icons.Default.PlayArrow,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text("Inyectar")
-                }
-                
-                // Botones secundarios
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = "Editar Perfil",
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.errorContainer)
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Eliminar Perfil",
-                        tint = MaterialTheme.colorScheme.error
-                    )
                 }
             }
         }
@@ -596,79 +647,93 @@ fun ProfileCard(
 }
 
 @Composable
-private fun KeyConfigChip(config: KeyConfiguration) {
-    val usageIcon = getUsageIcon(config.usage)
+fun KeyConfigChip(config: KeyConfiguration) {
+    val isConfigured = config.selectedKey.isNotEmpty()
     
     Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = if (isConfigured) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        },
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         ) {
-            Text(
-                text = usageIcon,
-                fontSize = 12.sp
+            Icon(
+                Icons.Rounded.Key,
+                contentDescription = null,
+                modifier = Modifier.size(12.dp),
+                tint = if (isConfigured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
-            Column {
-                Text(
-                    text = config.usage,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "#${config.slot}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-            }
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = config.keyType,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isConfigured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
         }
     }
 }
 
-// Funciones de utilidad
-private fun getAppTypeConfig(appType: String): AppTypeConfig {
-    return when (appType) {
-        "Retail" -> AppTypeConfig(
-            icon = Icons.Rounded.Store,
-            color = Color(0xFF3B82F6),
-            gradient = Brush.linearGradient(
-                colors = listOf(Color(0xFF3B82F6), Color(0xFF1D4ED8))
-            )
-        )
-        "H2H" -> AppTypeConfig(
-            icon = Icons.Rounded.Link,
-            color = Color(0xFF8B5CF6),
-            gradient = Brush.linearGradient(
-                colors = listOf(Color(0xFF8B5CF6), Color(0xFF7C3AED))
-            )
-        )
-        "Posint" -> AppTypeConfig(
+// Configuraciones de tipos de aplicación
+data class AppTypeConfig(
+    val icon: ImageVector,
+    val color: Color,
+    val gradient: Brush
+)
+
+@Composable
+fun getAppTypeConfig(appType: String): AppTypeConfig {
+    return when (appType.lowercase()) {
+        "amex" -> AppTypeConfig(
             icon = Icons.Rounded.CreditCard,
-            color = Color(0xFF10B981),
-            gradient = Brush.linearGradient(
-                colors = listOf(Color(0xFF10B981), Color(0xFF059669))
+            color = Color(0xFF006FCF),
+            gradient = Brush.horizontalGradient(
+                colors = listOf(Color(0xFF006FCF), Color(0xFF0052A3))
             )
         )
-        "ATM" -> AppTypeConfig(
-            icon = Icons.Rounded.AccountBalance,
-            color = Color(0xFFF59E0B),
-            gradient = Brush.linearGradient(
-                colors = listOf(Color(0xFFF59E0B), Color(0xFFD97706))
+        "visa" -> AppTypeConfig(
+            icon = Icons.Rounded.CreditCard,
+            color = Color(0xFF1A1F71),
+            gradient = Brush.horizontalGradient(
+                colors = listOf(Color(0xFF1A1F71), Color(0xFF0F1344))
+            )
+        )
+        "mastercard" -> AppTypeConfig(
+            icon = Icons.Rounded.CreditCard,
+            color = Color(0xFFEB001B),
+            gradient = Brush.horizontalGradient(
+                colors = listOf(Color(0xFFEB001B), Color(0xFFC70039))
+            )
+        )
+        "discover" -> AppTypeConfig(
+            icon = Icons.Rounded.CreditCard,
+            color = Color(0xFFFF6000),
+            gradient = Brush.horizontalGradient(
+                colors = listOf(Color(0xFFFF6000), Color(0xFFE55A00))
             )
         )
         else -> AppTypeConfig(
-            icon = Icons.Rounded.Settings,
-            color = Color(0xFF6B7280),
-            gradient = Brush.linearGradient(
-                colors = listOf(Color(0xFF6B7280), Color(0xFF4B5563))
+            icon = Icons.Rounded.Payment,
+            color = MaterialTheme.colorScheme.primary,
+            gradient = Brush.horizontalGradient(
+                colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
             )
         )
+    }
+}
+
+private fun getAppTypeIcon(appType: String): String {
+    return when (appType.lowercase()) {
+        "retail" -> "🏪"
+        "h2h" -> "🔗"
+        "posint" -> "💳"
+        "atm" -> "🏧"
+        "custom" -> "⚙️"
+        else -> "📱"
     }
 }
 
@@ -681,12 +746,6 @@ private fun getUsageIcon(usage: String): String {
         else -> "🔑"
     }
 }
-
-private data class AppTypeConfig(
-    val icon: ImageVector,
-    val color: Color,
-    val gradient: Brush
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -973,16 +1032,6 @@ fun CreateProfileModal(
     }
 }
 
-private fun getAppTypeIcon(appType: String): String {
-    return when (appType) {
-        "Retail" -> "🏪"
-        "H2H" -> "🔗"
-        "Posint" -> "💳"
-        "ATM" -> "🏧"
-        else -> "⚙️"
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KeyConfigurationItem(
@@ -1088,8 +1137,8 @@ fun KeyConfigurationItem(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Text(getUsageIcon(usage))
-                                        Text(usage)
+                                        Text(text = getUsageIcon(usage))
+                                        Text(text = usage)
                                     }
                                 },
                                 onClick = {
@@ -1188,8 +1237,8 @@ fun KeyConfigurationItem(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(key.kcv, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                                            Text("(ID: ${key.id})", style = MaterialTheme.typography.bodySmall)
+                                            Text(text = key.kcv, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                                            Text(text = "(ID: ${key.id})", style = MaterialTheme.typography.bodySmall)
                                         }
                                     },
                                     onClick = {

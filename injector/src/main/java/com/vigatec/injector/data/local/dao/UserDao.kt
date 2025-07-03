@@ -13,4 +13,10 @@ interface UserDao {
 
     @Query("SELECT * FROM users WHERE username = :username LIMIT 1")
     suspend fun findByUsername(username: String): User?
+
+    /**
+     * Cuenta el total de usuarios en el sistema.
+     */
+    @Query("SELECT COUNT(*) FROM users")
+    suspend fun getUserCount(): Int
 } 

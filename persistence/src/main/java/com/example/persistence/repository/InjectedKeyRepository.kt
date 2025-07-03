@@ -24,18 +24,71 @@ class InjectedKeyRepository @Inject constructor(
         keyType: String,
         keyAlgorithm: String,
         kcv: String,
-        keyData: String = "",
-        status: String
+        status: String = "SUCCESSFUL"
     ) {
-        val newRecord = InjectedKeyEntity(
-            keySlot = keySlot,
-            keyType = keyType,
-            keyAlgorithm = keyAlgorithm,
-            kcv = kcv,
-            keyData = keyData,
-            status = status
-        )
-        injectedKeyDao.insertOrUpdate(newRecord)
+        try {
+            val injectedKey = InjectedKeyEntity(
+                keySlot = keySlot,
+                keyType = keyType,
+                keyAlgorithm = keyAlgorithm,
+                kcv = kcv,
+                status = status,
+                injectionTimestamp = System.currentTimeMillis()
+            )
+            injectedKeyDao.insertOrUpdate(injectedKey)
+            Log.d(TAG, "Key injection recorded: Slot $keySlot, Type $keyType, Status $status")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error recording key injection", e)
+            throw e
+        }
+    }
+
+    suspend fun insertOrUpdate(key: InjectedKeyEntity) {
+        try {
+            injectedKeyDao.insertOrUpdate(key)
+            Log.d(TAG, "Key inserted/updated: ${key.id}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error inserting/updating key", e)
+            throw e
+        }
+    }
+
+    suspend fun getInjectionCountToday(startOfDay: Long): Int {
+        return try {
+            injectedKeyDao.getInjectionCountToday(startOfDay)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting injection count for today", e)
+            0
+        }
+    }
+
+    suspend fun getSuccessfulInjectionCount(): Int {
+        return try {
+            injectedKeyDao.getSuccessfulInjectionCount()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting successful injection count", e)
+            0
+        }
+    }
+
+    suspend fun deleteKey(keyId: Long) {
+        try {
+            injectedKeyDao.deleteKey(keyId)
+            Log.d(TAG, "Key deleted: $keyId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting key", e)
+            throw e
+        }
+    }
+
+    suspend fun deleteAllKeys() {
+        try {
+            injectedKeyDao.deleteAllKeys()
+            Log.d(TAG, "All keys deleted")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting all keys", e)
+            throw e
+        }
     }
 
     suspend fun getKeyBySlotAndType(slot: Int, type: String): InjectedKeyEntity? {
@@ -51,19 +104,13 @@ class InjectedKeyRepository @Inject constructor(
      * @param key La entidad de la llave a eliminar.
      */
     suspend fun deleteKey(key: InjectedKeyEntity) {
-        injectedKeyDao.delete(key)
-    }
-
-    /**
-     * Borra todas las llaves de la base de datos.
-     * Es una operación destructiva que limpia toda la tabla.
-     */
-    suspend fun deleteAllKeys() {
-        // --- LOG AÑADIDO ---
-        Log.i(TAG, "deleteAllKeys: Solicitud recibida para borrar todos los registros del DAO.")
-        injectedKeyDao.deleteAll()
-        // --- LOG AÑADIDO ---
-        Log.d(TAG, "deleteAllKeys: Llamada a injectedKeyDao.deleteAll() completada.")
+        try {
+            injectedKeyDao.deleteKey(key.id)
+            Log.d(TAG, "Key deleted by entity: ${key.id}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting key by entity", e)
+            throw e
+        }
     }
 
     /**

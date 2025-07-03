@@ -12,4 +12,11 @@ class UserRepository @Inject constructor(private val userDao: UserDao) {
         val user = userDao.findByUsername(username)
         return user != null && user.pass == pass
     }
+
+    /**
+     * Obtiene el total de usuarios en el sistema.
+     */
+    suspend fun getUserCount(): Int {
+        return userDao.getUserCount()
+    }
 } 

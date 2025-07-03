@@ -6,7 +6,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.manufacturer.KeySDKManager
-import com.example.manufacturer.base.models.KeyType as GenericKeyType
+import com.example.manufacturer.base.GenericKeyType
 import com.example.persistence.entities.InjectedKeyEntity
 import com.example.persistence.repository.InjectedKeyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,16 +22,99 @@ class InjectedKeysViewModel @Inject constructor(
 
     private val TAG = "InjectedKeysViewModel"
 
-    private val _snackbarMessage = MutableSharedFlow<String>()
-    val snackbarMessage = _snackbarMessage.asSharedFlow()
+    private val _loading = MutableStateFlow(true)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
-    val injectedKeys: StateFlow<List<InjectedKeyEntity>> =
-        injectedKeyRepository.getAllInjectedKeys()
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
+    private val _keys = MutableStateFlow<List<InjectedKeyEntity>>(emptyList())
+    val keys: StateFlow<List<InjectedKeyEntity>> = _keys.asStateFlow()
+
+    private val _showDeleteModal = MutableStateFlow(false)
+    val showDeleteModal: StateFlow<Boolean> = _showDeleteModal.asStateFlow()
+
+    private val _selectedKeyForDeletion = MutableStateFlow<InjectedKeyEntity?>(null)
+    val selectedKeyForDeletion: StateFlow<InjectedKeyEntity?> = _selectedKeyForDeletion.asStateFlow()
+
+    private val _snackbarMessage = MutableSharedFlow<String>()
+    val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
+
+    init {
+        loadKeys()
+    }
+
+    private fun loadKeys() {
+        viewModelScope.launch {
+            _loading.value = true
+            try {
+                injectedKeyRepository.getAllInjectedKeys()
+                    .collect { keys ->
+                        _keys.value = keys
+                        _loading.value = false
+                    }
+            } catch (e: Exception) {
+                _snackbarMessage.emit("Error al cargar las llaves: ${e.message}")
+                _loading.value = false
+            }
+        }
+    }
+
+    fun refreshKeys() {
+        loadKeys()
+    }
+
+    fun onDeleteKey(key: InjectedKeyEntity) {
+        _selectedKeyForDeletion.value = key
+        _showDeleteModal.value = true
+    }
+
+    fun confirmDeleteKey() {
+        viewModelScope.launch {
+            try {
+                val key = _selectedKeyForDeletion.value
+                if (key != null) {
+                    // Marcar como eliminando
+                    val updatedKey = key.copy(status = "DELETING")
+                    injectedKeyRepository.insertOrUpdate(updatedKey)
+                    
+                    // Simular el proceso de eliminación
+                    kotlinx.coroutines.delay(1000)
+                    
+                    // Eliminar de la base de datos
+                    injectedKeyRepository.deleteKey(key.id)
+                    _snackbarMessage.emit("Llave eliminada exitosamente")
+                }
+            } catch (e: Exception) {
+                _snackbarMessage.emit("Error al eliminar la llave: ${e.message}")
+            } finally {
+                dismissDeleteModal()
+            }
+        }
+    }
+
+    fun dismissDeleteModal() {
+        _showDeleteModal.value = false
+        _selectedKeyForDeletion.value = null
+    }
+
+    fun clearAllKeys() {
+        viewModelScope.launch {
+            try {
+                val currentKeys = _keys.value
+                currentKeys.forEach { key ->
+                    val updatedKey = key.copy(status = "DELETING")
+                    injectedKeyRepository.insertOrUpdate(updatedKey)
+                }
+                
+                // Simular el proceso de eliminación
+                kotlinx.coroutines.delay(1500)
+                
+                // Eliminar todas las llaves
+                injectedKeyRepository.deleteAllKeys()
+                _snackbarMessage.emit("Todas las llaves han sido eliminadas")
+            } catch (e: Exception) {
+                _snackbarMessage.emit("Error al eliminar las llaves: ${e.message}")
+            }
+        }
+    }
 
     fun deleteKey(key: InjectedKeyEntity) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -80,7 +163,7 @@ class InjectedKeysViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             Log.i(TAG, "deleteAllKeys: Proceso de borrado por estados iniciado.")
 
-            if (injectedKeys.value.isEmpty()) {
+            if (keys.value.isEmpty()) {
                 Log.i(TAG, "deleteAllKeys: No hay llaves para borrar.")
                 _snackbarMessage.emit("No hay llaves para borrar.")
                 return@launch
