@@ -44,7 +44,7 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF111827)) // bg-gray-900
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -57,7 +57,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF1F2937) // bg-gray-800
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                 ),
                 elevation = CardDefaults.cardElevation(8.dp)
             ) {
@@ -69,10 +69,10 @@ fun LoginScreen(
                     Icon(
                         imageVector = Icons.Default.VpnKey,
                         contentDescription = "Login Icon",
-                        tint = Color.White,
+                        tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier
                             .size(48.dp)
-                            .background(Color(0xFF16A34A), shape = CircleShape) // bg-green-600
+                            .background(MaterialTheme.colorScheme.primary, shape = CircleShape)
                             .padding(8.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
@@ -80,12 +80,12 @@ fun LoginScreen(
                         text = "Iniciar Sesión",
                         style = MaterialTheme.typography.headlineLarge.copy(
                             fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     )
                     Text(
                         text = "Key Injector - Sistema de Inyección",
-                        style = MaterialTheme.typography.bodyMedium.copy(color = Color.Gray)
+                        style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
                     )
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -142,15 +142,15 @@ fun LoginScreen(
                         enabled = !loginViewModel.isLoading,
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF16A34A), // bg-green-600
-                            disabledContainerColor = Color(0xFF16A34A).copy(alpha = 0.5f)
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            disabledContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                         )
                     ) {
                         AnimatedContent(targetState = loginViewModel.isLoading, label = "LoginButtonAnimation") { isLoading ->
                             if (isLoading) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onPrimary,
                                     strokeWidth = 2.dp
                                 )
                             } else {
@@ -171,16 +171,16 @@ fun LoginScreen(
 @Composable
 private fun getTextFieldColors(): TextFieldColors {
     return OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = Color(0xFF22C55E), // focus:border-green-500
-        unfocusedBorderColor = Color(0xFF4B5563), // border-gray-600
-        focusedLabelColor = Color(0xFF22C55E),
-        unfocusedLabelColor = Color.Gray,
-        cursorColor = Color(0xFF22C55E),
-        focusedTextColor = Color.White,
-        unfocusedTextColor = Color.White,
-        disabledTextColor = Color.Gray,
-        focusedContainerColor = Color(0xFF374151), // bg-gray-700
-        unfocusedContainerColor = Color(0xFF374151),
-        disabledContainerColor = Color(0xFF374151).copy(alpha = 0.5f)
+        focusedBorderColor = MaterialTheme.colorScheme.primary,
+        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+        focusedLabelColor = MaterialTheme.colorScheme.primary,
+        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        cursorColor = MaterialTheme.colorScheme.primary,
+        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+        disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f),
+        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.1f),
+        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.05f)
     )
 } 

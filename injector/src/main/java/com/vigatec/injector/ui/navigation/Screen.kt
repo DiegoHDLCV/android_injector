@@ -1,8 +1,14 @@
 package com.vigatec.injector.ui.navigation
 
 sealed class Screen(val route: String) {
-    object LoginScreen : Screen("login_screen")
-    object MainScreen : Screen("main_screen/{username}") {
-        fun createRoute(username: String) = "main_screen/$username"
-    }
+    object Login : Screen("login")
+    object Main : Screen("main")
+}
+
+sealed class MainScreen(val route: String) {
+    object Dashboard : MainScreen("dashboard")
+    object KeyVault : MainScreen("key_vault")
+    object Ceremony : MainScreen("ceremony")
+    object Profiles : MainScreen("profiles")
+    object Connection : MainScreen("connection")
 } 

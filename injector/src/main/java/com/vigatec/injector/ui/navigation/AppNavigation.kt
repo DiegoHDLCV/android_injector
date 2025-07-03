@@ -1,36 +1,34 @@
 package com.vigatec.injector.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.vigatec.injector.ui.screens.LoginScreen
-import com.vigatec.injector.ui.screens.MainScreen
+import com.vigatec.injector.ui.screens.MainScaffold
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
     NavHost(
         navController = navController,
-        startDestination = Screen.LoginScreen.route
+        startDestination = Screen.Login.route
     ) {
-        composable(Screen.LoginScreen.route) {
+        composable(Screen.Login.route) {
             LoginScreen(onLoginSuccess = { username ->
-                navController.navigate(Screen.MainScreen.createRoute(username)) {
-                    popUpTo(Screen.LoginScreen.route) {
+                navController.navigate(Screen.Main.route) {
+                    popUpTo(Screen.Login.route) {
                         inclusive = true
                     }
                 }
             })
         }
-        composable(
-            route = Screen.MainScreen.route,
-            arguments = listOf(navArgument("username") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val username = backStackEntry.arguments?.getString("username") ?: "User"
-            MainScreen(username = username)
+        composable(Screen.Main.route) {
+            // Aquí recuperamos el username, aunque en este nuevo diseño
+            // podríamos optar por obtenerlo de un ViewModel compartido o de una sesión.
+            // Por ahora, lo pasamos como argumento, pero no lo usamos en MainScaffold.
+            // Lo ideal sería obtenerlo de una fuente de datos única (ej. SessionViewModel).
+            MainScaffold(username = "admin") // Pasamos un valor por ahora.
         }
     }
 } 
