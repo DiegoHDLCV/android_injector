@@ -10,6 +10,12 @@ android {
     namespace = "com.vigatec.injector"
     compileSdk = 35
 
+    sourceSets {
+        named("main") {
+            jniLibs.srcDirs("src/main/jniLibs")
+        }
+    }
+
     defaultConfig {
         applicationId = "com.vigatec.injector"
         minSdk = 24
@@ -18,6 +24,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            // Forzar solo la ABI que tiene tu librería .so crítica
+            abiFilters.clear() // Limpia cualquier filtro anterior
+            abiFilters.add("armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -45,6 +57,8 @@ android {
 }
 
 dependencies {
+    implementation(fileTree(mapOf("dir" to "../shared-libs", "include" to listOf("*.jar"), "exclude" to listOf("core-3.2.1.jar"))))
+
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -71,6 +85,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(project(":persistence"))
+    implementation(project(":manufacturer"))
     implementation(project(":utils"))
 
     testImplementation(libs.junit)

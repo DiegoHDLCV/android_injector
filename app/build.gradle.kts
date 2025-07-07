@@ -66,15 +66,6 @@ android {
         checkReleaseBuilds = false
         abortOnError = false
     }
-
-    // --- ELIMINA ESTE BLOQUE defaultConfig DUPLICADO ---
-    // defaultConfig {
-    //     // ...
-    //     ndk {
-    //         abiFilters.addAll("armeabi-v7a", "arm64-v8a") // Ejemplo
-    //     }
-    // }
-    // --- FIN ELIMINACIÓN ---
 }
 
 dependencies {
@@ -85,6 +76,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(project(":format"))
     implementation(project(":utils"))
+    implementation(project(":injector"))
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 

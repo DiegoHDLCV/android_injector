@@ -1,7 +1,11 @@
 package com.vigatec.injector.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.communication.libraries.CommunicationSDKManager
+import com.example.communication.polling.PollingService
 import com.example.persistence.repository.InjectedKeyRepository
 import com.example.persistence.repository.ProfileRepository
 import com.vigatec.injector.repository.UserRepository
@@ -22,21 +26,34 @@ data class SystemStats(
 
 data class DashboardState(
     val stats: SystemStats = SystemStats(),
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    val isSubPosConnected: Boolean = false,
+    val isPollingActive: Boolean = false
 )
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val injectedKeyRepository: InjectedKeyRepository,
-    private val userRepository: UserRepository
-) : ViewModel() {
+    private val userRepository: UserRepository,
+    application: Application
+) : AndroidViewModel(application) {
 
+    private val TAG = "DashboardViewModel"
     private val _state = MutableStateFlow(DashboardState())
     val state: StateFlow<DashboardState> = _state
+    
+    // Servicio de polling
+    private val pollingService = PollingService()
+    
+    // Estado de conexión del SubPOS
+    private val _isSubPosConnected = MutableStateFlow(false)
+    val isSubPosConnected: StateFlow<Boolean> = _isSubPosConnected
 
     init {
         loadStats()
+        initializeCommunication()
+        observePollingStatus()
     }
 
     private fun loadStats() {
@@ -72,8 +89,76 @@ class DashboardViewModel @Inject constructor(
                     isLoading = false
                 )
             }.collect { dashboardState ->
-                _state.value = dashboardState
+                _state.value = dashboardState.copy(
+                    isSubPosConnected = _isSubPosConnected.value,
+                    isPollingActive = pollingService.isPollingActive.value
+                )
             }
         }
+    }
+    
+    private fun initializeCommunication() {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Inicializando SDK de comunicación...")
+                // Inicializar el SDK de comunicación
+                CommunicationSDKManager.initialize(getApplication())
+                
+                // Inicializar el servicio de polling
+                pollingService.initialize()
+                
+                Log.d(TAG, "Comunicación inicializada correctamente")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al inicializar comunicación", e)
+            }
+        }
+    }
+    
+    private fun observePollingStatus() {
+        viewModelScope.launch {
+            // Observar el estado de conexión del polling
+            pollingService.isConnected.collect { isConnected ->
+                Log.d(TAG, "Estado de conexión SubPOS: $isConnected")
+                _isSubPosConnected.value = isConnected
+                
+                // Actualizar el estado del dashboard
+                _state.value = _state.value.copy(
+                    isSubPosConnected = isConnected
+                )
+            }
+        }
+        
+        viewModelScope.launch {
+            // Observar el estado del polling
+            pollingService.isPollingActive.collect { isActive ->
+                Log.d(TAG, "Estado del polling: $isActive")
+                _state.value = _state.value.copy(
+                    isPollingActive = isActive
+                )
+            }
+        }
+    }
+    
+    fun startPolling() {
+        Log.d(TAG, "Iniciando polling desde MasterPOS...")
+        pollingService.startMasterPolling { isConnected ->
+            Log.d(TAG, "Callback de conexión: $isConnected")
+            _isSubPosConnected.value = isConnected
+        }
+    }
+    
+    fun stopPolling() {
+        Log.d(TAG, "Deteniendo polling...")
+        pollingService.stopPolling()
+    }
+    
+    fun isPollingReady(): Boolean {
+        return pollingService.isReadyForMessaging()
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        Log.d(TAG, "ViewModel limpiado, deteniendo polling...")
+        pollingService.stopPolling()
     }
 } 

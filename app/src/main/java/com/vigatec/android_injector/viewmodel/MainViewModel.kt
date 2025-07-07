@@ -235,6 +235,25 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             Log.i(TAG, "Procesando mensaje parseado: $message")
             when (message) {
+                is LegacyMessage -> {
+                    // Manejar mensajes del protocolo Legacy
+                    when (message.command) {
+                        "0100" -> {
+                            // Mensaje POLL recibido - SubPOS debe responder
+                            Log.d(TAG, "📥 POLL (0100) recibido desde MasterPOS")
+                            _snackbarEvent.emit("POLL recibido - Respondiendo...")
+                            handlePollRequest()
+                        }
+                        "0110" -> {
+                            // Respuesta POLL recibida - solo debería recibirlo el MasterPOS
+                            Log.d(TAG, "📥 Respuesta POLL (0110) recibida")
+                            _snackbarEvent.emit("Respuesta POLL recibida")
+                        }
+                        else -> {
+                            Log.d(TAG, "Comando Legacy ${message.command} no manejado")
+                        }
+                    }
+                }
                 is InjectSymmetricKeyCommand -> {
                     _snackbarEvent.emit("Recibido CMD: Inyectar Llave")
                     handleFuturexInjectKey(message)
@@ -505,6 +524,33 @@ class MainViewModel @Inject constructor(
             sendData(responsePayload)
             _snackbarEvent.emit("Respondiendo con N/S: $deviceSerialNumber")
             Log.i(TAG, "Respuesta de número de serie enviada.")
+        }
+    }
+    
+    private fun handlePollRequest() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "📤 Enviando respuesta POLL (0110) a MasterPOS...")
+                
+                // Formatear respuesta POLL usando el protocolo Legacy
+                val pollResponse = when (SystemConfig.commProtocolSelected) {
+                    CommProtocol.LEGACY -> LegacyMessageFormatter.format("0110", "ACK")
+                    else -> {
+                        Log.e(TAG, "Protocolo ${SystemConfig.commProtocolSelected} no soporta mensajes POLL")
+                        return@launch
+                    }
+                }
+                
+                // Enviar respuesta
+                sendData(pollResponse)
+                
+                Log.d(TAG, "✅ Respuesta POLL enviada exitosamente")
+                _snackbarEvent.emit("Respuesta POLL enviada")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al enviar respuesta POLL", e)
+                _snackbarEvent.emit("Error al responder POLL")
+            }
         }
     }
 

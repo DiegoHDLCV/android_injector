@@ -7,11 +7,22 @@ android {
     namespace = "com.example.communication"
     compileSdk = 35
 
+    sourceSets {
+        named("main") {
+            jniLibs.srcDirs("src/main/jniLibs")
+        }
+    }
+
     defaultConfig {
         minSdk = 24
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+        ndk {
+            // Forzar solo la ABI que tiene tu librería .so crítica
+            abiFilters.clear() // Limpia cualquier filtro anterior
+            abiFilters.add("armeabi-v7a")
+        }
     }
 
     buildTypes {
@@ -42,6 +53,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation(project(":format"))
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

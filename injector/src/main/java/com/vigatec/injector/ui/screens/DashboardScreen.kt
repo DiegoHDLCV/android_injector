@@ -43,6 +43,7 @@ fun DashboardScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { WelcomeCard(username = username) }
+        item { ConnectionStatusCard(dashboardState, viewModel) }
         item { 
             if (dashboardState.isLoading) {
                 DashboardStatsSkeleton()
@@ -51,7 +52,7 @@ fun DashboardScreen(
             }
         }
         item { QuickActionsCard(navController) }
-        item { SystemHealthCard() }
+        item { SystemHealthCard(dashboardState) }
     }
 }
 
@@ -208,7 +209,83 @@ fun QuickActionItem(title: String, icon: ImageVector, isAdmin: Boolean = false, 
 }
 
 @Composable
-fun SystemHealthCard() {
+fun ConnectionStatusCard(dashboardState: DashboardState, viewModel: DashboardViewModel) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (dashboardState.isSubPosConnected) 
+                Color(0xFF4CAF50).copy(alpha = 0.1f) 
+            else 
+                Color(0xFFF44336).copy(alpha = 0.1f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Indicador de luz verde/roja
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(
+                            color = if (dashboardState.isSubPosConnected) Color(0xFF4CAF50) else Color(0xFFF44336),
+                            shape = CircleShape
+                        )
+                )
+                
+                Spacer(modifier = Modifier.width(12.dp))
+                
+                Column {
+                    Text(
+                        text = "Estado de Conexión SubPOS",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (dashboardState.isSubPosConnected) 
+                            "SubPOS conectado y respondiendo" 
+                        else 
+                            "SubPOS no conectado",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            
+            // Botón de control de polling
+            Button(
+                onClick = {
+                    if (dashboardState.isPollingActive) {
+                        viewModel.stopPolling()
+                    } else {
+                        viewModel.startPolling()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (dashboardState.isPollingActive) 
+                        MaterialTheme.colorScheme.error 
+                    else 
+                        MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(
+                    imageVector = if (dashboardState.isPollingActive) Icons.Default.Stop else Icons.Default.PlayArrow,
+                    contentDescription = if (dashboardState.isPollingActive) "Detener" else "Iniciar"
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(if (dashboardState.isPollingActive) "Detener" else "Iniciar")
+            }
+        }
+    }
+}
+
+@Composable
+fun SystemHealthCard(dashboardState: DashboardState) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp)
@@ -216,7 +293,12 @@ fun SystemHealthCard() {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Salud del Sistema", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            HealthItem("Conexión POS", "Conectado", "Puerto: COM3", true)
+            HealthItem(
+                "Conexión SubPOS", 
+                if (dashboardState.isSubPosConnected) "Conectado" else "Desconectado", 
+                if (dashboardState.isPollingActive) "Polling activo" else "Polling inactivo", 
+                dashboardState.isSubPosConnected
+            )
             HealthItem("Autenticación", "Activa", "Sesión válida", true)
             HealthItem("Comunicación API", "Operativa", "Backend disponible", true)
         }

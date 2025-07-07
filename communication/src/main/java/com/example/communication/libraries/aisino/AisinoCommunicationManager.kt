@@ -1,10 +1,20 @@
 package com.example.communication.libraries.aisino
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
 import com.example.communication.base.IComController
 import com.example.communication.base.controllers.manager.ICommunicationManager
 import com.example.communication.libraries.aisino.wrapper.AisinoComController
+import com.vanstone.appsdk.client.ISdkStatue
+import com.vanstone.appsdk.client.SdkApi
+import com.vanstone.trans.api.SystemApi
+import com.vanstone.utils.CommonConvert
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 object AisinoCommunicationManager : ICommunicationManager {
 
@@ -27,13 +37,18 @@ object AisinoCommunicationManager : ICommunicationManager {
         Log.i(TAG, "Inicializando AisinoCommunicationManager...")
         this.applicationContext = application
 
-        // La inicialización del SDK global de Vanstone (SystemApi.SystemInit_Api)
-        // se asume que ya fue manejada externamente (ej. en AisinoKeyManager o Application.onCreate)
-        // ya que es un prerrequisito para que SdkApi.getInstance() funcione.
-        // Si SdkApi.getInstance().getRs232Handler() es null, las llamadas fallarán.
-        // Aquí solo marcamos este manager como inicializado.
+        // Inicializar el SDK de Vanstone si no está ya inicializado
+        try {
+            Log.d(TAG, "Inicializando SDK de Vanstone para comunicación...")
+            initializeVanstoneSDK(application)
+            Log.i(TAG, "SDK de Vanstone inicializado correctamente")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al inicializar SDK de Vanstone", e)
+            throw e
+        }
+
         isInitialized = true
-        Log.i(TAG, "AisinoCommunicationManager inicializado. Se asume que el SDK de Vanstone está listo.")
+        Log.i(TAG, "AisinoCommunicationManager inicializado correctamente.")
     }
 
     @Synchronized
@@ -70,6 +85,88 @@ object AisinoCommunicationManager : ICommunicationManager {
             applicationContext = null
             isInitialized = false
             Log.i(TAG, "AisinoCommunicationManager liberado.")
+        }
+    }
+    
+    // Variable para evitar inicializar el SDK múltiples veces
+    @Volatile
+    private var isVanstoneSDKInitialized = false
+    
+    private suspend fun initializeVanstoneSDK(application: Application) = withContext(Dispatchers.IO) {
+        if (isVanstoneSDKInitialized) {
+            Log.d(TAG, "SDK de Vanstone ya está inicializado, omitiendo.")
+            return@withContext
+        }
+        
+        val context: Context = application.applicationContext
+        
+        suspendCancellableCoroutine { continuation ->
+            try {
+                val curAppDir = context.filesDir.absolutePath
+                val pathBytes = CommonConvert.StringToBytes("$curAppDir/\u0000")
+                if (pathBytes == null) {
+                    val ex = IllegalStateException("Error convirtiendo directorio a bytes para SystemInit_Api.")
+                    Log.e(TAG, "Error: pathBytes es null", ex)
+                    if (continuation.isActive) continuation.resumeWithException(ex)
+                    return@suspendCancellableCoroutine
+                }
+
+                Log.d(TAG, "Llamando SystemApi.SystemInit_Api...")
+                SystemApi.SystemInit_Api(0, pathBytes, context, object : ISdkStatue {
+                    override fun sdkInitSuccessed() {
+                        Log.i(TAG, "SystemApi.SystemInit_Api: Éxito. Inicializando SdkApi...")
+                        if (!continuation.isActive) return
+
+                        // Paso 2: Inicializar SdkApi
+                        SdkApi.getInstance().init(context, object : ISdkStatue {
+                            override fun sdkInitSuccessed() {
+                                Log.i(TAG, "SdkApi.getInstance().init(): Éxito. Inicialización del SDK completa.")
+                                isVanstoneSDKInitialized = true
+                                if (continuation.isActive) {
+                                    continuation.resume(Unit)
+                                }
+                            }
+
+                            override fun sdkInitFailed() {
+                                val ex = IllegalStateException("Falló la inicialización del SDK (SdkApi).")
+                                Log.e(TAG, "Error: Falló la inicialización de SdkApi.", ex)
+                                if (continuation.isActive) {
+                                    continuation.resumeWithException(ex)
+                                }
+                            }
+                        })
+                    }
+
+                    override fun sdkInitFailed() {
+                        val ex = IllegalStateException("Falló la inicialización del SDK (SystemApi).")
+                        Log.e(TAG, "Error: Falló la inicialización de SystemApi.", ex)
+                        if (continuation.isActive) {
+                            continuation.resumeWithException(ex)
+                        }
+                    }
+                })
+            } catch (e: Throwable) {
+                Log.e(TAG, "Excepción durante la configuración de initializeVanstoneSDK", e)
+                if (continuation.isActive) {
+                    continuation.resumeWithException(e)
+                }
+            }
+        }
+    }
+    
+    // Objeto Dummy interno para manejar casos no soportados (ya existe en el archivo original)
+    private object DummyCommunicationManager : ICommunicationManager {
+        override suspend fun initialize(application: Application) { 
+            Log.w("DummyCommManager", "Initialize llamado, pero no hace nada.") 
+        }
+
+        override fun getComController(): IComController? {
+            Log.w("DummyCommManager", "getComController llamado, devolviendo null.")
+            return null
+        }
+
+        override fun release() { 
+            Log.w("DummyCommManager", "Release llamado, pero no hace nada.") 
         }
     }
 }

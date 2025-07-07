@@ -69,9 +69,27 @@ class KeyInjectionViewModel @Inject constructor(
     private var messageParser: IMessageParser? = null
     private var messageFormatter: IMessageFormatter? = null
     private val connectionMutex = Mutex()
+    
+    // Instancia del servicio de polling
+    private val pollingService = com.example.communication.polling.PollingService()
 
     init {
         setupProtocolHandlers()
+        initializePollingService()
+    }
+    
+    private fun initializePollingService() {
+        viewModelScope.launch {
+            try {
+                // Inicializar el SDK de comunicación
+                CommunicationSDKManager.initialize(application)
+                // Inicializar el servicio de polling
+                pollingService.initialize()
+                Log.d(TAG, "PollingService inicializado en KeyInjectionViewModel")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al inicializar PollingService", e)
+            }
+        }
     }
 
     private fun setupProtocolHandlers() {
@@ -124,6 +142,18 @@ class KeyInjectionViewModel @Inject constructor(
             )
 
             try {
+                // Verificar si el polling está activo y detenerlo
+                if (pollingService.isPollingActive.value) {
+                    Log.d(TAG, "Deteniendo polling antes de iniciar inyección...")
+                    _state.value = _state.value.copy(
+                        log = _state.value.log + "Deteniendo polling para iniciar inyección...\n"
+                    )
+                    pollingService.stopPolling()
+                    
+                    // Esperar un momento para asegurar que el puerto esté libre
+                    kotlinx.coroutines.delay(1000)
+                }
+                
                 // Inicializar comunicación
                 initializeCommunication()
                 
@@ -163,8 +193,24 @@ class KeyInjectionViewModel @Inject constructor(
                 _snackbarEvent.emit("Error durante la inyección: ${e.message}")
             } finally {
                 closeCommunication()
+                
+                // Reiniciar el polling después de la inyección
+                viewModelScope.launch {
+                    Log.d(TAG, "Reiniciando polling después de la inyección...")
+                    _state.value = _state.value.copy(
+                        log = _state.value.log + "Reiniciando polling...\n"
+                    )
+                    kotlinx.coroutines.delay(1000) // Esperar un momento
+                    restartPolling()
+                }
             }
         }
+    }
+    
+    private fun restartPolling() {
+        // Esta función debe ser llamada desde el DashboardViewModel
+        // para reiniciar el polling después de la inyección
+        Log.d(TAG, "Polling debería reiniciarse desde el DashboardViewModel")
     }
 
     private suspend fun initializeCommunication() {
