@@ -5,6 +5,7 @@ import android.util.Log
 import com.example.communication.base.IComController
 import com.example.communication.base.controllers.manager.ICommunicationManager
 import com.example.communication.libraries.aisino.AisinoCommunicationManager
+import com.example.communication.libraries.newpos.NewposCommunicationManager
 import com.example.communication.libraries.urovo.UrovoCommunicationManager
 import com.example.config.EnumManufacturer
 import com.example.config.SystemConfig
@@ -19,6 +20,7 @@ object CommunicationSDKManager : ICommunicationManager {
             //EnumManufacturer.AISINO -> AisinoCommunicationManager // Implementar
             EnumManufacturer.AISINO -> AisinoCommunicationManager // Implementar
             EnumManufacturer.UROVO -> UrovoCommunicationManager // Implementar
+            EnumManufacturer.NEWPOS -> NewposCommunicationManager // Implementar
             // ... otros fabricantes
             else -> {
                 Log.w(

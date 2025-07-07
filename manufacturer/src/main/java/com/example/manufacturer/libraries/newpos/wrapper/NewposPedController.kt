@@ -252,16 +252,27 @@ class NewposPedController(private val context: Context) : IPedController {
         keyBytes: ByteArray,
         kcvBytes: ByteArray?
     ): Boolean {
-        if (keyType != GenericKeyType.MASTER_KEY) {
-            Log.w(TAG, "NewPOS injectKey is primarily for MASTER_KEY. Attempting with $keyType.")
+        if (keyType != GenericKeyType.MASTER_KEY && keyType != GenericKeyType.TRANSPORT_KEY) {
+            Log.w(TAG, "NewPOS injectKey is primarily for MASTER_KEY and TRANSPORT_KEY. Attempting with $keyType.")
         }
 
-        val npKeySystem = mapToNewposKeySystem(keyType, keyAlgorithm)
-        val npKeyType = mapToNewposKeyType(keyType)
-            ?: throw PedKeyException("Unsupported key type for KeyType mapping: $keyType")
+        // CORRECCIÓN PARA TRANSPORT_KEY: NewPOS no tiene un método específico para inyectar
+        // Transport Keys en texto plano. Funcionalmente, las Transport Keys son similares
+        // a las Master Keys (ambas son llaves de nivel superior), por lo que las tratamos
+        // como MASTER_KEY para el mapeo de NewPOS.
+        val effectiveKeyType = if (keyType == GenericKeyType.TRANSPORT_KEY) {
+            Log.d(TAG, "Tratando TRANSPORT_KEY como MASTER_KEY para NewPOS injectKey debido a limitaciones de la API.")
+            GenericKeyType.MASTER_KEY
+        } else {
+            keyType
+        }
+
+        val npKeySystem = mapToNewposKeySystem(effectiveKeyType, keyAlgorithm)
+        val npKeyType = mapToNewposKeyType(effectiveKeyType)
+            ?: throw PedKeyException("Unsupported key type for KeyType mapping: $effectiveKeyType")
 
         try {
-            Log.d(TAG, "Calling injectKey: KS=$npKeySystem, KT=$npKeyType, KeyIdx=$keyIndex")
+            Log.d(TAG, "Calling injectKey: KS=$npKeySystem, KT=$npKeyType, KeyIdx=$keyIndex (Original type: $keyType)")
             val result = pedInstance.injectKey(npKeySystem, npKeyType, keyIndex, keyBytes)
             if (result != 0) {
                 throw PedKeyException("Failed to write key (plaintext). NewPOS Error Code: $result")

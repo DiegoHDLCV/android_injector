@@ -86,7 +86,6 @@ dependencies {
 
     implementation(project(":persistence"))
     implementation(project(":manufacturer"))
-    implementation(project(":utils"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

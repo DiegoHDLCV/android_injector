@@ -6,7 +6,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.manufacturer.KeySDKManager
-import com.example.manufacturer.base.GenericKeyType
+import com.example.manufacturer.base.models.KeyType
 import com.example.persistence.entities.InjectedKeyEntity
 import com.example.persistence.repository.InjectedKeyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -210,14 +210,14 @@ class InjectedKeysViewModel @Inject constructor(
         }
     }
 
-    private fun mapStringToGenericKeyType(keyTypeString: String): GenericKeyType {
+    private fun mapStringToGenericKeyType(keyTypeString: String): KeyType {
         return try {
-            GenericKeyType.valueOf(keyTypeString)
+            KeyType.valueOf(keyTypeString)
         } catch (e: IllegalArgumentException) {
             if (keyTypeString.contains("MASTER") || keyTypeString.contains("TRANSPORT")) {
-                GenericKeyType.MASTER_KEY
+                KeyType.MASTER_KEY
             } else {
-                GenericKeyType.WORKING_PIN_KEY
+                KeyType.WORKING_PIN_KEY
             }
         }
     }

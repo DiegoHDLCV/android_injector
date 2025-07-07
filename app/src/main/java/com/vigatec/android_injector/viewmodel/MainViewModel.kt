@@ -167,7 +167,7 @@ class MainViewModel @Inject constructor(
 
                 val buffer = ByteArray(1024)
                 while (isActive) {
-                    Log.v(TAG, "startListeningInternal: Esperando datos (búfer de ${buffer.size} bytes)...")
+                    //Log.v(TAG, "startListeningInternal: Esperando datos (búfer de ${buffer.size} bytes)...")
                     val bytesRead = comController!!.readData(buffer.size, buffer, 5000)
                     if (bytesRead > 0) {
                         val received = buffer.copyOf(bytesRead)
@@ -187,7 +187,7 @@ class MainViewModel @Inject constructor(
                         Log.e(TAG, "startListeningInternal: Error crítico de lectura de puerto (código: $bytesRead)")
                         throw Exception("Error crítico de lectura de puerto (código: $bytesRead)")
                     } else if (bytesRead == 0) {
-                        Log.v(TAG, "startListeningInternal: No se leyeron bytes en este ciclo (timeout).")
+                        //Log.v(TAG, "startListeningInternal: No se leyeron bytes en este ciclo (timeout).")
                     } else if (bytesRead == -6) {
                         Log.v(TAG, "startListeningInternal: Error -6 (Posiblemente puerto no disponible o desconectado), reintentando.")
                     }
