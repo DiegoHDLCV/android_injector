@@ -349,18 +349,25 @@ class NewposPedController(private val context: Context) : IPedController {
     }
 
     override suspend fun isKeyPresent(keyIndex: Int, keyType: GenericKeyType): Boolean {
-        val npKeySystem = mapToNewposKeySystem(keyType)
-        val npKeyType = mapToNewposKeyType(keyType)
+        // AÑADIR ESTA LÓGICA DE TRADUCCIÓN
+        val effectiveKeyType = if (keyType == GenericKeyType.TRANSPORT_KEY) {
+            Log.d(TAG, "isKeyPresent: Tratando TRANSPORT_KEY como MASTER_KEY para la verificación.")
+            GenericKeyType.MASTER_KEY
+        } else {
+            keyType
+        }
+
+        val npKeySystem = mapToNewposKeySystem(effectiveKeyType) // Usar el tipo efectivo
+        val npKeyType = mapToNewposKeyType(effectiveKeyType) // Usar el tipo efectivo
             ?: throw PedKeyException("Unsupported key type for isKeyPresent: $keyType")
 
         return try {
-            // Mode 0 is standard for existence check.
+            // La llamada ahora será consistente con la inyección
             val result = pedInstance.checkKey(npKeySystem, npKeyType, keyIndex, 0)
-            Log.d(TAG, "checkKey for [$keyType/$keyIndex] returned: $result")
+            Log.d(TAG, "checkKey for [$keyType/$keyIndex] (as $effectiveKeyType) returned: $result")
             result == 0 // 0 means the key exists.
         } catch (e: Exception) {
             Log.e(TAG, "Error checking key presence for [$keyType/$keyIndex]", e)
-            // It's safer to return false on error than to throw an exception.
             false
         }
     }
