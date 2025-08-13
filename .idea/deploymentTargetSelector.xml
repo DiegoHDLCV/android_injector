@@ -8,9 +8,6 @@
       <SelectionState runConfigName="UrovoKeyInjectionTests">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
-      <SelectionState runConfigName="testInjectPlainMasterKeyAndVerifyPresence()">
-        <option name="selectionMode" value="DROPDOWN" />
-      </SelectionState>
       <SelectionState runConfigName="testInjectEncryptedDataKeyAndVerifyUsage()">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
@@ -21,6 +18,9 @@
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
       <SelectionState runConfigName="injector">
+        <option name="selectionMode" value="DROPDOWN" />
+      </SelectionState>
+      <SelectionState runConfigName="testInjectEncryptedWorkingKey()">
         <option name="selectionMode" value="DROPDOWN" />
       </SelectionState>
     </selectionStates>

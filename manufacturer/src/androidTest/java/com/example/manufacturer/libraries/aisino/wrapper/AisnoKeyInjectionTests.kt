@@ -44,7 +44,7 @@ class AisinoKeyInjectionTests {
 
     private lateinit var pedController: AisinoPedController
 
-    // --- Nuevas Definiciones de Claves y Slots ---
+    // --- Definiciones de Claves y Slots ---
 
     // Clave Maestra / de Transporte (KTK)
     private val masterKeyIndex = 10
@@ -115,6 +115,114 @@ class AisinoKeyInjectionTests {
     // ========================================================================
 
     /**
+     * ========================================================================
+     * --- PRUEBA AISLADA: INYECCIÓN DE WORKING KEY CIFRADA ---
+     * ========================================================================
+     *
+     * Objetivo: Demostrar el flujo completo para inyectar una clave de trabajo
+     * (Working Key - WK) que ha sido previamente cifrada con una clave maestra
+     * (Master Key / Key Transport Key - KTK).
+     *
+     * Este es el escenario de uso más común en producción.
+     */
+    @Test
+    fun testInjectEncryptedWorkingKey() = runBlocking {
+        println("\n--- INICIO PRUEBA: INYECCIÓN DE WORKING KEY (CIFRADA CON KTK) ---")
+
+        // --- Definiciones para esta prueba ---
+        val ktkIndex = 10 // Slot para la Key Transport Key (Master Key)
+        val wkIndex = 11  // Slot para la Working Key (en este caso, de datos)
+
+        val plainKtkBytes = "CB79E0898F2907C24A13516BEAE904A2".hexToBytes() // KTK en texto plano
+        val plainWkBytes  = "892FF24F80C13461760E1349083862D9".hexToBytes() // WK en texto plano
+
+        val dataToTestEncryption = "Esto es un texto de prueba".toByteArray(Charsets.UTF_8)
+
+        // --- PASO 1: Inyectar la Clave Maestra (KTK) en texto plano ---
+        // En un entorno real, esto se hace en un lugar seguro. Para la prueba, la inyectamos directamente.
+        println("PASO 1: Inyectando KTK en texto plano en el slot $ktkIndex.")
+        pedController.writeKeyPlain(
+            keyIndex = ktkIndex,
+            keyType = KeyType.MASTER_KEY,
+            keyAlgorithm = KeyAlgorithm.DES_TRIPLE,
+            keyBytes = plainKtkBytes,
+            kcvBytes = null // No se verifica el KCV para esta prueba
+        )
+        // Verificación de que la KTK se cargó correctamente
+        assertTrue("La KTK debe existir en el slot $ktkIndex después de la inyección.", pedController.isKeyPresent(ktkIndex, KeyType.MASTER_KEY))
+        println("KTK inyectada con éxito.")
+
+        // --- PASO 2: Cifrar la Working Key usando la KTK ---
+        // Este paso simula lo que haría un Sistema de Gestión de Claves (KMS).
+        // El PED usa su KTK interna para realizar este cifrado.
+        println("PASO 2: Cifrando la WK con la KTK del slot $ktkIndex.")
+        val encryptedWk = pedController.encrypt(
+            PedCipherRequest(
+                keyIndex = ktkIndex,
+                keyType = KeyType.MASTER_KEY,
+                data = plainWkBytes,
+                algorithm = KeyAlgorithm.DES_TRIPLE,
+                mode = BlockCipherMode.ECB,
+                iv = null,
+                encrypt = true
+            )
+        ).resultData
+        println("WK cifrada (Hex): ${encryptedWk.toHexString()}")
+        assertFalse("La WK cifrada no debe ser igual a la WK en texto plano.", plainWkBytes.contentEquals(encryptedWk))
+
+        // --- PASO 3: Inyectar la Working Key Cifrada en el PED ---
+        // Esta es la llamada principal. Se le dice al PED que use la KTK del slot 'ktkIndex'
+        // para descifrar 'encryptedWk' e instalar el resultado en el slot 'wkIndex'.
+        println("PASO 3: Inyectando la WK cifrada en el slot $wkIndex.")
+        val writeSuccess = pedController.writeKey(
+            keyIndex = wkIndex,
+            keyType = KeyType.WORKING_DATA_ENCRYPTION_KEY,
+            keyAlgorithm = KeyAlgorithm.DES_TRIPLE,
+            keyData = PedKeyData(encryptedWk),
+            transportKeyIndex = ktkIndex,
+            transportKeyType = KeyType.MASTER_KEY
+        )
+        assertTrue("La inyección de la WK cifrada debe ser exitosa.", writeSuccess)
+        println("Inyección de la WK cifrada finalizada con éxito.")
+
+        // --- PASO 4: Verificar que la Working Key está presente y es funcional ---
+        println("PASO 4: Verificando que la WK en el slot $wkIndex está operativa.")
+        assertTrue("La WK debe existir en el slot $wkIndex después de la inyección.", pedController.isKeyPresent(wkIndex, KeyType.WORKING_DATA_ENCRYPTION_KEY))
+
+        // Prueba funcional: Usar la nueva WK para cifrar y descifrar datos.
+        val encryptedData = pedController.encrypt(
+            PedCipherRequest(
+                keyIndex = wkIndex,
+                keyType = KeyType.WORKING_DATA_ENCRYPTION_KEY,
+                data = dataToTestEncryption,
+                algorithm = KeyAlgorithm.DES_TRIPLE,
+                mode = BlockCipherMode.ECB,
+                iv = null,
+                encrypt = true
+            )
+        ).resultData
+
+        val decryptedData = pedController.decrypt(
+            PedCipherRequest(
+                keyIndex = wkIndex,
+                keyType = KeyType.WORKING_DATA_ENCRYPTION_KEY,
+                data = encryptedData,
+                algorithm = KeyAlgorithm.DES_TRIPLE,
+                mode = BlockCipherMode.ECB,
+                iv = null,
+                encrypt = false
+            )
+        ).resultData
+
+        // CORRECCIÓN: Recortar el relleno (padding) de los datos descifrados antes de comparar.
+        val trimmedDecryptedData = decryptedData.copyOf(dataToTestEncryption.size)
+
+        assertArrayEquals("Los datos descifrados deben coincidir con los datos originales.", dataToTestEncryption, trimmedDecryptedData)
+        println("Verificación funcional exitosa: La WK puede cifrar y descifrar datos correctamente.")
+        println("\n--- ÉXITO: El flujo de inyección de Working Key cifrada se ha completado correctamente. ---")
+    }
+
+    /**
      * PRUEBA 1: Inyección de Clave de DATOS Cifrada y Verificación de Uso.
      */
     @Test
@@ -146,7 +254,10 @@ class AisinoKeyInjectionTests {
         val decryptedData = pedController.decrypt(PedCipherRequest(keyIndex = dataKeyIndex, keyType = dataKeyType, data = encryptedData, algorithm = keyAlgorithm, mode = BlockCipherMode.ECB, iv = null, encrypt = false)).resultData
 
         assertFalse("Los datos cifrados no deben ser iguales a los datos en claro", plaintextData.contentEquals(encryptedData))
-        assertArrayEquals("Los datos descifrados deben coincidir con los originales", plaintextData, decryptedData)
+
+        // CORRECCIÓN: Recortar el relleno (padding) si es necesario.
+        val trimmedDecryptedData = decryptedData.copyOf(plaintextData.size)
+        assertArrayEquals("Los datos descifrados deben coincidir con los originales", plaintextData, trimmedDecryptedData)
 
         println("ÉXITO: El flujo de inyección y uso de clave de DATOS cifrada se ha completado correctamente.")
     }
@@ -230,18 +341,17 @@ class AisinoKeyInjectionTests {
 
 
         println("PASO 3: Cifrando datos para verificar funcionamiento e incremento del KSN.")
-        // CORRECCIÓN: Se añaden los parámetros obligatorios que faltaban en el constructor.
         val encryptRequest = PedCipherRequest(
-            isDukpt = true,
-            dukptGroupIndex = dukptGroupIndex,
-            dukptKeyVariant = DukptKeyVariant.DATA_ENCRYPT,
+            keyIndex = 0, // Placeholder for DUKPT
+            keyType = KeyType.DUKPT_WORKING_KEY, // Placeholder for DUKPT
             data = plaintextData,
             algorithm = keyAlgorithm,
             mode = BlockCipherMode.ECB,
             iv = null,
             encrypt = true,
-            keyIndex = 0, // Placeholder
-            keyType = KeyType.DUKPT_WORKING_KEY // Placeholder
+            isDukpt = true,
+            dukptGroupIndex = dukptGroupIndex,
+            dukptKeyVariant = DukptKeyVariant.DATA_ENCRYPT
         )
         val encryptionResult = pedController.encrypt(encryptRequest)
 
@@ -288,8 +398,8 @@ class AisinoKeyInjectionTests {
 
 
     // ========================================================================
-// --- CASOS DE PRUEBA: OBTENCIÓN DE PIN (INTERACTIVOS) ---
-// ========================================================================
+    // --- CASOS DE PRUEBA: OBTENCIÓN DE PIN (INTERACTIVOS) ---
+    // ========================================================================
 
     /**
      * PRUEBA 7: Obtención de PIN Block con Clave de Trabajo (Master/Session).
@@ -393,7 +503,6 @@ class AisinoKeyInjectionTests {
             assertEquals("El PIN block debe tener 8 bytes.", 8, result.pinBlock!!.size)
             println("ÉXITO: PIN Block (Hex): ${result.pinBlock.toHexString()}")
 
-            // **INICIO DE LA CORRECCIÓN**
             // La API devuelve el KSN que se USÓ para esta transacción.
             val ksnUsedForPin = result.finalDukptInfo?.ksn
             assertNotNull("La información DUKPT usada para el PIN no debe ser nula.", ksnUsedForPin)
@@ -406,7 +515,6 @@ class AisinoKeyInjectionTests {
 
             // Ahora la comparación es correcta: el KSN de ANTES vs el KSN de AHORA.
             assertFalse("El KSN debe haberse incrementado después de la operación.", ksnBefore.contentEquals(ksnAfterPin))
-            // **FIN DE LA CORRECCIÓN**
 
         } catch (e: PedTimeoutException) {
             fail("PRUEBA FALLIDA: La prueba expiró. No se ingresó un PIN en el dispositivo. ${e.message}")
@@ -416,15 +524,24 @@ class AisinoKeyInjectionTests {
             fail("PRUEBA FALLIDA: Ocurrió un error inesperado durante getPinBlock. ${e.message}")
         }
     }
-    // --- Utilidades ---
-    private fun String.hexToBytes(): ByteArray {
-        check(length % 2 == 0) { "La cadena hexadecimal debe tener una longitud par" }
-        return chunked(2)
-            .map { it.toInt(16).toByte() }
-            .toByteArray()
-    }
+}
 
-    private fun ByteArray.toHexString(): String {
-        return joinToString("") { "%02X".format(it).uppercase(Locale.ROOT) }
-    }
+// --- Funciones de Extensión (Utilidades) ---
+
+/**
+ * Convierte una cadena de texto en formato hexadecimal a un ByteArray.
+ * La cadena debe tener una longitud par.
+ */
+private fun String.hexToBytes(): ByteArray {
+    check(length % 2 == 0) { "La cadena hexadecimal debe tener una longitud par" }
+    return chunked(2)
+        .map { it.toInt(16).toByte() }
+        .toByteArray()
+}
+
+/**
+ * Convierte un ByteArray a su representación en formato de cadena hexadecimal en mayúsculas.
+ */
+private fun ByteArray.toHexString(): String {
+    return joinToString("") { "%02X".format(it).uppercase(Locale.ROOT) }
 }

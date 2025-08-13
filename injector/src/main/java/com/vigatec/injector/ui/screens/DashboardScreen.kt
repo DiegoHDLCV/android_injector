@@ -1,5 +1,6 @@
 package com.vigatec.injector.ui.screens
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,9 +13,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -27,13 +34,21 @@ import com.vigatec.injector.viewmodel.DashboardState
 import com.vigatec.injector.viewmodel.DashboardViewModel
 import com.vigatec.injector.viewmodel.SystemStats
 
+private data class QuickActionMeta(
+    val title: String,
+    val icon: ImageVector,
+    val isAdmin: Boolean = false,
+    val onClick: () -> Unit
+)
+
 @Composable
 fun DashboardScreen(
     username: String,
     navController: NavController,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
-    val dashboardState by viewModel.state.collectAsState()
+    val dashboardStateState = viewModel.state.collectAsState()
+    val dashboardState = dashboardStateState.value
 
     LazyColumn(
         modifier = Modifier
@@ -42,17 +57,17 @@ fun DashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item { WelcomeCard(username = username) }
-        item { ConnectionStatusCard(dashboardState, viewModel) }
-        item { 
+        item(key = "welcome") { WelcomeCard(username = username) }
+        item(key = "connection") { ConnectionStatusCard(dashboardState, viewModel) }
+        item(key = "stats") { 
             if (dashboardState.isLoading) {
                 DashboardStatsSkeleton()
             } else {
                 DashboardStats(stats = dashboardState.stats)
             }
         }
-        item { QuickActionsCard(navController) }
-        item { SystemHealthCard(dashboardState) }
+        item(key = "quick_actions") { QuickActionsCard(navController) }
+        item(key = "system_health") { SystemHealthCard(dashboardState) }
     }
 }
 
@@ -101,18 +116,32 @@ fun WelcomeCard(username: String) {
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        val primaryTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.20f)
+        val secondaryTint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
+        val gradient = Brush.linearGradient(listOf(primaryTint, secondaryTint))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(brush = gradient, shape = RoundedCornerShape(12.dp))
+                .clip(RoundedCornerShape(12.dp))
+                .padding(16.dp)
         ) {
-            Text(
-                text = "¡Bienvenido, $username!",
-                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Sistema de inyección de llaves criptográficas para POS.",
-                style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f))
-            )
+            Column {
+                Text(
+                    text = "¡Bienvenido, $username!",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Sistema de inyección de llaves criptográficas para POS.",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                    )
+                )
+            }
         }
     }
 }
@@ -156,10 +185,10 @@ fun StatCard(title: String, value: String, icon: ImageVector, modifier: Modifier
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(text = title, style = MaterialTheme.typography.labelMedium)
                 Text(text = value, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
@@ -177,20 +206,60 @@ fun QuickActionsCard(navController: NavController) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Acciones Rápidas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(16.dp))
-            QuickActionItem("Gestionar Perfiles", Icons.AutoMirrored.Filled.Label, onClick = { /* navController.navigate(...) */ })
-            QuickActionItem("Ver Llaves", Icons.Default.VpnKey, onClick = { /* navController.navigate(...) */ })
-            QuickActionItem("Conexión POS", Icons.Default.Usb, onClick = { /* navController.navigate(...) */ })
-            QuickActionItem("Ceremonia Crypto", Icons.Default.Security, isAdmin = true, onClick = { navController.navigate("ceremony") })
-            QuickActionItem("Usuarios", Icons.Default.People, isAdmin = true, onClick = { /* navController.navigate(...) */ })
+
+            val actions = remember(navController) {
+                listOf(
+                    QuickActionMeta("Gestionar Perfiles", Icons.AutoMirrored.Filled.Label, false) { /* navController.navigate(...) */ },
+                    QuickActionMeta("Ver Llaves", Icons.Default.VpnKey, false) { /* navController.navigate(...) */ },
+                    QuickActionMeta("Conexión POS", Icons.Default.Usb, false) { /* navController.navigate(...) */ },
+                    QuickActionMeta("Ceremonia Crypto", Icons.Default.Security, true) { navController.navigate("ceremony") },
+                    QuickActionMeta("Usuarios", Icons.Default.People, true) { /* navController.navigate(...) */ }
+                )
+            }
+
+            for (i in actions.indices step 2) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val a0 = actions[i]
+                    QuickActionItem(
+                        title = a0.title,
+                        icon = a0.icon,
+                        isAdmin = a0.isAdmin,
+                        onClick = a0.onClick,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (i + 1 < actions.size) {
+                        val a1 = actions[i + 1]
+                        QuickActionItem(
+                            title = a1.title,
+                            icon = a1.icon,
+                            isAdmin = a1.isAdmin,
+                            onClick = a1.onClick,
+                            modifier = Modifier.weight(1f)
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         }
     }
 }
 
 @Composable
-fun QuickActionItem(title: String, icon: ImageVector, isAdmin: Boolean = false, onClick: () -> Unit) {
+fun QuickActionItem(
+    title: String,
+    icon: ImageVector,
+    isAdmin: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Button(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = if(isAdmin) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.primaryContainer,
@@ -201,8 +270,8 @@ fun QuickActionItem(title: String, icon: ImageVector, isAdmin: Boolean = false, 
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(imageVector = icon, contentDescription = title)
-            Spacer(modifier = Modifier.width(12.dp))
+            Icon(imageVector = icon, contentDescription = title, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text(text = title, fontWeight = FontWeight.Medium)
         }
     }
@@ -214,32 +283,38 @@ fun ConnectionStatusCard(dashboardState: DashboardState, viewModel: DashboardVie
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (dashboardState.isSubPosConnected) 
-                Color(0xFF4CAF50).copy(alpha = 0.1f) 
-            else 
-                Color(0xFFF44336).copy(alpha = 0.1f)
+            containerColor = run {
+                val target = if (dashboardState.isSubPosConnected)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                else
+                    MaterialTheme.colorScheme.error.copy(alpha = 0.10f)
+                animateColorAsState(targetValue = target, label = "connectionContainer").value
+            }
         )
     ) {
-        Row(
+        val isTogglingState = remember { mutableStateOf(false) }
+        LaunchedEffect(dashboardState.isPollingActive, dashboardState.isSubPosConnected) {
+            isTogglingState.value = false
+        }
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Indicador de luz verde/roja
                 Box(
                     modifier = Modifier
                         .size(24.dp)
                         .background(
-                            color = if (dashboardState.isSubPosConnected) Color(0xFF4CAF50) else Color(0xFFF44336),
+                            color = animateColorAsState(
+                                targetValue = if (dashboardState.isSubPosConnected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                label = "connectionDot"
+                            ).value,
                             shape = CircleShape
                         )
                 )
-                
                 Spacer(modifier = Modifier.width(12.dp))
-                
                 Column {
                     Text(
                         text = "Estado de Conexión SubPOS",
@@ -247,38 +322,51 @@ fun ConnectionStatusCard(dashboardState: DashboardState, viewModel: DashboardVie
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = if (dashboardState.isSubPosConnected) 
-                            "SubPOS conectado y respondiendo" 
-                        else 
+                        text = if (dashboardState.isSubPosConnected)
+                            "SubPOS conectado y respondiendo"
+                        else
                             "SubPOS no conectado",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                 }
             }
-            
-            // Botón de control de polling
+
             Button(
                 onClick = {
+                    isTogglingState.value = true
                     if (dashboardState.isPollingActive) {
                         viewModel.stopPolling()
                     } else {
                         viewModel.startPolling()
                     }
                 },
+                enabled = !isTogglingState.value,
+                modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (dashboardState.isPollingActive) 
-                        MaterialTheme.colorScheme.error 
-                    else 
-                        MaterialTheme.colorScheme.primary
+                    containerColor = when {
+                        isTogglingState.value -> MaterialTheme.colorScheme.surfaceVariant
+                        dashboardState.isPollingActive -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.primary
+                    }
                 )
             ) {
-                Icon(
-                    imageVector = if (dashboardState.isPollingActive) Icons.Default.Stop else Icons.Default.PlayArrow,
-                    contentDescription = if (dashboardState.isPollingActive) "Detener" else "Iniciar"
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(if (dashboardState.isPollingActive) "Detener" else "Iniciar")
+                if (isTogglingState.value) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Procesando…")
+                } else {
+                    Icon(
+                        imageVector = if (dashboardState.isPollingActive) Icons.Default.LinkOff else Icons.Default.Link,
+                        contentDescription = if (dashboardState.isPollingActive) "Desconectar" else "Conectar"
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (dashboardState.isPollingActive) "Desconectar" else "Conectar")
+                }
             }
         }
     }
@@ -307,13 +395,17 @@ fun SystemHealthCard(dashboardState: DashboardState) {
 
 @Composable
 fun HealthItem(name: String, status: String, details: String, isHealthy: Boolean) {
+    val dotColorState = animateColorAsState(
+        targetValue = if (isHealthy) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+        label = "healthDot"
+    )
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(10.dp).background(if (isHealthy) Color(0xFF4CAF50) else Color(0xFFF44336), CircleShape))
+            Box(modifier = Modifier.size(10.dp).background(dotColorState.value, CircleShape))
             Spacer(modifier = Modifier.width(8.dp))
             Column {
                 Text(text = name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
@@ -322,7 +414,7 @@ fun HealthItem(name: String, status: String, details: String, isHealthy: Boolean
         }
         Text(
             text = status,
-            color = if (isHealthy) Color(0xFF4CAF50) else Color(0xFFF44336),
+            color = dotColorState.value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold
         )

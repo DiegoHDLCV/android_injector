@@ -86,12 +86,15 @@ class PollingService {
                     val testRead = comController?.readData(1, testBuffer, 100)
                     if (testRead == -4) { // ERROR_NOT_OPEN
                         Log.d(TAG, "Abriendo puerto de comunicación...")
-                        comController!!.open()
+                        val openResult = comController!!.open()
+                        Log.d(TAG, "Resultado open(): $openResult")
+                    } else if ((testRead ?: 0) < 0) {
+                        Log.w(TAG, "readData prueba devolvió código de error: $testRead")
                     }
                     
                     // Enviar mensaje
-                    comController!!.write(pollMessage, 1000)
-                    Log.d(TAG, "Mensaje POLL enviado: ${pollMessage.toHexString()}")
+                    val written = comController!!.write(pollMessage, 1000)
+                    Log.d(TAG, "📤 Enviado POLL (${pollMessage.size} bytes, write()=$written): ${pollMessage.toHexString()}")
                     
                     // Esperar respuesta con timeout
                     val responseReceived = withTimeoutOrNull(RESPONSE_TIMEOUT) {
@@ -162,7 +165,8 @@ class PollingService {
         pollingJob = null
         
         try {
-            comController?.close()
+            val result = comController?.close()
+            Log.d(TAG, "Resultado close(): $result")
         } catch (e: Exception) {
             Log.e(TAG, "Error al cerrar el puerto", e)
         }
@@ -178,8 +182,8 @@ class PollingService {
                 val responseMessage = LegacyMessageFormatter.format("0110", "ACK")
                 
                 // Enviar respuesta
-                comController?.write(responseMessage, 1000)
-                Log.d(TAG, "📤 Respuesta POLL enviada: ${responseMessage.toHexString()}")
+                val written = comController?.write(responseMessage, 1000) ?: -1
+                Log.d(TAG, "📤 Respuesta POLL enviada (${responseMessage.size} bytes, write()=$written): ${responseMessage.toHexString()}")
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error al enviar respuesta POLL", e)
@@ -249,7 +253,7 @@ class PollingService {
             
             while (_isPollingActive.value) {
                 try {
-                    val bytesRead = comController?.readData(1024, buffer, 100) ?: 0
+                val bytesRead = comController?.readData(1024, buffer, 100) ?: 0
                     
                     if (bytesRead > 0) {
                         Log.d(TAG, "📥 Datos recibidos: ${bytesRead} bytes - ${buffer.sliceArray(0 until bytesRead).toHexString()}")
