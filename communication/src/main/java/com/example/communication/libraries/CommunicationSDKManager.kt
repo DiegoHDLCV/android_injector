@@ -16,8 +16,6 @@ object CommunicationSDKManager : ICommunicationManager {
     private val manager: ICommunicationManager by lazy {
         Log.d("CommSDKManager", "Seleccionando manager para: ${SystemConfig.managerSelected}")
         when (SystemConfig.managerSelected) {
-            //EnumManufacturer.NEWPOS -> NewposCommunicationManager
-            //EnumManufacturer.AISINO -> AisinoCommunicationManager // Implementar
             EnumManufacturer.AISINO -> AisinoCommunicationManager // Implementar
             EnumManufacturer.UROVO -> UrovoCommunicationManager // Implementar
             EnumManufacturer.NEWPOS -> NewposCommunicationManager // Implementar
@@ -52,6 +50,14 @@ object CommunicationSDKManager : ICommunicationManager {
         } catch (e: Exception) {
             // --- CORREGIDO --- Se cambió "getApnController" a "getComController" en el log
             Log.e("CommSDKManager", "Error en getComController", e); null
+        }
+    }
+
+    fun rescanIfSupported() {
+        when (manager) {
+            is AisinoCommunicationManager -> (manager as AisinoCommunicationManager).safeRescanIfInitialized()
+            // Otros managers podrían implementar lógica futura
+            else -> Log.d("CommSDKManager", "rescanIfSupported: no soportado para ${SystemConfig.managerSelected}")
         }
     }
 

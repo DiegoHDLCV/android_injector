@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.communication.libraries.CommunicationSDKManager
 import com.example.communication.polling.PollingService
+import com.example.communication.polling.CommLog
 import com.example.persistence.repository.InjectedKeyRepository
 import com.example.persistence.repository.ProfileRepository
 import com.vigatec.injector.repository.UserRepository
@@ -28,7 +29,8 @@ data class DashboardState(
     val stats: SystemStats = SystemStats(),
     val isLoading: Boolean = true,
     val isSubPosConnected: Boolean = false,
-    val isPollingActive: Boolean = false
+    val isPollingActive: Boolean = false,
+    val commLogs: List<com.example.communication.polling.CommLogEntry> = emptyList()
 )
 
 @HiltViewModel
@@ -135,6 +137,12 @@ class DashboardViewModel @Inject constructor(
                 _state.value = _state.value.copy(
                     isPollingActive = isActive
                 )
+            }
+        }
+
+        viewModelScope.launch {
+            CommLog.entries.collect { logs ->
+                _state.value = _state.value.copy(commLogs = logs)
             }
         }
     }

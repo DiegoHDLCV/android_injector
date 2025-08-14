@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,13 +39,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.rememberNavController
-import com.example.communication.libraries.CommunicationSDKManager
-import com.example.manufacturer.KeySDKManager
-import com.example.manufacturer.di.SDKInitManager
 import com.vigatec.android_injector.ui.Navigator
 import com.vigatec.android_injector.ui.navigation.AppNavHost
 import com.vigatec.android_injector.ui.theme.MultimarcaTheme
 import com.vigatec.android_injector.viewmodel.MainViewModel
+import com.vigatec.android_injector.viewmodel.ConnectionStatus
+import com.vigatec.android_injector.util.LogcatReader
+import com.vigatec.android_injector.util.LogFileWriter
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 
@@ -75,7 +77,6 @@ fun PermissionProtectedContent(appViewModel: MainViewModel = hiltViewModel()) {
     val context = LocalContext.current
     var hasStoragePermissions by remember { mutableStateOf(checkInitialPermissions(context)) }
     var initialCheckDone by remember { mutableStateOf(false) }
-    var sdkInitialized by remember { mutableStateOf(false) } // Nuevo estado para SDK
 
     val requestManageStoragePermission =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -119,28 +120,8 @@ fun PermissionProtectedContent(appViewModel: MainViewModel = hiltViewModel()) {
         initialCheckDone = true
     }
 
-    // Efecto para inicializar el SDK una vez que los permisos están concedidos
-    LaunchedEffect(hasStoragePermissions, initialCheckDone) {
-        if (hasStoragePermissions && initialCheckDone && !sdkInitialized) {
-            Log.d(MainActivity.TAG, "Permisos concedidos, inicializando SDKs...")
-            try {
-                //SDKInitManager.initializeOnce(context.applicationContext as android.app.Application)
-                KeySDKManager.initialize(context.applicationContext as android.app.Application)
-                CommunicationSDKManager.initialize(context.applicationContext as android.app.Application)
-
-                Log.i(MainActivity.TAG, "SDKs inicializados después de obtener permisos.")
-                sdkInitialized = true // Marcar como inicializado
-            } catch (e: Exception) {
-                Log.e(MainActivity.TAG, "Error inicializando SDKs después de permisos", e)
-                Toast.makeText(context, "Error al inicializar componentes de la app.", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-
     if (!initialCheckDone || (!hasStoragePermissions && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)) {
-        // Muestra un loader o un mensaje mientras se verifican/solicitan permisos,
-        // especialmente para MANAGE_EXTERNAL_STORAGE que lleva a otra pantalla.
+        // Loader de permisos
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 CircularProgressIndicator()
@@ -163,22 +144,11 @@ fun PermissionProtectedContent(appViewModel: MainViewModel = hiltViewModel()) {
                 }
             }
         }
-    } else if (hasStoragePermissions && sdkInitialized) {
-        // Permisos concedidos y SDK inicializado, muestra la app principal
-        Log.d(MainActivity.TAG, "Permisos OK y SDK inicializado, mostrando MyApp.")
+    } else if (hasStoragePermissions) {
+        // Permisos listos => Montamos la app (SplashScreen realizará la init real)
+        Log.d(MainActivity.TAG, "Permisos OK, mostrando MyApp (Splash gestionará inicialización de SDKs).")
         MyApp(viewModel = appViewModel)
-    } else if (hasStoragePermissions && !sdkInitialized) {
-        // Permisos concedidos, pero SDK aún inicializándose (o falló y no se marcó)
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator()
-                Text("Inicializando aplicación...", modifier = Modifier.padding(top = 8.dp))
-            }
-        }
-    }
-    else {
-        // Permisos denegados y no es MANAGE_EXTERNAL_STORAGE (para el cual hay un botón de reintento)
-        // o algo salió mal.
+    } else {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Los permisos de almacenamiento son necesarios para usar la aplicación.")
@@ -188,9 +158,7 @@ fun PermissionProtectedContent(appViewModel: MainViewModel = hiltViewModel()) {
                         onManageStorage = { intent -> requestManageStoragePermission.launch(intent) },
                         onLegacyStorage = { perms -> requestLegacyStoragePermissions.launch(perms) }
                     )
-                }) {
-                    Text("Otorgar Permisos")
-                }
+                }) { Text("Otorgar Permisos") }
             }
         }
     }
@@ -238,6 +206,7 @@ private fun requestPermissions(
 fun MyApp(viewModel: MainViewModel = hiltViewModel()) {
     val navController = rememberNavController()
     val TAG_APP_UI_EVENT_OBSERVER = "AppUIEventObserver"
+    val connectionStatus by viewModel.connectionStatus.collectAsState()
 
     // Cambiar key1 a Unit y añadir log al inicio del LaunchedEffect
     LaunchedEffect(key1 = Unit) { // MODIFICADO: key1 = Unit
@@ -250,8 +219,60 @@ fun MyApp(viewModel: MainViewModel = hiltViewModel()) {
     }
 
     Scaffold { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
+        Box(modifier = Modifier
+            .padding(innerPadding)
+            .fillMaxSize()
+        ) {
             AppNavHost(navController = navController)
+        }
+    }
+}
+// Los paneles de logs se renderizan dentro de MainScreen para que compartan su scroll
+
+@Composable
+private fun ConnectionStatusBanner(status: ConnectionStatus) {
+    val (bg, fg, text) = when (status) {
+        ConnectionStatus.LISTENING -> Triple(
+            MaterialTheme.colorScheme.primaryContainer,
+            MaterialTheme.colorScheme.onPrimaryContainer,
+            "SubPOS escuchando"
+        )
+        ConnectionStatus.INITIALIZING, ConnectionStatus.OPENING -> Triple(
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            "Inicializando comunicación…"
+        )
+        ConnectionStatus.CLOSING -> Triple(
+            MaterialTheme.colorScheme.surfaceVariant,
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            "Cerrando comunicación…"
+        )
+        ConnectionStatus.ERROR -> Triple(
+            MaterialTheme.colorScheme.errorContainer,
+            MaterialTheme.colorScheme.onErrorContainer,
+            "Error de comunicación"
+        )
+        ConnectionStatus.DISCONNECTED -> Triple(
+            MaterialTheme.colorScheme.surface,
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            "Desconectado"
+        )
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        androidx.compose.material3.Card(
+            colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = bg)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text(text = text, color = fg)
+            }
         }
     }
 }

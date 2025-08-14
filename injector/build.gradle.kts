@@ -76,6 +76,7 @@ dependencies {
     implementation(project(":config"))
     implementation(project(":communication"))
     implementation(project(":format"))
+    implementation(libs.androidx.lifecycle.runtime.compose)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
 

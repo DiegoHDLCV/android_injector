@@ -8,6 +8,7 @@ import com.vigatec.injector.ui.screens.DashboardScreen
 import com.vigatec.injector.ui.screens.KeyVaultScreen
 import com.vigatec.injector.ui.screens.CeremonyScreen
 import com.vigatec.injector.ui.screens.ProfilesScreen
+import com.vigatec.injector.ui.screens.RawDataListenerScreen
 
 @Composable
 fun MainNavGraph(navController: NavHostController, username: String) {
@@ -28,5 +29,8 @@ fun MainNavGraph(navController: NavHostController, username: String) {
         composable(MainScreen.Profiles.route) {
             ProfilesScreen()
         }
+        composable(MainScreen.RawDataListener.route) {
+            RawDataListenerScreen()
+        }
     }
-} 
+}

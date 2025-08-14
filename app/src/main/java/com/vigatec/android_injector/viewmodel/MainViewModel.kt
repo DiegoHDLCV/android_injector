@@ -9,6 +9,7 @@ import com.example.communication.base.EnumCommConfDataBits
 import com.example.communication.base.EnumCommConfParity
 import com.example.communication.base.IComController
 import com.example.communication.libraries.CommunicationSDKManager
+import com.example.communication.libraries.aisino.AisinoCommunicationManager
 import com.example.config.CommProtocol
 import com.example.config.SystemConfig
 import com.example.format.*
@@ -21,6 +22,8 @@ import com.example.manufacturer.base.models.KeyAlgorithm
 import com.example.manufacturer.base.models.PedKeyData
 import com.example.persistence.repository.InjectedKeyRepository
 import com.vigatec.android_injector.ui.events.UiEvent
+import com.example.communication.polling.CommLog
+import com.vigatec.utils.FormatUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -72,6 +75,9 @@ class MainViewModel @Inject constructor(
     private lateinit var messageParser: IMessageParser
     private lateinit var messageFormatter: IMessageFormatter
 
+    // Buffer para detección de POLL Legacy mientras estamos en modo FUTUREX
+    private val legacyPollBuffer = mutableListOf<Byte>()
+
     init {
         setupProtocolHandlers()
         Log.i(TAG, "MainViewModel creado.")
@@ -80,10 +86,12 @@ class MainViewModel @Inject constructor(
     private fun ensureComControllerIsReady(): Boolean {
         if (comController == null) {
             Log.d(TAG, "comController es nulo, intentando obtenerlo de CommunicationSDKManager...")
+            CommLog.d(TAG, "Intentando obtener comController…")
             comController = CommunicationSDKManager.getComController()
         }
         if (comController == null) {
             handleError("El controlador de comunicación no está disponible.")
+            CommLog.e(TAG, "comController no disponible")
             return false
         }
         return true
@@ -137,7 +145,12 @@ class MainViewModel @Inject constructor(
     ) = viewModelScope.launch {
         connectionMutex.withLock {
             if (!ensureComControllerIsReady()) return@withLock
-            startListeningInternal(baudRate, parity, dataBits)
+            val effectiveBaud = if (SystemConfig.managerSelected.name == "AISINO") {
+                val b = AisinoCommunicationManager.getSelectedBaudEnum()
+                Log.i(TAG, "Alineando baud con auto-scan AISINO: ${b.name}")
+                b
+            } else baudRate
+            startListeningInternal(effectiveBaud, parity, dataBits)
         }
     }
 
@@ -159,37 +172,65 @@ class MainViewModel @Inject constructor(
                 Log.d(TAG, "startListeningInternal: Estado de conexión cambiado a INITIALIZING.")
                 comController!!.init(baudRate, parity, dataBits)
                 Log.d(TAG, "startListeningInternal: comController inicializado.")
-                comController!!.open()
+                val openRes = comController!!.open()
                 Log.d(TAG, "startListeningInternal: Puerto de comunicación abierto.")
+                CommLog.d(TAG, "open() => $openRes")
                 _connectionStatus.value = ConnectionStatus.LISTENING
                 Log.i(TAG, "¡Conexión establecida! Escuchando en protocolo ${SystemConfig.commProtocolSelected}.")
                 _snackbarEvent.emit("Conexión establecida.")
 
                 val buffer = ByteArray(1024)
+                var silentReads = 0
+                var anyDataEver = false
+                var pingSent = false
                 while (isActive) {
-                    //Log.v(TAG, "startListeningInternal: Esperando datos (búfer de ${buffer.size} bytes)...")
-                    val bytesRead = comController!!.readData(buffer.size, buffer, 5000)
+                    val bytesRead = comController!!.readData(buffer.size, buffer, 1000)
                     if (bytesRead > 0) {
                         val received = buffer.copyOf(bytesRead)
                         val receivedString = String(received, Charsets.US_ASCII)
                         _rawReceivedData.value += receivedString
                         Log.v(TAG, "RAW_SERIAL_IN (HEX): ${received.toHexString(true)} (ASCII: '$receivedString')")
-                        messageParser.appendData(received)
-                        var parsedMessage: ParsedMessage?
-                        do {
-                            parsedMessage = messageParser.nextMessage()
-                            parsedMessage?.let {
-                                Log.d(TAG, "startListeningInternal: Mensaje parseado encontrado: ${it::class.simpleName}.")
-                                processParsedCommand(it)
-                            } ?: Log.v(TAG, "startListeningInternal: No hay más mensajes completos para parsear en el buffer.")
-                        } while (parsedMessage != null && isActive)
-                    } else if (bytesRead < 0 && bytesRead != -6) {
-                        Log.e(TAG, "startListeningInternal: Error crítico de lectura de puerto (código: $bytesRead)")
-                        throw Exception("Error crítico de lectura de puerto (código: $bytesRead)")
-                    } else if (bytesRead == 0) {
-                        //Log.v(TAG, "startListeningInternal: No se leyeron bytes en este ciclo (timeout).")
-                    } else if (bytesRead == -6) {
-                        Log.v(TAG, "startListeningInternal: Error -6 (Posiblemente puerto no disponible o desconectado), reintentando.")
+                        CommLog.i(TAG, "RX ${bytesRead}B: ${received.toHexString(true)}")
+                        anyDataEver = true
+                        silentReads = 0
+
+                        // --- NUEVO: Filtrar y responder a POLL Legacy aunque protocolo actual sea FUTUREX ---
+                        val cleaned = filterAndHandleLegacyPollFrames(received)
+                        if (cleaned.isNotEmpty()) {
+                            messageParser.appendData(cleaned)
+                            var parsedMessage: ParsedMessage?
+                            do {
+                                parsedMessage = messageParser.nextMessage()
+                                parsedMessage?.let {
+                                    Log.d(TAG, "startListeningInternal: Mensaje parseado encontrado: ${it::class.simpleName}.")
+                                    processParsedCommand(it)
+                                } ?: Log.v(TAG, "startListeningInternal: No hay más mensajes completos para parsear en el buffer.")
+                            } while (parsedMessage != null && isActive)
+                        }
+                    } else {
+                        silentReads++
+                        if (!pingSent && SystemConfig.managerSelected.name == "AISINO") {
+                            // Enviar ping 0x06 una vez si aún no ha llegado nada
+                            try {
+                                val ping = byteArrayOf(0x06)
+                                val w = comController!!.write(ping, 200)
+                                Log.d(TAG, "Ping inicial (0x06) enviado a AISINO write=$w")
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Fallo enviando ping inicial: ${e.message}")
+                            }
+                            pingSent = true
+                        }
+                        if (!anyDataEver && silentReads % 5 == 0 && SystemConfig.managerSelected.name == "AISINO") {
+                            Log.i(TAG, "${silentReads} lecturas silenciosas AISINO - intentando re-scan")
+                            CommunicationSDKManager.rescanIfSupported()
+                            // Re-obtener controller tras rescan
+                            comController = CommunicationSDKManager.getComController()
+                            if (comController != null) {
+                                comController!!.init(baudRate, parity, dataBits)
+                                comController!!.open()
+                                Log.i(TAG, "Re-scan aplicado y puerto reabierto")
+                            }
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -201,7 +242,8 @@ class MainViewModel @Inject constructor(
                 }
             } finally {
                 Log.d(TAG, "startListeningInternal: Bloque finally de la escucha. Cerrando comController si está abierto.")
-                comController?.close()
+                val closeRes = comController?.close()
+                CommLog.d(TAG, "close() => $closeRes")
                 if (_connectionStatus.value != ConnectionStatus.ERROR) {
                     _connectionStatus.value = ConnectionStatus.DISCONNECTED
                     Log.d(TAG, "startListeningInternal: Estado de conexión cambiado a DISCONNECTED (no hubo error previo).")
@@ -530,23 +572,11 @@ class MainViewModel @Inject constructor(
     private fun handlePollRequest() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                Log.d(TAG, "📤 Enviando respuesta POLL (0110) a MasterPOS...")
-                
-                // Formatear respuesta POLL usando el protocolo Legacy
-                val pollResponse = when (SystemConfig.commProtocolSelected) {
-                    CommProtocol.LEGACY -> LegacyMessageFormatter.format("0110", "ACK")
-                    else -> {
-                        Log.e(TAG, "Protocolo ${SystemConfig.commProtocolSelected} no soporta mensajes POLL")
-                        return@launch
-                    }
-                }
-                
-                // Enviar respuesta
+                Log.d(TAG, "📤 Enviando respuesta POLL (0110) a MasterPOS (forzado Legacy)...")
+                val pollResponse = LegacyMessageFormatter.format("0110", "ACK")
                 sendData(pollResponse)
-                
                 Log.d(TAG, "✅ Respuesta POLL enviada exitosamente")
                 _snackbarEvent.emit("Respuesta POLL enviada")
-                
             } catch (e: Exception) {
                 Log.e(TAG, "Error al enviar respuesta POLL", e)
                 _snackbarEvent.emit("Error al responder POLL")
@@ -654,5 +684,61 @@ class MainViewModel @Inject constructor(
     private fun ByteArray.toHexString(addSpace: Boolean = false): String {
         val separator = if (addSpace) " " else ""
         return joinToString(separator) { "%02X".format(it) }
+    }
+
+    @OptIn(ExperimentalStdlibApi::class)
+    private fun filterAndHandleLegacyPollFrames(chunk: ByteArray): ByteArray {
+        if (chunk.isNotEmpty()) {
+            Log.v(TAG, "filterLegacyPoll: chunk=${chunk.toHexString(true)} size=${chunk.size}")
+        }
+        legacyPollBuffer.addAll(chunk.toList())
+        val output = ArrayList<Byte>()
+        var progressed: Boolean
+        do {
+            progressed = false
+            val stxIndex = legacyPollBuffer.indexOf(0x02)
+            if (stxIndex == -1) {
+                if (legacyPollBuffer.isNotEmpty()) {
+                    // No frame structure; leave bytes for protocol parser (could be Futurex frame start later) but avoid flooding
+                    output.addAll(legacyPollBuffer)
+                    Log.v(TAG, "filterLegacyPoll: sin STX, reenviando ${legacyPollBuffer.size} bytes al parser y limpiando")
+                    legacyPollBuffer.clear()
+                }
+                break
+            }
+            if (stxIndex > 0) {
+                output.addAll(legacyPollBuffer.subList(0, stxIndex))
+                repeat(stxIndex) { legacyPollBuffer.removeAt(0) }
+                progressed = true
+            }
+            val etxIndexRel = legacyPollBuffer.indexOf(0x03)
+            if (etxIndexRel == -1) break
+            if (legacyPollBuffer.size <= etxIndexRel + 1) break
+            val frameSize = etxIndexRel + 2
+            val frame = legacyPollBuffer.subList(0, frameSize).toByteArray()
+            val payload = frame.sliceArray(1 until etxIndexRel)
+            val receivedLrc = frame[etxIndexRel + 1]
+            val calcLrc = FormatUtils.calculateLrc(frame.sliceArray(1..etxIndexRel))
+            if (receivedLrc != calcLrc) {
+                Log.w(TAG, "filterLegacyPoll: LRC inválido frame=${frame.toHexString(true)} recv=${receivedLrc.toHexString()} calc=${calcLrc.toHexString()} descartando STX")
+                legacyPollBuffer.removeAt(0)
+                progressed = true
+                continue
+            }
+            val payloadStr = try { String(payload, Charsets.US_ASCII) } catch (_: Exception) { "" }
+            val isPoll = payloadStr.startsWith("0100|")
+            if (isPoll) {
+                Log.d(TAG, "filterLegacyPoll: Detectado POLL Legacy payload='$payloadStr' frame=${frame.toHexString(true)}")
+                //respondLegacyPoll()
+                repeat(frameSize) { legacyPollBuffer.removeAt(0) }
+                progressed = true
+            } else {
+                Log.v(TAG, "filterLegacyPoll: Frame no-POLL reenviado al parser payload='$payloadStr'")
+                output.addAll(frame.toList())
+                repeat(frameSize) { legacyPollBuffer.removeAt(0) }
+                progressed = true
+            }
+        } while (progressed)
+        return output.toByteArray()
     }
 }

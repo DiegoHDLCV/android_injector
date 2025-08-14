@@ -31,7 +31,7 @@ fun KeyInjectionModal(
     viewModel: KeyInjectionViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
-    
+
     LaunchedEffect(Unit) {
         viewModel.snackbarEvent.collect { message ->
             // Aquí podrías mostrar un Snackbar si es necesario
@@ -473,4 +473,4 @@ private fun InjectionLogsCard(state: KeyInjectionState) {
             }
         }
     }
-} 
+}

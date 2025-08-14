@@ -3,6 +3,7 @@ package com.example.communication.polling
 import android.util.Log
 import com.example.communication.base.IComController
 import com.example.communication.libraries.CommunicationSDKManager
+import com.example.config.SystemConfig
 import com.example.format.LegacyMessage
 import com.example.format.LegacyMessageFormatter
 import com.example.format.LegacyMessageParser
@@ -41,6 +42,10 @@ class PollingService {
     private val POLLING_INTERVAL = 2000L // 2 segundos
     private val RESPONSE_TIMEOUT = 5000L // 5 segundos para timeout
     
+    // Contador de fallos de escritura
+    private var consecutiveWriteFailures = 0
+    private val MAX_WRITE_FAILURES = 3
+
     /**
      * Inicializa el servicio de polling
      */
@@ -51,12 +56,15 @@ class PollingService {
             comController = CommunicationSDKManager.getComController()
             if (comController == null) {
                 Log.e(TAG, "No se pudo obtener el controlador de comunicación")
+                CommLog.e(TAG, "No se pudo obtener el controlador de comunicación")
                 return
             }
             
             Log.d(TAG, "PollingService inicializado correctamente")
+            CommLog.i(TAG, "PollingService inicializado correctamente")
         } catch (e: Exception) {
             Log.e(TAG, "Error al inicializar PollingService", e)
+            CommLog.e(TAG, "Error al inicializar PollingService: ${e.message}")
         }
     }
     
@@ -64,17 +72,28 @@ class PollingService {
      * Inicia el polling desde el MasterPOS (Injector)
      */
     fun startMasterPolling(onConnectionStatusChanged: (Boolean) -> Unit) {
+        if (!SystemConfig.isMaster()) {
+            Log.w(TAG, "Ignorando startMasterPolling: rol actual es SUBPOS")
+            return
+        }
         if (_isPollingActive.value) {
             Log.w(TAG, "El polling ya está activo")
             return
         }
         
         Log.d(TAG, "Iniciando polling desde MasterPOS...")
+        CommLog.i(TAG, "Iniciando polling desde MasterPOS…")
         _isPollingActive.value = true
         
         pollingJob = CoroutineScope(Dispatchers.IO).launch {
             while (_isPollingActive.value) {
                 try {
+                    if (consecutiveWriteFailures >= MAX_WRITE_FAILURES) {
+                        Log.e(TAG, "Demasiados fallos de escritura consecutivos ($consecutiveWriteFailures). Abortando polling.")
+                        CommLog.e(TAG, "Abortando polling tras $consecutiveWriteFailures fallos write.")
+                        _isPollingActive.value = false
+                        break
+                    }
                     Log.d(TAG, "Enviando mensaje POLL (0100)...")
                     
                     // Formatear mensaje POLL (0100)
@@ -88,14 +107,25 @@ class PollingService {
                         Log.d(TAG, "Abriendo puerto de comunicación...")
                         val openResult = comController!!.open()
                         Log.d(TAG, "Resultado open(): $openResult")
+                        CommLog.d(TAG, "open() => $openResult")
                     } else if ((testRead ?: 0) < 0) {
                         Log.w(TAG, "readData prueba devolvió código de error: $testRead")
+                        CommLog.w(TAG, "readData prueba devolvió error: $testRead")
                     }
                     
                     // Enviar mensaje
                     val written = comController!!.write(pollMessage, 1000)
-                    Log.d(TAG, "📤 Enviado POLL (${pollMessage.size} bytes, write()=$written): ${pollMessage.toHexString()}")
-                    
+                    val hex = pollMessage.toHexString()
+                    Log.d(TAG, "📤 Enviado POLL (${pollMessage.size} bytes, write()=$written): $hex")
+                    CommLog.i(TAG, "TX POLL (${pollMessage.size}B, write=$written): $hex")
+                    if (written < 0) {
+                        consecutiveWriteFailures++
+                        Log.w(TAG, "Fallo de escritura #$consecutiveWriteFailures (code=$written)")
+                    } else {
+                        if (consecutiveWriteFailures > 0) Log.i(TAG, "Recuperado de fallos de escritura.")
+                        consecutiveWriteFailures = 0
+                    }
+
                     // Esperar respuesta con timeout
                     val responseReceived = withTimeoutOrNull(RESPONSE_TIMEOUT) {
                         waitForPollResponse()
@@ -112,12 +142,15 @@ class PollingService {
                     
                     if (connected) {
                         Log.d(TAG, "✅ Respuesta POLL recibida - SubPOS conectado")
+                        CommLog.i(TAG, "RX ACK de POLL (0110) - Conectado")
                     } else {
                         Log.w(TAG, "⚠️ Timeout esperando respuesta POLL - SubPOS no responde")
+                        CommLog.w(TAG, "Timeout esperando ACK de POLL (0110)")
                     }
                     
                 } catch (e: Exception) {
                     Log.e(TAG, "Error durante el polling", e)
+                    CommLog.e(TAG, "Error durante el polling: ${e.message}")
                     if (_isConnected.value) {
                         _isConnected.value = false
                         withContext(Dispatchers.Main) {
@@ -159,6 +192,7 @@ class PollingService {
      */
     fun stopPolling() {
         Log.d(TAG, "Deteniendo polling...")
+        CommLog.i(TAG, "Deteniendo polling…")
         _isPollingActive.value = false
         _isConnected.value = false
         pollingJob?.cancel()
@@ -167,8 +201,10 @@ class PollingService {
         try {
             val result = comController?.close()
             Log.d(TAG, "Resultado close(): $result")
+            CommLog.d(TAG, "close() => $result")
         } catch (e: Exception) {
             Log.e(TAG, "Error al cerrar el puerto", e)
+            CommLog.e(TAG, "Error al cerrar el puerto: ${e.message}")
         }
     }
     
@@ -183,7 +219,9 @@ class PollingService {
                 
                 // Enviar respuesta
                 val written = comController?.write(responseMessage, 1000) ?: -1
-                Log.d(TAG, "📤 Respuesta POLL enviada (${responseMessage.size} bytes, write()=$written): ${responseMessage.toHexString()}")
+                val hex = responseMessage.toHexString()
+                Log.d(TAG, "📤 Respuesta POLL enviada (${responseMessage.size} bytes, write()=$written): $hex")
+                CommLog.i(TAG, "TX ACK POLL (${responseMessage.size}B, write=$written): $hex")
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error al enviar respuesta POLL", e)
@@ -194,6 +232,7 @@ class PollingService {
     /**
      * Espera una respuesta POLL (0110)
      */
+    @OptIn(ExperimentalCoroutinesApi::class)
     private suspend fun waitForPollResponse(): Boolean = suspendCancellableCoroutine { cont ->
         var received = false
         
@@ -215,6 +254,7 @@ class PollingService {
                 
                 if (bytesRead > 0) {
                     Log.d(TAG, "Datos recibidos: ${bytesRead} bytes")
+                    CommLog.d(TAG, "RX ${bytesRead}B (esperando 0110)")
                     messageParser.appendData(buffer.sliceArray(0 until bytesRead))
                     
                     // Procesar mensajes
@@ -256,7 +296,9 @@ class PollingService {
                 val bytesRead = comController?.readData(1024, buffer, 100) ?: 0
                     
                     if (bytesRead > 0) {
-                        Log.d(TAG, "📥 Datos recibidos: ${bytesRead} bytes - ${buffer.sliceArray(0 until bytesRead).toHexString()}")
+                    val hex = buffer.sliceArray(0 until bytesRead).toHexString()
+                    Log.d(TAG, "📥 Datos recibidos: ${bytesRead} bytes - $hex")
+                    CommLog.i(TAG, "RX ${bytesRead}B: $hex")
                         messageParser.appendData(buffer.sliceArray(0 until bytesRead))
                         
                         // Procesar mensajes
@@ -304,4 +346,4 @@ class PollingService {
     
     // Extensión para convertir ByteArray a string hexadecimal
     private fun ByteArray.toHexString(): String = joinToString(" ") { "0x%02X".format(it) }
-} 
+}

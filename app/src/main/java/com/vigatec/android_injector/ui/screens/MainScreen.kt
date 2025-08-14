@@ -32,12 +32,25 @@ import com.vigatec.android_injector.ui.events.UiEvent
 import com.vigatec.android_injector.ui.navigation.Routes // Asegúrate de tener este import
 import com.vigatec.android_injector.viewmodel.ConnectionStatus
 import com.vigatec.android_injector.viewmodel.MainViewModel
+import com.vigatec.android_injector.util.LogcatReader
+import com.example.communication.polling.CommLog
+import com.example.communication.polling.CommLogEntry
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
 fun MainScreen(navController: NavHostController) {
     val viewModel: MainViewModel = hiltViewModel()
     val status by viewModel.connectionStatus.collectAsState()
+    // Auto-start listening once when arriving from Splash (after SDKs ready)
+    var autoStarted by remember { mutableStateOf(false) }
+    LaunchedEffect(status) {
+        if (!autoStarted && status == ConnectionStatus.DISCONNECTED) {
+            viewModel.startListening()
+            autoStarted = true
+        }
+    }
+    val commLogs by CommLog.entries.collectAsState()
+    val logcatLines by LogcatReader.lines.collectAsState()
     val rawDataReceived by viewModel.rawReceivedData.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollState = rememberScrollState()
@@ -67,7 +80,8 @@ fun MainScreen(navController: NavHostController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
@@ -156,6 +170,12 @@ fun MainScreen(navController: NavHostController) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // Panel de Logs de Comunicación
+            CommLogsPanel(entries = commLogs)
+
+            // Panel de Logcat (proceso actual)
+            //LogcatPanel(lines = logcatLines)
+
             Text("Log de Datos Recibidos:", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -163,11 +183,9 @@ fun MainScreen(navController: NavHostController) {
                 text = rawDataReceived.ifEmpty { "Esperando datos..." },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .border(1.dp, MaterialTheme.colorScheme.outline)
-                    .padding(8.dp)
-                    .verticalScroll(scrollState),
+                    .padding(8.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -175,3 +193,84 @@ fun MainScreen(navController: NavHostController) {
     }
 }
 
+@Composable
+private fun CommLogsPanel(entries: List<CommLogEntry>) {
+    androidx.compose.material3.Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 120.dp, max = 220.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("Logs de Comunicación (SubPOS)", style = MaterialTheme.typography.titleSmall)
+            if (entries.isEmpty()) {
+                Text("Sin registros aún…", style = MaterialTheme.typography.bodySmall)
+            } else {
+                val last = entries.takeLast(120).asReversed()
+                androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 180.dp)) {
+                    items(last.size) { idx ->
+                        val e = last[idx]
+                        val color = when (e.level) {
+                            "E" -> MaterialTheme.colorScheme.error
+                            "W" -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.onSurface
+                        }
+                        Text("[${e.level}] ${e.tag}: ${e.message}", color = color, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LogcatPanel(lines: List<String>) {
+    androidx.compose.material3.Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 120.dp, max = 240.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("Logcat (proceso actual)", style = MaterialTheme.typography.titleSmall)
+            val allowedTags = setOf(
+                "AisinoComController",
+                "AisinoCommManager",
+                "CommSDKManager",
+                "CommunicationSDKManager",
+                "PollingService",
+                "NewposComController",
+                "UrovoComController",
+                "IComController",
+                "MainViewModel", // solo tomaremos líneas con palabras de puerto/serial abajo
+                "SdkApi"
+            )
+            val keywords = setOf(
+                "UART", "USB", "Serial", "Baud", "write", "read", "RX", "TX",
+                "Port", "open", "close", "SystemInit_Api", "Attempting to read",
+                "Attempting to open", "opened successfully", "reset", "baud rate"
+            )
+            val filtered = lines.filter { raw ->
+                val line = raw.trim()
+                val tagMatch = allowedTags.any { t -> line.contains(" $t ") || line.contains("$t ") }
+                val keywordMatch = keywords.any { kw -> line.contains(kw, ignoreCase = true) }
+                if (line.contains("MainViewModel")) {
+                    // Solo logs de MV relacionados a comunicación
+                    keywordMatch
+                } else {
+                    tagMatch || keywordMatch
+                }
+            }
+            if (filtered.isEmpty()) {
+                Text("Sin líneas aún…", style = MaterialTheme.typography.bodySmall)
+            } else {
+                val last = filtered.takeLast(120).asReversed()
+                androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 200.dp)) {
+                    items(last.size) { idx ->
+                        Text(last[idx], style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}

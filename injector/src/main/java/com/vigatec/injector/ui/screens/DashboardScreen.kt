@@ -33,6 +33,7 @@ import com.vigatec.injector.ui.components.StatCardSkeleton
 import com.vigatec.injector.viewmodel.DashboardState
 import com.vigatec.injector.viewmodel.DashboardViewModel
 import com.vigatec.injector.viewmodel.SystemStats
+import com.example.communication.polling.CommLogEntry
 
 private data class QuickActionMeta(
     val title: String,
@@ -68,6 +69,7 @@ fun DashboardScreen(
         }
         item(key = "quick_actions") { QuickActionsCard(navController) }
         item(key = "system_health") { SystemHealthCard(dashboardState) }
+        item(key = "comm_logs") { CommLogsCard(dashboardState.commLogs) }
     }
 }
 
@@ -389,6 +391,38 @@ fun SystemHealthCard(dashboardState: DashboardState) {
             )
             HealthItem("Autenticación", "Activa", "Sesión válida", true)
             HealthItem("Comunicación API", "Operativa", "Backend disponible", true)
+        }
+    }
+}
+
+@Composable
+fun CommLogsCard(entries: List<CommLogEntry>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Logs de Comunicación", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            if (entries.isEmpty()) {
+                Text("Sin registros aún…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+            } else {
+                // Mostrar últimos 50 para rendimiento
+                val last = entries.takeLast(50).asReversed()
+                last.forEach { e ->
+                    val color = when (e.level) {
+                        "E" -> MaterialTheme.colorScheme.error
+                        "W" -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                    Text(
+                        text = "[${e.level}] ${e.tag}: ${e.message}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = color
+                    )
+                    Spacer(Modifier.height(2.dp))
+                }
+            }
         }
     }
 }
