@@ -293,12 +293,12 @@ class PollingService {
             
             while (_isPollingActive.value) {
                 try {
-                val bytesRead = comController?.readData(1024, buffer, 100) ?: 0
+                    val bytesRead = comController?.readData(1024, buffer, 100) ?: 0
                     
                     if (bytesRead > 0) {
-                    val hex = buffer.sliceArray(0 until bytesRead).toHexString()
-                    Log.d(TAG, "📥 Datos recibidos: ${bytesRead} bytes - $hex")
-                    CommLog.i(TAG, "RX ${bytesRead}B: $hex")
+                        val hex = buffer.sliceArray(0 until bytesRead).toHexString()
+                        Log.d(TAG, "📥 Datos recibidos: ${bytesRead} bytes - $hex")
+                        CommLog.i(TAG, "RX ${bytesRead}B: $hex")
                         messageParser.appendData(buffer.sliceArray(0 until bytesRead))
                         
                         // Procesar mensajes

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBox
+import androidx.compose.material.icons.filled.Cable
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
@@ -39,16 +41,15 @@ import java.util.Locale
 
 data class BottomBarDestination(
     val route: String,
-    val icon: ImageVector,
-    val label: String
+    val icon: ImageVector
 )
 
 val bottomBarDestinations = listOf(
-    BottomBarDestination(MainScreen.Dashboard.route, Icons.Default.Dashboard, "Dashboard"),
-    BottomBarDestination(MainScreen.KeyVault.route, Icons.Default.VpnKey, "Llaves"),
-    BottomBarDestination(MainScreen.Ceremony.route, Icons.Default.Security, "Ceremonia"),
-    BottomBarDestination(MainScreen.Profiles.route, Icons.Default.List, "Perfiles"),
-    BottomBarDestination(MainScreen.RawDataListener.route, Icons.Default.Radio, "Raw Data")
+    BottomBarDestination(MainScreen.Dashboard.route, Icons.Default.Dashboard),
+    BottomBarDestination(MainScreen.KeyVault.route, Icons.Default.VpnKey),
+    BottomBarDestination(MainScreen.Ceremony.route, Icons.Default.Security),
+    BottomBarDestination(MainScreen.Profiles.route, Icons.Default.AccountBox),
+    BottomBarDestination(MainScreen.RawDataListener.route, Icons.Default.Cable)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,7 +57,7 @@ val bottomBarDestinations = listOf(
 fun MainScaffold(username: String) {
     val navController = rememberNavController()
     Scaffold(
-        topBar = { MainTopAppBar() },
+        //topBar = { MainTopAppBar() },
         bottomBar = { AppBottomBar(navController = navController) }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
@@ -144,7 +145,6 @@ fun RowScope.AddItem(
     navController: NavHostController
 ) {
     NavigationBarItem(
-        label = { Text(text = screen.label) },
         icon = { Icon(imageVector = screen.icon, contentDescription = "Navigation Icon") },
         selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
         onClick = {

@@ -1,27 +1,36 @@
 package com.vigatec.injector.ui.screens
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,6 +42,7 @@ import com.vigatec.injector.ui.components.ProfileCardSkeleton
 import com.vigatec.injector.viewmodel.ProfileFormData
 import com.vigatec.injector.viewmodel.ProfileViewModel
 import com.vigatec.injector.viewmodel.KeyInjectionViewModel
+import com.vigatec.injector.viewmodel.InjectionStatus
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,7 +118,7 @@ fun ProfilesSkeletonScreen() {
         item {
             StatisticsHeaderSkeleton()
         }
-        
+
         // Lista de perfiles esqueleto
         items(5) {
             ProfileCardSkeleton()
@@ -142,64 +152,31 @@ fun StatisticsHeaderSkeleton() {
 fun StatisticItemSkeleton() {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Icono esqueleto
         Box(
             modifier = Modifier
                 .size(48.dp)
-                .background(
-                    color = Color.LightGray.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(24.dp)
-                )
-                .padding(12.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
         )
-        
+
         // Valor esqueleto
         Box(
             modifier = Modifier
-                .width(30.dp)
-                .height(20.dp)
-                .background(
-                    color = Color.LightGray.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(4.dp)
-                )
-                .padding(vertical = 4.dp)
+                .size(width = 40.dp, height = 20.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
         )
-        
+
         // Label esqueleto
         Box(
             modifier = Modifier
-                .width(60.dp)
-                .height(12.dp)
-                .background(
-                    color = Color.LightGray.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(4.dp)
-                )
-                .padding(vertical = 2.dp)
+                .size(width = 60.dp, height = 16.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
         )
-    }
-}
-
-@Composable
-fun LoadingScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = "Cargando perfiles...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-        }
     }
 }
 
@@ -218,9 +195,9 @@ fun EmptyStateScreen(onCreateProfile: () -> Unit) {
             modifier = Modifier.size(80.dp),
             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         Text(
             text = "No hay perfiles configurados",
             style = MaterialTheme.typography.headlineSmall.copy(
@@ -228,18 +205,18 @@ fun EmptyStateScreen(onCreateProfile: () -> Unit) {
             ),
             color = MaterialTheme.colorScheme.onSurface
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         Text(
             text = "Crea tu primer perfil para comenzar a inyectar llaves criptográficas en dispositivos POS.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            textAlign = TextAlign.Center
         )
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         Button(
             onClick = onCreateProfile,
             modifier = Modifier.height(48.dp),
@@ -268,13 +245,13 @@ private fun ProfilesContent(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Header con estadísticas
         item {
             StatisticsHeader(profiles = profiles)
         }
-        
+
         // Lista de perfiles
         items(
             items = profiles,
@@ -311,17 +288,17 @@ private fun StatisticsHeader(profiles: List<ProfileEntity>) {
                 label = "Total Perfiles",
                 color = MaterialTheme.colorScheme.primary
             )
-            
+
             StatisticItem(
                 icon = Icons.Rounded.Key,
                 value = profiles.count { it.keyConfigurations.isNotEmpty() }.toString(),
                 label = "Configurados",
                 color = MaterialTheme.colorScheme.secondary
             )
-            
+
             StatisticItem(
                 icon = Icons.Rounded.CheckCircle,
-                value = profiles.count { 
+                value = profiles.count {
                     it.keyConfigurations.all { config -> config.selectedKey.isNotEmpty() }
                 }.toString(),
                 label = "Listos",
@@ -356,7 +333,7 @@ private fun StatisticItem(
                 modifier = Modifier.size(24.dp)
             )
         }
-        
+
         Text(
             text = value,
             style = MaterialTheme.typography.headlineSmall.copy(
@@ -364,7 +341,7 @@ private fun StatisticItem(
             ),
             color = MaterialTheme.colorScheme.onSurface
         )
-        
+
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
@@ -378,371 +355,398 @@ fun ProfileCard(
     profile: ProfileEntity,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onInject: () -> Unit
+    onInject: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
+    // --- Estado derivado y helpers de UI ---
     val appTypeConfig = getAppTypeConfig(profile.applicationType)
-    val keyCount = profile.keyConfigurations.size
-    val isConfigured = keyCount > 0
-    val isReady = profile.keyConfigurations.all { it.selectedKey.isNotEmpty() }
-    
-    Card(
-        modifier = Modifier
+    val totalKeys = profile.keyConfigurations.size
+    val readyKeys = profile.keyConfigurations.count { it.selectedKey.isNotBlank() }
+    val hasAny = totalKeys > 0
+    val isReady = hasAny && readyKeys == totalKeys
+    val statusColor = when {
+        isReady -> MaterialTheme.colorScheme.primary
+        hasAny  -> MaterialTheme.colorScheme.secondary
+        else    -> MaterialTheme.colorScheme.tertiary
+    }
+    val statusLabel = when {
+        isReady -> "Listo"
+        hasAny  -> "Pendiente"
+        else    -> "Vacío"
+    }
+    val progress = if (totalKeys == 0) 0f else readyKeys.toFloat() / totalKeys.toFloat()
+
+    var showOverflow by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    ElevatedCard(
+        modifier = modifier
             .fillMaxWidth()
+            .semantics { contentDescription = "Tarjeta de perfil ${profile.name}" }
             .animateContentSize(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(4.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Header con avatar y info principal
+
+            // ====== CABECERA ======
             Row(
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Avatar con gradiente
+                // Avatar con gradiente + estado
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(16.dp))
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(12.dp))
                         .background(appTypeConfig.gradient),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = appTypeConfig.icon,
-                        contentDescription = null,
+                        contentDescription = "Tipo de app ${profile.applicationType}",
                         tint = Color.White,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(26.dp)
                     )
-                    
-                    // Indicador de estado
+                    // Punto de estado
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .size(16.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                when {
-                                    isReady -> MaterialTheme.colorScheme.primary
-                                    isConfigured -> MaterialTheme.colorScheme.secondary
-                                    else -> MaterialTheme.colorScheme.tertiary
-                                }
-                            )
+                            .offset(x = 4.dp, y = (-4).dp)
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(statusColor)
+                            .border(2.dp, MaterialTheme.colorScheme.surface, CircleShape)
                     )
                 }
-                
-                // Información del perfil
+
+                // Título + descripción + meta
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = profile.name,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    
-                    Text(
-                        text = profile.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                        maxLines = 2,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    
+                    if (profile.description.isNotBlank()) {
+                        Text(
+                            text = profile.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    // Fila de metadatos compactos
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Badge del tipo de aplicación
+                        // Badge tipo de aplicación
                         Surface(
-                            color = appTypeConfig.color.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(12.dp)
+                            color = appTypeConfig.color.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
                                 text = profile.applicationType,
-                                style = MaterialTheme.typography.labelMedium,
+                                style = MaterialTheme.typography.labelSmall,
                                 color = appTypeConfig.color,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
-                        
+
                         // Contador de llaves
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
-                                Icons.Rounded.Key,
+                                imageVector = Icons.Rounded.Key,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                text = "$keyCount llaves",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                text = "$readyKeys/$totalKeys",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-                }
-            }
-            
-            // Barra de estado
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(
-                                    when {
-                                        isReady -> MaterialTheme.colorScheme.primary
-                                        isConfigured -> MaterialTheme.colorScheme.secondary
-                                        else -> MaterialTheme.colorScheme.tertiary
-                                    }
+
+                        // Estado (chip)
+                        Surface(
+                            color = statusColor.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(999.dp),
+                            border = BorderStroke(1.dp, statusColor.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(statusColor)
                                 )
-                        )
-                        Text(
-                            text = when {
-                                isReady -> "Listo para inyectar"
-                                isConfigured -> "Pendiente configuración"
-                                else -> "Sin configuraciones"
-                            },
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-            
-            // Configuraciones de llaves (vista compacta)
-            if (keyCount > 0) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            Icons.Rounded.Settings,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                        Text(
-                            text = "Configuraciones",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                        )
-                    }
-                    
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(
-                            items = profile.keyConfigurations.take(6),
-                            key = { it.id }
-                        ) { config ->
-                            KeyConfigChip(config = config)
-                        }
-                        
-                        if (keyCount > 6) {
-                            item {
-                                Surface(
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Text(
-                                        text = "+${keyCount - 6}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                    )
-                                }
+                                Text(
+                                    text = statusLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             }
                         }
                     }
                 }
+
+                // Menú de desborde
+                Box {
+                    IconButton(
+                        onClick = { showOverflow = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Más acciones"
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = showOverflow,
+                        onDismissRequest = { showOverflow = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Editar") },
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                            onClick = { showOverflow = false; onEdit() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Eliminar") },
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                            onClick = { showOverflow = false; showDeleteConfirm = true }
+                        )
+                    }
+                }
             }
-            
-            // Botones de acción
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onEdit,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
+
+            // ====== PROGRESO (si aplica) ======
+            if (hasAny) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(999.dp)),
                     )
-                ) {
-                    Icon(
-                        Icons.Default.Edit,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Editar")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = if (isReady) "Todo listo para inyectar" else "Configuración pendiente",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "${(progress * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-                
-                OutlinedButton(
-                    onClick = onDelete,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Eliminar")
+            }
+
+            // ====== LLAVES / CHIPS ======
+            if (totalKeys > 0) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(
+                        items = profile.keyConfigurations.take(10),
+                        key = { it.id }
+                    ) { config ->
+                        KeyConfigChip(config = config)
+                    }
+                    if (totalKeys > 10) {
+                        item {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(16.dp),
+                                tonalElevation = 1.dp
+                            ) {
+                                Text(
+                                    text = "+${totalKeys - 10}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                )
+                            }
+                        }
+                    }
                 }
-                
+            } else {
+                // Vacío: callout suave
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            "Aún no agregas configuraciones de llaves.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // ====== ACCIONES ======
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Acción principal destacada
                 Button(
                     onClick = onInject,
-                    modifier = Modifier.weight(1f),
                     enabled = isReady,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                    )
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("injectButton"),
                 ) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Inyectar")
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Inyectar llaves")
                 }
             }
         }
+    }
+
+    // ====== Confirmación de eliminación ======
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Eliminar perfil") },
+            text = { Text("¿Seguro que deseas eliminar \"${profile.name}\"? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(
+                    onClick = { showDeleteConfirm = false; onDelete() },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancelar") }
+            }
+        )
     }
 }
 
 @Composable
 fun KeyConfigChip(config: KeyConfiguration) {
     val isConfigured = config.selectedKey.isNotEmpty()
-    
+
     Surface(
         color = if (isConfigured) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
         } else {
             MaterialTheme.colorScheme.surfaceVariant
         },
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(8.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
             Icon(
                 Icons.Rounded.Key,
                 contentDescription = null,
-                modifier = Modifier.size(12.dp),
+                modifier = Modifier.size(10.dp),
                 tint = if (isConfigured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(3.dp))
             Text(
                 text = config.keyType,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 color = if (isConfigured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
         }
     }
 }
 
-// Configuraciones de tipos de aplicación
+// Funciones auxiliares
 data class AppTypeConfig(
     val icon: ImageVector,
     val color: Color,
     val gradient: Brush
 )
 
-@Composable
 fun getAppTypeConfig(appType: String): AppTypeConfig {
-    return when (appType.lowercase()) {
-        "amex" -> AppTypeConfig(
-            icon = Icons.Rounded.CreditCard,
-            color = Color(0xFF006FCF),
-            gradient = Brush.horizontalGradient(
-                colors = listOf(Color(0xFF006FCF), Color(0xFF0052A3))
+    return when (appType.uppercase()) {
+        "RETAIL" -> AppTypeConfig(
+            icon = Icons.Rounded.Store,
+            color = Color(0xFF2196F3),
+            gradient = Brush.linearGradient(
+                colors = listOf(Color(0xFF2196F3), Color(0xFF1976D2))
             )
         )
-        "visa" -> AppTypeConfig(
-            icon = Icons.Rounded.CreditCard,
-            color = Color(0xFF1A1F71),
-            gradient = Brush.horizontalGradient(
-                colors = listOf(Color(0xFF1A1F71), Color(0xFF0F1344))
+        "H2H" -> AppTypeConfig(
+            icon = Icons.Rounded.Computer,
+            color = Color(0xFF4CAF50),
+            gradient = Brush.linearGradient(
+                colors = listOf(Color(0xFF4CAF50), Color(0xFF388E3C))
             )
         )
-        "mastercard" -> AppTypeConfig(
-            icon = Icons.Rounded.CreditCard,
-            color = Color(0xFFEB001B),
-            gradient = Brush.horizontalGradient(
-                colors = listOf(Color(0xFFEB001B), Color(0xFFC70039))
+        "POSINT" -> AppTypeConfig(
+            icon = Icons.Rounded.PointOfSale,
+            color = Color(0xFFFF9800),
+            gradient = Brush.linearGradient(
+                colors = listOf(Color(0xFFFF9800), Color(0xFFF57C00))
             )
         )
-        "discover" -> AppTypeConfig(
-            icon = Icons.Rounded.CreditCard,
-            color = Color(0xFFFF6000),
-            gradient = Brush.horizontalGradient(
-                colors = listOf(Color(0xFFFF6000), Color(0xFFE55A00))
+        "ATM" -> AppTypeConfig(
+            icon = Icons.Rounded.AccountBalance,
+            color = Color(0xFF9C27B0),
+            gradient = Brush.linearGradient(
+                colors = listOf(Color(0xFF9C27B0), Color(0xFF7B1FA2))
+            )
+        )
+        "CUSTOM" -> AppTypeConfig(
+            icon = Icons.Rounded.Settings,
+            color = Color(0xFF607D8B),
+            gradient = Brush.linearGradient(
+                colors = listOf(Color(0xFF607D8B), Color(0xFF455A64))
             )
         )
         else -> AppTypeConfig(
-            icon = Icons.Rounded.Payment,
-            color = MaterialTheme.colorScheme.primary,
-            gradient = Brush.horizontalGradient(
-                colors = listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+            icon = Icons.Rounded.Apps,
+            color = Color(0xFF757575),
+            gradient = Brush.linearGradient(
+                colors = listOf(Color(0xFF757575), Color(0xFF616161))
             )
         )
     }
 }
 
-private fun getAppTypeIcon(appType: String): String {
-    return when (appType.lowercase()) {
-        "retail" -> "🏪"
-        "h2h" -> "🔗"
-        "posint" -> "💳"
-        "atm" -> "🏧"
-        "custom" -> "⚙️"
-        else -> "📱"
-    }
-}
-
-private fun getUsageIcon(usage: String): String {
-    return when (usage.lowercase()) {
-        "pin" -> "🔐"
-        "mac" -> "🔒"
-        "data" -> "📊"
-        "kek" -> "🗝️"
+fun getUsageIcon(usage: String): String {
+    return when (usage.uppercase()) {
+        "PIN" -> "🔐"
+        "MAC" -> "🔒"
+        "DATA" -> "📄"
+        "KEK" -> "🗝️"
         else -> "🔑"
     }
 }
@@ -766,41 +770,35 @@ fun CreateProfileModal(
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.9f)
+                .fillMaxWidth(0.98f)
+                .fillMaxHeight(0.95f)
                 .align(Alignment.Center),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
+            shape = RoundedCornerShape(20.dp),
             elevation = CardDefaults.cardElevation(8.dp)
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // Header
+            Column(modifier = Modifier.fillMaxSize()) {
+
+                // ==== HEADER ====
                 Surface(
                     color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
                             Text(
-                                text = if (formData.id == null) "Crear Perfil" else "Editar Perfil",
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
+                                text = if (formData.id == null) "Crear" else "Editar",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = "Configura las propiedades del perfil y sus llaves",
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = "Configura el perfil y sus llaves",
+                                style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                             )
                         }
@@ -813,59 +811,52 @@ fun CreateProfileModal(
                         }
                     }
                 }
-                
-                // Contenido
+
+                // ==== CONTENIDO SCROLLEABLE ====
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .padding(24.dp)
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
                         .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    // Información básica
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    // --- Información básica ---
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             text = "📋 Información Básica",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary
                         )
-                        
+
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant
                             ),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(
-                                modifier = Modifier.padding(20.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 OutlinedTextField(
                                     value = formData.name,
                                     onValueChange = { onFormDataChange(formData.copy(name = it)) },
-                                    label = { Text("Nombre del Perfil") },
-                                    placeholder = { Text("ej: Perfil Retail Principal") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                                    )
+                                    label = { Text("Nombre") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
-                                
+
                                 OutlinedTextField(
                                     value = formData.description,
                                     onValueChange = { onFormDataChange(formData.copy(description = it)) },
                                     label = { Text("Descripción") },
-                                    placeholder = { Text("Describe el propósito de este perfil...") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    minLines = 3,
-                                    maxLines = 5
+                                    minLines = 2,
+                                    maxLines = 3,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
-                                
-                                // Selector de tipo de aplicación
+
+                                // --- Selector de tipo de aplicación ---
                                 var expanded by remember { mutableStateOf(false) }
                                 ExposedDropdownMenuBox(
                                     expanded = expanded,
@@ -873,30 +864,26 @@ fun CreateProfileModal(
                                 ) {
                                     OutlinedTextField(
                                         value = formData.appType,
-                                        onValueChange = {},
+                                        onValueChange = {}, // evita escribir
                                         readOnly = true,
                                         label = { Text("Tipo de Aplicación") },
-                                        placeholder = { Text("Seleccionar tipo...") },
-                                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                                        },
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .menuAnchor()
                                     )
+
+                                    // Menú más alto
                                     ExposedDropdownMenu(
                                         expanded = expanded,
-                                        onDismissRequest = { expanded = false }
+                                        onDismissRequest = { expanded = false },
+                                        modifier = Modifier.heightIn(max = 300.dp)
                                     ) {
                                         listOf("Retail", "H2H", "Posint", "ATM", "Custom").forEach { type ->
                                             DropdownMenuItem(
-                                                text = { 
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                    ) {
-                                                        Text(getAppTypeIcon(type))
-                                                        Text(type)
-                                                    }
-                                                },
+                                                text = { Text(type) },
                                                 onClick = {
                                                     onFormDataChange(formData.copy(appType = type))
                                                     expanded = false
@@ -908,83 +895,36 @@ fun CreateProfileModal(
                             }
                         }
                     }
-                    
-                    // Configuración de llaves
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+
+                    // --- Configuración de llaves ---
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "🔑 Configuración de Llaves",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
+                                text = "🔑 Llaves",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.primary
                             )
-                            
-                            Button(
-                                onClick = onAddKeyConfig,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.secondary
-                                )
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Agregar Llave")
+                            IconButton(onClick = onAddKeyConfig) {
+                                Icon(Icons.Default.Add, contentDescription = "Agregar llave")
                             }
                         }
-                        
+
                         if (formData.keyConfigurations.isEmpty()) {
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                ),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(40.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Rounded.Key,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(48.dp),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                        )
-                                        Text(
-                                            text = "No hay configuraciones de llaves",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-                                        )
-                                        Text(
-                                            text = "Agrega configuraciones para definir qué llaves se inyectarán",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
+                            Text(
+                                "No hay llaves configuradas.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         } else {
-                            Column(
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 formData.keyConfigurations.forEach { config ->
                                     KeyConfigurationItem(
                                         config = config,
                                         availableKeys = availableKeys,
-                                        onUpdate = onUpdateKeyConfig,
+                                        onUpdate = { id, field, value -> onUpdateKeyConfig(id, field, value) },
                                         onRemove = { onRemoveKeyConfig(config.id) }
                                     )
                                 }
@@ -992,38 +932,30 @@ fun CreateProfileModal(
                         }
                     }
                 }
-                
-                // Footer con botones
+
+                // ==== FOOTER BOTONES ====
                 Surface(
+                    tonalElevation = 2.dp,
                     color = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
+                    shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.End
                     ) {
-                        TextButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.padding(end = 12.dp)
-                        ) {
-                            Text("Cancelar")
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancelar", style = MaterialTheme.typography.labelLarge)
                         }
-                        Button(
-                            onClick = onSave,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
+                        Spacer(Modifier.width(8.dp))
+                        Button(onClick = onSave) {
+                            Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (formData.id == null) "Crear" else "Actualizar",
+                                style = MaterialTheme.typography.labelLarge
                             )
-                        ) {
-                            Icon(
-                                Icons.Default.Save,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (formData.id == null) "Crear Perfil" else "Actualizar Perfil")
                         }
                     }
                 }
@@ -1032,7 +964,7 @@ fun CreateProfileModal(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun KeyConfigurationItem(
     config: KeyConfiguration,
@@ -1040,212 +972,444 @@ fun KeyConfigurationItem(
     onUpdate: (Long, String, String) -> Unit,
     onRemove: () -> Unit
 ) {
+    val usageOptions = remember { listOf("PIN", "MAC", "DATA", "KEK") }
+    val keyTypeOptions = remember { listOf("TDES", "AES") }
+
+    // Estados UI
+    var usageExpanded by rememberSaveable { mutableStateOf(false) }
+    var keyTypeExpanded by rememberSaveable { mutableStateOf(false) }
+    var keyExpanded by rememberSaveable { mutableStateOf(false) }
+
+    // Derivados
+    val isKeySelected = remember(config.selectedKey) { config.selectedKey.isNotBlank() }
+    val headline = remember(config) { "Config. ${config.id}" }
+
     Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp)
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header con icono y botón de eliminar
+
+            // ===== Header compacto con meta + eliminar =====
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(10.dp))
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = getUsageIcon(config.usage),
-                            fontSize = 20.sp
-                        )
+                        Text(getUsageIcon(config.usage), fontSize = 18.sp)
                     }
                     Column {
                         Text(
-                            text = "Configuración de Llave",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
+                            text = "Configuración de llave",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        // Meta en una línea
                         Text(
-                            text = "ID: ${config.id}",
+                            text = buildString {
+                                append(headline)
+                                append(" • Uso: ${config.usage.ifBlank { "—" }}")
+                                append(" • Tipo: ${config.keyType.ifBlank { "—" }}")
+                                append(" • Slot: ${config.slot.ifBlank { "—" }}")
+                            },
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
-                
-                IconButton(
-                    onClick = onRemove,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.errorContainer)
-                ) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Eliminar configuración",
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(18.dp)
-                    )
+
+                CompositionLocalProvider(LocalMinimumTouchTargetEnforcement provides false) {
+                    IconButton(
+                        onClick = onRemove,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Eliminar configuración",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
                 }
             }
-            
-            // Campos de configuración
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Uso
-                var usageExpanded by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = usageExpanded,
-                    onExpandedChange = { usageExpanded = !usageExpanded }
-                ) {
-                    OutlinedTextField(
-                        value = config.usage,
-                        onValueChange = { onUpdate(config.id, "usage", it) },
-                        label = { Text("Uso") },
-                        placeholder = { Text("Seleccionar uso...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = usageExpanded) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-                    ExposedDropdownMenu(
-                        expanded = usageExpanded,
-                        onDismissRequest = { usageExpanded = false }
+
+            // ===== Layout responsive (1 o 2 columnas según ancho) =====
+            val configuration = LocalConfiguration.current
+            val isWide = configuration.screenWidthDp.dp >= 600.dp
+            val fieldSpacing = 10.dp
+
+            if (isWide) {
+                // 2 columnas: reduce scroll vertical y la percepción de "modal chico"
+                Row(horizontalArrangement = Arrangement.spacedBy(fieldSpacing)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(fieldSpacing)
                     ) {
-                        listOf("PIN", "MAC", "DATA", "KEK").forEach { usage ->
-                            DropdownMenuItem(
-                                text = { 
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Text(text = getUsageIcon(usage))
-                                        Text(text = usage)
-                                    }
+                        // Uso (solo lectura + menú)
+                        ExposedDropdownMenuBox(
+                            expanded = usageExpanded,
+                            onExpandedChange = { usageExpanded = !usageExpanded }
+                        ) {
+                            OutlinedTextField(
+                                value = config.usage,
+                                onValueChange = {}, // evita escritura
+                                readOnly = true,
+                                label = { Text("Uso") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = usageExpanded)
                                 },
-                                onClick = {
-                                    onUpdate(config.id, "usage", usage)
-                                    usageExpanded = false
-                                }
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor()
                             )
+
+                            ExposedDropdownMenu(
+                                expanded = usageExpanded,
+                                onDismissRequest = { usageExpanded = false },
+                                modifier = Modifier.heightIn(max = 320.dp) // menú más alto
+                            ) {
+                                usageOptions.forEach { usage ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(getUsageIcon(usage))
+                                                Text(usage)
+                                            }
+                                        },
+                                        onClick = {
+                                            onUpdate(config.id, "usage", usage)
+                                            usageExpanded = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-                
-                // Tipo de llave
-                var keyTypeExpanded by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = keyTypeExpanded,
-                    onExpandedChange = { keyTypeExpanded = !keyTypeExpanded }
-                ) {
-                    OutlinedTextField(
-                        value = config.keyType,
-                        onValueChange = { onUpdate(config.id, "keyType", it) },
-                        label = { Text("Tipo de Llave") },
-                        placeholder = { Text("Seleccionar tipo...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyTypeExpanded) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-                    ExposedDropdownMenu(
-                        expanded = keyTypeExpanded,
-                        onDismissRequest = { keyTypeExpanded = false }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(fieldSpacing)
                     ) {
-                        listOf("TDES", "AES").forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type) },
-                                onClick = {
-                                    onUpdate(config.id, "keyType", type)
-                                    keyTypeExpanded = false
-                                }
+                        // Tipo de llave (solo lectura + menú)
+                        ExposedDropdownMenuBox(
+                            expanded = keyTypeExpanded,
+                            onExpandedChange = { keyTypeExpanded = !keyTypeExpanded }
+                        ) {
+                            OutlinedTextField(
+                                value = config.keyType,
+                                onValueChange = {}, // evita escritura
+                                readOnly = true,
+                                label = { Text("Tipo de llave") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyTypeExpanded)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor()
                             )
+
+                            ExposedDropdownMenu(
+                                expanded = keyTypeExpanded,
+                                onDismissRequest = { keyTypeExpanded = false },
+                                modifier = Modifier.heightIn(max = 320.dp)
+                            ) {
+                                keyTypeOptions.forEach { type ->
+                                    DropdownMenuItem(
+                                        text = { Text(type) },
+                                        onClick = {
+                                            onUpdate(config.id, "keyType", type)
+                                            keyTypeExpanded = false
+                                        }
+                                    )
+                                }
+                            }
                         }
                     }
-                }
-                
-                // Slot
-                OutlinedTextField(
-                    value = config.slot,
-                    onValueChange = { onUpdate(config.id, "slot", it) },
-                    label = { Text("Slot") },
-                    placeholder = { Text("ej: 01") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                    )
-                )
-                
-                // Llave seleccionada
-                var keyExpanded by remember { mutableStateOf(false) }
-                ExposedDropdownMenuBox(
-                    expanded = keyExpanded,
-                    onExpandedChange = { keyExpanded = !keyExpanded }
-                ) {
+
+                    // Slot (validación suave HEX 2 dígitos)
                     OutlinedTextField(
-                        value = config.selectedKey,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Llave Seleccionada (KCV)") },
-                        placeholder = { Text("Seleccionar llave...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyExpanded) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
+                        value = config.slot,
+                        onValueChange = { raw ->
+                            val filtered = raw.uppercase()
+                                .filter { it in "0123456789ABCDEF" }
+                                .take(2)
+                            onUpdate(config.id, "slot", filtered)
+                        },
+                        label = { Text("Slot (HEX)") },
+                        placeholder = { Text("01") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                        supportingText = {
+                            Text(
+                                "Máx. 2 dígitos hexadecimales",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    ExposedDropdownMenu(
+                }
+
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(fieldSpacing)
+                ) {
+                    // Llave seleccionada (readOnly + lista larga scrolleable)
+                    ExposedDropdownMenuBox(
                         expanded = keyExpanded,
-                        onDismissRequest = { keyExpanded = false }
+                        onExpandedChange = { keyExpanded = !keyExpanded }
                     ) {
-                        if (availableKeys.isEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text("No hay llaves disponibles") },
-                                onClick = { keyExpanded = false }
-                            )
-                        } else {
-                            availableKeys.forEach { key ->
+                        OutlinedTextField(
+                            value = config.selectedKey,
+                            onValueChange = {}, // no editable
+                            readOnly = true,
+                            label = { Text("Llave seleccionada (KCV)") },
+                            placeholder = { Text("Seleccionar llave...") },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyExpanded)
+                            },
+                            supportingText = {
+                                if (!isKeySelected) Text(
+                                    "Requerida para inyectar",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+
+                        // Menú alto + contenido scrolleable
+                        ExposedDropdownMenu(
+                            expanded = keyExpanded,
+                            onDismissRequest = { keyExpanded = false },
+                            modifier = Modifier
+                                .heightIn(max = 360.dp)
+                                .widthIn(min = 280.dp)
+                        ) {
+                            if (availableKeys.isEmpty()) {
                                 DropdownMenuItem(
-                                    text = { 
+                                    text = { Text("No hay llaves disponibles") },
+                                    onClick = { keyExpanded = false }
+                                )
+                            } else {
+                                // Lista con LazyColumn para grandes volúmenes
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 360.dp)
+                                ) {
+                                    LazyColumn {
+                                        items(availableKeys, key = { it.id }) { key ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Column {
+                                                        Text(
+                                                            key.kcv,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                        Text(
+                                                            "ID: ${key.id}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                },
+                                                onClick = {
+                                                    onUpdate(
+                                                        config.id,
+                                                        "selectedKey",
+                                                        key.kcv
+                                                    )
+                                                    keyExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                // ===== Layout 1 columna (móvil/estrecho) =====
+                Column(verticalArrangement = Arrangement.spacedBy(fieldSpacing)) {
+
+                    ExposedDropdownMenuBox(
+                        expanded = usageExpanded,
+                        onExpandedChange = { usageExpanded = !usageExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = config.usage,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Uso") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = usageExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = usageExpanded,
+                            onDismissRequest = { usageExpanded = false },
+                            modifier = Modifier.heightIn(max = 320.dp)
+                        ) {
+                            usageOptions.forEach { usage ->
+                                DropdownMenuItem(
+                                    text = {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(text = key.kcv, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
-                                            Text(text = "(ID: ${key.id})", style = MaterialTheme.typography.bodySmall)
+                                            Text(getUsageIcon(usage))
+                                            Text(usage)
                                         }
                                     },
                                     onClick = {
-                                        onUpdate(config.id, "selectedKey", key.kcv)
-                                        keyExpanded = false
+                                        onUpdate(config.id, "usage", usage)
+                                        usageExpanded = false
                                     }
                                 )
+                            }
+                        }
+                    }
+
+                    ExposedDropdownMenuBox(
+                        expanded = keyTypeExpanded,
+                        onExpandedChange = { keyTypeExpanded = !keyTypeExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = config.keyType,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Tipo de llave") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyTypeExpanded) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = keyTypeExpanded,
+                            onDismissRequest = { keyTypeExpanded = false },
+                            modifier = Modifier.heightIn(max = 320.dp)
+                        ) {
+                            keyTypeOptions.forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(type) },
+                                    onClick = {
+                                        onUpdate(config.id, "keyType", type)
+                                        keyTypeExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Slot (validación suave HEX 2 dígitos)
+                    OutlinedTextField(
+                        value = config.slot,
+                        onValueChange = { raw ->
+                            val filtered = raw.uppercase()
+                                .filter { it in "0123456789ABCDEF" }
+                                .take(2)
+                            onUpdate(config.id, "slot", filtered)
+                        },
+                        label = { Text("Slot (HEX)") },
+                        placeholder = { Text("01") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        supportingText = {
+                            Text(
+                                "Máx. 2 dígitos hexadecimales",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    ExposedDropdownMenuBox(
+                        expanded = keyExpanded,
+                        onExpandedChange = { keyExpanded = !keyExpanded }
+                    ) {
+                        OutlinedTextField(
+                            value = config.selectedKey,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Llave seleccionada (KCV)") },
+                            placeholder = { Text("Seleccionar llave...") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyExpanded) },
+                            supportingText = {
+                                if (!isKeySelected) Text(
+                                    "Requerida para inyectar",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = keyExpanded,
+                            onDismissRequest = { keyExpanded = false },
+                            modifier = Modifier.heightIn(max = 360.dp)
+                        ) {
+                            if (availableKeys.isEmpty()) {
+                                DropdownMenuItem(
+                                    text = { Text("No hay llaves disponibles") },
+                                    onClick = { keyExpanded = false }
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 360.dp)
+                                ) {
+                                    LazyColumn {
+                                        items(availableKeys, key = { it.id }) { key ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Column {
+                                                        Text(
+                                                            key.kcv,
+                                                            fontFamily = FontFamily.Monospace
+                                                        )
+                                                        Text(
+                                                            "ID: ${key.id}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                },
+                                                onClick = {
+                                                    onUpdate(config.id, "selectedKey", key.kcv)
+                                                    keyExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -1254,3 +1418,5 @@ fun KeyConfigurationItem(
         }
     }
 }
+
+
