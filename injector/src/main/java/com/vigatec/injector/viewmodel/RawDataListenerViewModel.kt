@@ -115,14 +115,80 @@ class RawDataListenerViewModel @Inject constructor(
             try {
                 _connectionStatus.value = ListenerStatus.INITIALIZING
                 Log.d(TAG, "startListeningInternal: Estado de conexión cambiado a INITIALIZING.")
-                comController!!.init(baudRate, parity, dataBits)
-                Log.d(TAG, "startListeningInternal: comController inicializado.")
-                val openRes = comController!!.open()
-                Log.d(TAG, "startListeningInternal: Puerto de comunicación abierto.")
-                CommLog.d(TAG, "open() => $openRes")
+
+                // DIAGNÓSTICO: Verificar estado del sistema antes de abrir
+                Log.i(TAG, "=== DIAGNÓSTICO DE CONEXIÓN INJECTOR ===")
+                Log.i(TAG, "Fabricante detectado: ${SystemConfig.managerSelected}")
+                Log.i(TAG, "Rol del dispositivo: ${SystemConfig.deviceRole}")
+                Log.i(TAG, "Protocolo seleccionado: ${SystemConfig.commProtocolSelected}")
+                Log.i(TAG, "Parámetros: baudRate=$baudRate, parity=$parity, dataBits=$dataBits")
+
+                // Intentar reinicializar el SDK si el primer intento falla
+                var openAttempts = 0
+                var openRes = -1
+                val maxAttempts = 3
+
+                while (openAttempts < maxAttempts && openRes != 0) {
+                    openAttempts++
+                    Log.i(TAG, "Intento de conexión #$openAttempts de $maxAttempts")
+
+                    if (openAttempts > 1) {
+                        Log.i(TAG, "Reinicializando SDK de comunicación...")
+                        try {
+                            // Liberar recursos previos
+                            comController?.close()
+                            CommunicationSDKManager.release()
+                            kotlinx.coroutines.delay(1000) // Esperar un momento
+
+                            // Reinicializar
+                            CommunicationSDKManager.initialize(getApplication())
+                            comController = CommunicationSDKManager.getComController()
+
+                            if (comController == null) {
+                                Log.e(TAG, "No se pudo obtener comController tras reinicialización")
+                                continue
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error durante reinicialización: ${e.message}", e)
+                            continue
+                        }
+                    }
+
+                    // Inicializar controlador
+                    comController!!.init(baudRate, parity, dataBits)
+                    Log.d(TAG, "comController inicializado (intento #$openAttempts)")
+
+                    // Intentar abrir puerto
+                    openRes = comController!!.open()
+                    Log.i(TAG, "open() intento #$openAttempts => $openRes")
+                    CommLog.d(TAG, "open() intento #$openAttempts => $openRes")
+
+                    if (openRes == 0) {
+                        Log.i(TAG, "¡Puerto abierto exitosamente en intento #$openAttempts!")
+                        break
+                    } else {
+                        Log.w(TAG, "Fallo al abrir puerto en intento #$openAttempts: código $openRes")
+                        if (openAttempts < maxAttempts) {
+                            Log.i(TAG, "Esperando antes del siguiente intento...")
+                            kotlinx.coroutines.delay(2000) // Esperar 2 segundos antes del siguiente intento
+                        }
+                    }
+                }
+
+                if (openRes != 0) {
+                    val errorMsg = when (openRes) {
+                        -1 -> "Error genérico (-1) - Puerto no disponible o en uso"
+                        -2 -> "Error de permisos (-2) - Verifique permisos USB"
+                        -3 -> "Puerto no encontrado (-3) - Dispositivo no conectado"
+                        -4 -> "Puerto ya abierto (-4) - Recurso en uso"
+                        else -> "Error desconocido ($openRes)"
+                    }
+                    throw Exception("No se pudo abrir el puerto tras $maxAttempts intentos. $errorMsg")
+                }
+
                 _connectionStatus.value = ListenerStatus.LISTENING
                 Log.i(TAG, "¡Conexión establecida! Escuchando datos raw.")
-                _snackbarEvent.emit("Conexión establecida. Escuchando datos raw...")
+                _snackbarEvent.emit("Conexión establecida tras $openAttempts intento(s).")
 
                 val buffer = ByteArray(1024)
                 var silentReads = 0

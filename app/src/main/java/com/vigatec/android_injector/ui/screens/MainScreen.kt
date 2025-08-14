@@ -168,6 +168,48 @@ fun MainScreen(navController: NavHostController) {
             }
             // --- FIN DEL CÓDIGO AÑADIDO ---
 
+            // --- BOTONES DE ENVÍO AGREGADOS ---
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { viewModel.sendAck() },
+                    enabled = status == ConnectionStatus.LISTENING
+                ) {
+                    Text("Enviar ACK")
+                }
+            }
+
+            // Campo para datos personalizados
+            var customDataText by remember { mutableStateOf("") }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            androidx.compose.material3.OutlinedTextField(
+                value = customDataText,
+                onValueChange = { customDataText = it },
+                label = { Text("Datos personalizados (ASCII)") },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = status == ConnectionStatus.LISTENING,
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    if (customDataText.isNotEmpty()) {
+                        viewModel.sendCustomData(customDataText)
+                        customDataText = ""
+                    }
+                },
+                enabled = status == ConnectionStatus.LISTENING && customDataText.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Enviar Datos Personalizados")
+            }
+            // --- FIN BOTONES DE ENVÍO ---
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Panel de Logs de Comunicación
