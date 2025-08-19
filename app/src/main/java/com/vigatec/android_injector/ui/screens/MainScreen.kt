@@ -210,6 +210,32 @@ fun MainScreen(navController: NavHostController) {
             }
             // --- FIN BOTONES DE ENVÍO ---
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- BOTÓN DE EMERGENCIA ---
+//            Button(
+//                onClick = { viewModel.emergencyReset() },
+//                enabled = true, // Siempre habilitado para emergencias
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .background(
+//                        color = Color.Red.copy(alpha = 0.1f),
+//                        shape = MaterialTheme.shapes.medium
+//                    )
+//            ) {
+//                Text(
+//                    text = "🚨 RESET DE EMERGENCIA",
+//                    color = Color.Red,
+//                    style = MaterialTheme.typography.bodyLarge
+//                )
+//            }
+            Text(
+                text = "Usar solo si la app se queda colgada",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.Red.copy(alpha = 0.7f)
+            )
+            // --- FIN BOTÓN DE EMERGENCIA ---
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // Panel de Logs de Comunicación
