@@ -132,27 +132,8 @@ class RawDataListenerViewModel @Inject constructor(
                     openAttempts++
                     Log.i(TAG, "Intento de conexión #$openAttempts de $maxAttempts")
 
-                    if (openAttempts > 1) {
-                        Log.i(TAG, "Reinicializando SDK de comunicación...")
-                        try {
-                            // Liberar recursos previos
-                            comController?.close()
-                            CommunicationSDKManager.release()
-                            kotlinx.coroutines.delay(1000) // Esperar un momento
-
-                            // Reinicializar
-                            CommunicationSDKManager.initialize(getApplication())
-                            comController = CommunicationSDKManager.getComController()
-
-                            if (comController == null) {
-                                Log.e(TAG, "No se pudo obtener comController tras reinicialización")
-                                continue
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error durante reinicialización: ${e.message}", e)
-                            continue
-                        }
-                    }
+                    // SDK ya fue inicializado en Splash; evitar re-inicializaciones aquí
+                    // Solo intentamos cerrar/abrir el puerto en reintentos
 
                     // Inicializar controlador
                     comController!!.init(baudRate, parity, dataBits)

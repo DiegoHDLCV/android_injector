@@ -54,7 +54,8 @@ class DashboardViewModel @Inject constructor(
 
     init {
         loadStats()
-        initializeCommunication()
+        // La inicialización de SDKs se centraliza en SplashViewModel mediante SDKInitManager
+        initializePolling()
         observePollingStatus()
     }
 
@@ -99,19 +100,15 @@ class DashboardViewModel @Inject constructor(
         }
     }
     
-    private fun initializeCommunication() {
+    private fun initializePolling() {
         viewModelScope.launch {
             try {
-                Log.d(TAG, "Inicializando SDK de comunicación...")
-                // Inicializar el SDK de comunicación
-                CommunicationSDKManager.initialize(getApplication())
-                
                 // Inicializar el servicio de polling
                 pollingService.initialize()
                 
-                Log.d(TAG, "Comunicación inicializada correctamente")
+                Log.d(TAG, "Polling inicializado correctamente")
             } catch (e: Exception) {
-                Log.e(TAG, "Error al inicializar comunicación", e)
+                Log.e(TAG, "Error al inicializar polling", e)
             }
         }
     }

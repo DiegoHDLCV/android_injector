@@ -178,7 +178,7 @@ class MainViewModel @Inject constructor(
                 Log.i(TAG, "Protocolo seleccionado: ${SystemConfig.commProtocolSelected}")
                 Log.i(TAG, "Parámetros: baudRate=$baudRate, parity=$parity, dataBits=$dataBits")
 
-                // Intentar reinicializar el SDK si el primer intento falla
+                // Reintentos controlados sin reinicializar el SDK (evita estados inconsistentes en vendor SDK)
                 var openAttempts = 0
                 var openRes = -1
                 val maxAttempts = 3
@@ -186,28 +186,7 @@ class MainViewModel @Inject constructor(
                 while (openAttempts < maxAttempts && openRes != 0) {
                     openAttempts++
                     Log.i(TAG, "Intento de conexión #$openAttempts de $maxAttempts")
-
-                    if (openAttempts > 1) {
-                        Log.i(TAG, "Reinicializando SDK de comunicación...")
-                        try {
-                            // Liberar recursos previos
-                            comController?.close()
-                            CommunicationSDKManager.release()
-                            kotlinx.coroutines.delay(1000) // Esperar un momento
-
-                            // Reinicializar
-                            CommunicationSDKManager.initialize(getApplication())
-                            comController = CommunicationSDKManager.getComController()
-
-                            if (comController == null) {
-                                Log.e(TAG, "No se pudo obtener comController tras reinicialización")
-                                continue
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error durante reinicialización: ${e.message}", e)
-                            continue
-                        }
-                    }
+                    // Nota: No reinicializamos SDK aquí. Solo reconfiguramos el controller y reintentamos open().
 
                     // Inicializar controlador
                     comController!!.init(baudRate, parity, dataBits)
@@ -411,9 +390,14 @@ class MainViewModel @Inject constructor(
         var responseCode = FuturexErrorCode.SUCCESSFUL.code
         var logMessage = ""
 
-        val deletionResult = runCatching {
+        val deletionResult = try {
             Log.i(TAG, "handleDeleteAllKeys: Iniciando proceso para eliminar TODAS las llaves (Comando ${command.rawPayload}).")
-            pedController!!.deleteAllKeys()
+            val result = pedController!!.deleteAllKeys()
+            Result.success(result)
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            try { pedController?.releasePed() } catch (_: Exception) {}
         }
 
         deletionResult.onSuccess { success ->
@@ -480,6 +464,8 @@ class MainViewModel @Inject constructor(
                 else -> FuturexErrorCode.DEVICE_IS_BUSY.code
             }
             Log.e(TAG, "Falló la eliminación de la llave en el slot ${command.keySlot}", e)
+        } finally {
+            try { pedController?.releasePed() } catch (_: Exception) {}
         }
 
         val response = messageFormatter.format("06", listOf(responseCode))
@@ -502,7 +488,7 @@ class MainViewModel @Inject constructor(
         val genericKeyType = mapFuturexKeyTypeToGeneric(command.keyType)
         val genericAlgorithm = KeyAlgorithm.DES_TRIPLE
 
-        val injectionResult = runCatching {
+        val injectionResult = try {
             Log.i(TAG, "handleFuturexInjectKey: Iniciando proceso para slot ${command.keySlot} | Tipo: $genericKeyType | Encryption: ${command.encryptionType}")
 
             Log.d(TAG, "Procediendo con la inyección en slot ${command.keySlot}...")
@@ -515,7 +501,7 @@ class MainViewModel @Inject constructor(
                     when (genericKeyType) {
                         GenericKeyType.MASTER_KEY, GenericKeyType.TRANSPORT_KEY -> {
                             Log.d(TAG, "Inyectando Master/Transport Key en claro usando writeKeyPlain.")
-                            pedController!!.writeKeyPlain(command.keySlot, genericKeyType, genericAlgorithm, keyDataBytes, command.keyChecksum?.hexToByteArray())
+                            pedController!!.writeKeyPlain(command.keySlot, genericKeyType, genericAlgorithm, keyDataBytes, command.keyChecksum.hexToByteArray())
                         }
                         GenericKeyType.DUKPT_INITIAL_KEY -> {
                             Log.d(TAG, "Inyectando DUKPT Initial Key en claro usando writeDukptInitialKey.")
@@ -545,7 +531,7 @@ class MainViewModel @Inject constructor(
                         GenericKeyType.WORKING_MAC_KEY,
                         GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> {
                             Log.d(TAG, "Llamando a 'writeKey' para una llave de trabajo cifrada.")
-                            val keyData = PedKeyData(keyBytes = encryptedKeyBytes, kcv = command.keyChecksum?.hexToByteArray())
+                            val keyData = PedKeyData(keyBytes = encryptedKeyBytes, kcv = command.keyChecksum.hexToByteArray())
                             pedController!!.writeKey(
                                 keyIndex = command.keySlot,
                                 keyType = genericKeyType,
@@ -566,7 +552,13 @@ class MainViewModel @Inject constructor(
                     if (command.ktkHex == null) throw PedKeyException("Falta la KTK en claro para el tipo de cifrado 02.")
 
                     Log.d(TAG, "Paso 1/2: Inyectando KTK en claro en slot ${command.ktkSlot}")
-                    pedController!!.writeKeyPlain(command.ktkSlot, GenericKeyType.TRANSPORT_KEY, genericAlgorithm, command.ktkHex!!.hexToByteArray(), command.ktkChecksum.hexToByteArray())
+                    pedController!!.writeKeyPlain(
+                        command.ktkSlot,
+                        GenericKeyType.TRANSPORT_KEY,
+                        genericAlgorithm,
+                        command.ktkHex!!.hexToByteArray(),
+                        command.ktkChecksum.hexToByteArray()
+                    )
 
                     Log.d(TAG, "Paso 2/2: Parseando TR-31 para inyectar la llave final")
                     val tr31Block = parseTr31Block(command.keyHex)
@@ -576,7 +568,11 @@ class MainViewModel @Inject constructor(
                 }
                 else -> throw PedKeyException("Tipo de encriptación '${command.encryptionType}' no soportado.")
             }
-            "Inyección en slot ${command.keySlot} procesada exitosamente."
+            Result.success("Inyección en slot ${command.keySlot} procesada exitosamente.")
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            try { pedController?.releasePed() } catch (_: Exception) {}
         }
 
         injectionResult.onSuccess {
@@ -759,9 +755,7 @@ class MainViewModel @Inject constructor(
         }
         legacyPollBuffer.addAll(chunk.toList())
         val output = ArrayList<Byte>()
-        var progressed: Boolean
         do {
-            progressed = false
             val stxIndex = legacyPollBuffer.indexOf(0x02)
             if (stxIndex == -1) {
                 if (legacyPollBuffer.isNotEmpty()) {
@@ -775,7 +769,6 @@ class MainViewModel @Inject constructor(
             if (stxIndex > 0) {
                 output.addAll(legacyPollBuffer.subList(0, stxIndex))
                 repeat(stxIndex) { legacyPollBuffer.removeAt(0) }
-                progressed = true
             }
             val etxIndexRel = legacyPollBuffer.indexOf(0x03)
             if (etxIndexRel == -1) break
@@ -788,7 +781,6 @@ class MainViewModel @Inject constructor(
             if (receivedLrc != calcLrc) {
                 Log.w(TAG, "filterLegacyPoll: LRC inválido frame=${frame.toHexString(true)} recv=${receivedLrc.toHexString()} calc=${calcLrc.toHexString()} descartando STX")
                 legacyPollBuffer.removeAt(0)
-                progressed = true
                 continue
             }
             val payloadStr = try { String(payload, Charsets.US_ASCII) } catch (_: Exception) { "" }
@@ -797,14 +789,12 @@ class MainViewModel @Inject constructor(
                 Log.d(TAG, "filterLegacyPoll: Detectado POLL Legacy payload='$payloadStr' frame=${frame.toHexString(true)}")
                 //respondLegacyPoll()
                 repeat(frameSize) { legacyPollBuffer.removeAt(0) }
-                progressed = true
             } else {
                 Log.v(TAG, "filterLegacyPoll: Frame no-POLL reenviado al parser payload='$payloadStr'")
                 output.addAll(frame.toList())
                 repeat(frameSize) { legacyPollBuffer.removeAt(0) }
-                progressed = true
             }
-        } while (progressed)
+        } while (legacyPollBuffer.contains(0x02))
         return output.toByteArray()
     }
 

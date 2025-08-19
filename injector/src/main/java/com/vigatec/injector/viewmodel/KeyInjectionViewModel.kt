@@ -75,14 +75,14 @@ class KeyInjectionViewModel @Inject constructor(
 
     init {
         setupProtocolHandlers()
+        // La inicialización de SDKs se centraliza en SplashViewModel mediante SDKInitManager
+        // Aquí solo inicializamos PollingService asumiendo SDK ya inicializado
         initializePollingService()
     }
     
     private fun initializePollingService() {
         viewModelScope.launch {
             try {
-                // Inicializar el SDK de comunicación
-                CommunicationSDKManager.initialize(application)
                 // Inicializar el servicio de polling
                 pollingService.initialize()
                 Log.d(TAG, "PollingService inicializado en KeyInjectionViewModel")
@@ -216,9 +216,6 @@ class KeyInjectionViewModel @Inject constructor(
     private suspend fun initializeCommunication() {
         connectionMutex.withLock {
             try {
-                // Inicializar el SDK de comunicación
-                CommunicationSDKManager.initialize(application)
-                
                 // Obtener el controlador de comunicación
                 comController = CommunicationSDKManager.getComController()
                     ?: throw Exception("No se pudo obtener el controlador de comunicación")
