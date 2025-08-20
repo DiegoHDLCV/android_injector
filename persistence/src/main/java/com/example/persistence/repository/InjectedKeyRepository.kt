@@ -43,6 +43,56 @@ class InjectedKeyRepository @Inject constructor(
         }
     }
 
+    /**
+     * NUEVO MÉTODO: Registra la inyección de una llave con sus datos completos.
+     * Este método es crucial para la ceremonia de llaves donde necesitamos guardar
+     * la llave real, no solo el KCV.
+     */
+    suspend fun recordKeyInjectionWithData(
+        keySlot: Int,
+        keyType: String,
+        keyAlgorithm: String,
+        kcv: String,
+        keyData: String,
+        status: String = "SUCCESSFUL"
+    ) {
+        try {
+            Log.i(TAG, "=== REGISTRANDO INYECCIÓN DE LLAVE CON DATOS COMPLETOS ===")
+            Log.i(TAG, "Slot: $keySlot")
+            Log.i(TAG, "Tipo: $keyType")
+            Log.i(TAG, "Algoritmo: $keyAlgorithm")
+            Log.i(TAG, "KCV: $kcv")
+            Log.i(TAG, "Datos de llave (longitud): ${keyData.length / 2} bytes")
+            Log.i(TAG, "Datos de llave (primeros 32 bytes): ${keyData.take(64)}")
+            Log.i(TAG, "Estado: $status")
+            
+            val injectedKey = InjectedKeyEntity(
+                keySlot = keySlot,
+                keyType = keyType,
+                keyAlgorithm = keyAlgorithm,
+                kcv = kcv,
+                keyData = keyData,
+                status = status,
+                injectionTimestamp = System.currentTimeMillis()
+            )
+            
+            injectedKeyDao.insertOrUpdate(injectedKey)
+            Log.i(TAG, "✓ Llave registrada exitosamente en base de datos con ID: ${injectedKey.id}")
+            Log.i(TAG, "✓ Datos de la llave guardados: ${keyData.length / 2} bytes")
+            Log.i(TAG, "✓ KCV validado: $kcv")
+            Log.i(TAG, "================================================")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ Error al registrar inyección de llave con datos", e)
+            Log.e(TAG, "Detalles del error:")
+            Log.e(TAG, "  - Slot: $keySlot")
+            Log.e(TAG, "  - Tipo: $keyType")
+            Log.e(TAG, "  - KCV: $kcv")
+            Log.e(TAG, "  - Longitud de datos: ${keyData.length / 2} bytes")
+            throw e
+        }
+    }
+
     suspend fun insertOrUpdate(key: InjectedKeyEntity) {
         try {
             injectedKeyDao.insertOrUpdate(key)

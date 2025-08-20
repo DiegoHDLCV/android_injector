@@ -43,6 +43,7 @@ import com.vigatec.injector.viewmodel.ProfileFormData
 import com.vigatec.injector.viewmodel.ProfileViewModel
 import com.vigatec.injector.viewmodel.KeyInjectionViewModel
 import com.vigatec.injector.viewmodel.InjectionStatus
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +84,15 @@ fun ProfilesScreen(
                     profiles = state.profiles,
                     onEdit = { viewModel.onShowCreateModal(it) },
                     onDelete = { viewModel.onDeleteProfile(it) },
-                    onInject = { keyInjectionViewModel.showInjectionModal(it) }
+                    onInject = {
+                        Log.i("ProfilesScreen", "=== ABRIENDO MODAL DE INYECCIÓN FUTUREX ===")
+                        Log.i("ProfilesScreen", "Usuario presionó botón de inyección en perfil: ${it.name}")
+                        Log.i("ProfilesScreen", "Configuraciones de llave: ${it.keyConfigurations.size}")
+                        it.keyConfigurations.forEachIndexed { index, config ->
+                            Log.i("ProfilesScreen", "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
+                        }
+                        keyInjectionViewModel.showInjectionModal(it)
+                    }
                 )
             }
         }
@@ -621,7 +630,16 @@ fun ProfileCard(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 // Acción principal destacada
                 Button(
-                    onClick = onInject,
+                    onClick = { 
+                        Log.i("ProfileCard", "=== PRESIONANDO BOTÓN DE INYECCIÓN FUTUREX ===")
+                        Log.i("ProfileCard", "Perfil: ${profile.name}")
+                        Log.i("ProfileCard", "Estado: $statusLabel (${readyKeys}/${totalKeys} llaves configuradas)")
+                        Log.i("ProfileCard", "Configuraciones de llave:")
+                        profile.keyConfigurations.forEachIndexed { index, config ->
+                            Log.i("ProfileCard", "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType} - Llave: ${if (config.selectedKey.isNotEmpty()) "Configurada" else "No configurada"}")
+                        }
+                        onInject() 
+                    },
                     enabled = isReady,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1214,38 +1232,37 @@ fun KeyConfigurationItem(
                                     onClick = { keyExpanded = false }
                                 )
                             } else {
-                                // Lista con LazyColumn para grandes volúmenes
-                                Box(
+                                // Lista con Column scrolleable para evitar problemas de medicion
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .heightIn(max = 360.dp)
+                                        .verticalScroll(rememberScrollState())
                                 ) {
-                                    LazyColumn {
-                                        items(availableKeys, key = { it.id }) { key ->
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Column {
-                                                        Text(
-                                                            key.kcv,
-                                                            fontFamily = FontFamily.Monospace
-                                                        )
-                                                        Text(
-                                                            "ID: ${key.id}",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
-                                                },
-                                                onClick = {
-                                                    onUpdate(
-                                                        config.id,
-                                                        "selectedKey",
-                                                        key.kcv
+                                    availableKeys.forEach { key ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Column {
+                                                    Text(
+                                                        key.kcv,
+                                                        fontFamily = FontFamily.Monospace
                                                     )
-                                                    keyExpanded = false
+                                                    Text(
+                                                        "ID: ${key.id}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
                                                 }
-                                            )
-                                        }
+                                            },
+                                            onClick = {
+                                                onUpdate(
+                                                    config.id,
+                                                    "selectedKey",
+                                                    key.kcv
+                                                )
+                                                keyExpanded = false
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -1381,33 +1398,37 @@ fun KeyConfigurationItem(
                                     onClick = { keyExpanded = false }
                                 )
                             } else {
-                                Box(
+                                // Lista con Column scrolleable para evitar problemas de medicion
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .heightIn(max = 360.dp)
+                                        .verticalScroll(rememberScrollState())
                                 ) {
-                                    LazyColumn {
-                                        items(availableKeys, key = { it.id }) { key ->
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Column {
-                                                        Text(
-                                                            key.kcv,
-                                                            fontFamily = FontFamily.Monospace
-                                                        )
-                                                        Text(
-                                                            "ID: ${key.id}",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    }
-                                                },
-                                                onClick = {
-                                                    onUpdate(config.id, "selectedKey", key.kcv)
-                                                    keyExpanded = false
+                                    availableKeys.forEach { key ->
+                                        DropdownMenuItem(
+                                            text = {
+                                                Column {
+                                                    Text(
+                                                        key.kcv,
+                                                        fontFamily = FontFamily.Monospace
+                                                    )
+                                                    Text(
+                                                        "ID: ${key.id}",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
                                                 }
-                                            )
-                                        }
+                                            },
+                                            onClick = {
+                                                onUpdate(
+                                                    config.id,
+                                                    "selectedKey",
+                                                    key.kcv
+                                                )
+                                                keyExpanded = false
+                                            }
+                                        )
                                     }
                                 }
                             }

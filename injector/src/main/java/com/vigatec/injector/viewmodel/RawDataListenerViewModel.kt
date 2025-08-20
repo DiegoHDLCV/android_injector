@@ -207,15 +207,15 @@ class RawDataListenerViewModel @Inject constructor(
                             }
                             pingSent = true
                         }
-                        if (!anyDataEver && silentReads % 5 == 0 && SystemConfig.managerSelected.name == "AISINO") {
-                            Log.i(TAG, "${silentReads} lecturas silenciosas AISINO - intentando re-scan")
+                        if (!anyDataEver && silentReads % 5 == 0) {
+                            //Log.i(TAG, "${silentReads} lecturas silenciosas AISINO - intentando re-scan")
                             CommunicationSDKManager.rescanIfSupported()
                             // Re-obtener controller tras rescan
                             comController = CommunicationSDKManager.getComController()
                             if (comController != null) {
                                 comController!!.init(baudRate, parity, dataBits)
                                 comController!!.open()
-                                Log.i(TAG, "Re-scan aplicado y puerto reabierto")
+                                //Log.i(TAG, "Re-scan aplicado y puerto reabierto")
                             }
                         }
                     }

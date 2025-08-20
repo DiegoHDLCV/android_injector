@@ -28,7 +28,7 @@ class NewposComController : IComController {
             }
 
             return if (serialPort != null) {
-                Log.d(TAG, "init: SerialPort instance created successfully")
+                //Log.d(TAG, "init: SerialPort instance created successfully")
                 0
             } else {
                 Log.e(TAG, "init: Failed to initialize SerialPort")
@@ -42,7 +42,7 @@ class NewposComController : IComController {
 
     override fun open(): Int {
         return if (serialPort != null) {
-            Log.d(TAG, "open: SerialPort opened successfully")
+            //Log.d(TAG, "open: SerialPort opened successfully")
             0
         } else {
             Log.e(TAG, "open: Failed to open SerialPort, call init() first")

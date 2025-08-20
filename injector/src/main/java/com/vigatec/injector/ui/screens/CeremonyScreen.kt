@@ -199,18 +199,31 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Botón de debug temporal
-        Button(
-            onClick = { 
-                viewModel.addToLog("Test: Verificando estado actual")
-                viewModel.addToLog("Componentes: ${viewModel.uiState.value.components.size}")
-                viewModel.addToLog("Componente actual: ${viewModel.uiState.value.component}")
-                viewModel.addToLog("Custodio actual: ${viewModel.uiState.value.currentCustodian}")
-                viewModel.addToLog("Total custodios: ${viewModel.uiState.value.numCustodians}")
-            },
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+        // Botones de debug
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Debug Estado")
+            Button(
+                onClick = { 
+                    viewModel.addToLog("Test: Verificando estado actual")
+                    viewModel.addToLog("Componentes: ${viewModel.uiState.value.components.size}")
+                    viewModel.addToLog("Componente actual: ${viewModel.uiState.value.component}")
+                    viewModel.addToLog("Custodio actual: ${viewModel.uiState.value.currentCustodian}")
+                    viewModel.addToLog("Total custodios: ${viewModel.uiState.value.numCustodians}")
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+            ) {
+                Text("Debug Estado")
+            }
+            
+            Button(
+                onClick = { 
+                    viewModel.verifyDatabaseState()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
+            ) {
+                Text("Verificar BD")
+            }
         }
         
         Spacer(modifier = Modifier.height(8.dp))

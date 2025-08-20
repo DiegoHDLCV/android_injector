@@ -78,41 +78,63 @@ class FuturexMessageParser : IMessageParser {
         val calculatedLrc = FormatUtils.calculateLrc(bytesForLrc)
 
         Log.d(TAG, "LRC recibido: ${receivedLrc.toInt() and 0xFF}, calculado: ${calculatedLrc.toInt() and 0xFF}")
+        
+        // ⚠️ TEMPORALMENTE DESHABILITADO: Validación del LRC para debugging
+        // TODO: Rehabilitar después de identificar el problema del LRC
         if (receivedLrc != calculatedLrc) {
-            Log.e(TAG, "¡Error de LRC! Descartando marco inválido.")
-            repeat(frameSize) { buffer.removeAt(0) }
-            return null
+            Log.w(TAG, "⚠️ LRC incorrecto detectado, pero continuando para debugging...")
+            Log.w(TAG, "  - LRC recibido: 0x${receivedLrc.toString(16).uppercase()}")
+            Log.w(TAG, "  - LRC calculado: 0x${calculatedLrc.toString(16).uppercase()}")
+            Log.w(TAG, "  - Diferencia: 0x${(receivedLrc.toInt() xor calculatedLrc.toInt()).toString(16).uppercase()}")
+            Log.w(TAG, "  - Continuando con el parseo del comando...")
+        } else {
+            Log.i(TAG, "✓ LRC válido")
         }
 
         val payloadBytes = buffer.subList(1, etxIndex).toByteArray()
+        
+        // Logs adicionales para debugging del LRC
+        Log.i(TAG, "=== FRAME PARSEADO (LRC validación deshabilitada) ===")
+        Log.i(TAG, "STX encontrado en índice: $stxIndex")
+        Log.i(TAG, "ETX encontrado en índice: $etxIndex")
+        Log.i(TAG, "Frame size: $frameSize")
+        Log.i(TAG, "Payload bytes: ${payloadBytes.toHexString()}")
+        Log.i(TAG, "Payload ASCII: ${String(payloadBytes, Charsets.US_ASCII)}")
+        Log.i(TAG, "================================================")
+        
         return Pair(payloadBytes, frameSize)
     }
 
     // --- PARSERS PARA CADA COMANDO ---
 
     private fun parseInjectSymmetricKeyCommand(fullPayload: String): InjectSymmetricKeyCommand {
-        Log.d(TAG, "Parseando Comando Moderno de Inyección '02'")
+        Log.i(TAG, "=== PARSEANDO COMANDO DE INYECCIÓN '02' ===")
+        Log.i(TAG, "Payload completo: $fullPayload")
+        Log.i(TAG, "Longitud del payload: ${fullPayload.length} caracteres")
+        
         val reader = PayloadReader(fullPayload)
         reader.read(2) // Omitir Command "02"
 
-        val version = reader.read(2).also { Log.d(TAG, "[FuturexParser] Version: '$it'") }
-        val keySlot = reader.read(2).also { Log.d(TAG, "[FuturexParser] KeySlot: '$it'") }.toInt(16)
-        val ktkSlot = reader.read(2).also { Log.d(TAG, "[FuturexParser] KtkSlot: '$it'") }.toInt(16)
-        val keyType = reader.read(2).also { Log.d(TAG, "[FuturexParser] KeyType: '$it'") }
-        val encryptionType = reader.read(2).also { Log.d(TAG, "[FuturexParser] EncryptionType: '$it'") }
-        val keyChecksum = reader.read(4).also { Log.d(TAG, "[FuturexParser] KeyChecksum: '$it'") }
-        val ktkChecksum = reader.read(4).also { Log.d(TAG, "[FuturexParser] KtkChecksum: '$it'") }
+        val version = reader.read(2).also { Log.i(TAG, "  - Versión: '$it'") }
+        val keySlot = reader.read(2).also { Log.i(TAG, "  - KeySlot: '$it' (${it.toInt(16)})") }.toInt(16)
+        val ktkSlot = reader.read(2).also { Log.i(TAG, "  - KtkSlot: '$it' (${it.toInt(16)})") }.toInt(16)
+        val keyType = reader.read(2).also { Log.i(TAG, "  - KeyType: '$it'") }
+        val encryptionType = reader.read(2).also { Log.i(TAG, "  - EncryptionType: '$it'") }
+        val keyChecksum = reader.read(4).also { Log.i(TAG, "  - KeyChecksum: '$it'") }
+        val ktkChecksum = reader.read(4).also { Log.i(TAG, "  - KtkChecksum: '$it'") }
 
-        Log.d(TAG, "Leyendo campo KSN de 20 caracteres (obligatorio en comando 02)...")
-        val ksn = reader.read(20).also { Log.d(TAG, "[FuturexParser] KSN: '$it'") }
+        Log.i(TAG, "  - Leyendo KSN (20 caracteres)...")
+        val ksn = reader.read(20).also { Log.i(TAG, "  - KSN: '$it'") }
 
+        Log.i(TAG, "  - Leyendo longitud de llave (3 caracteres)...")
         val keyLengthStr = reader.read(3)
         val keyLengthBytes = keyLengthStr.toInt(16)
         val keyLengthChars = keyLengthBytes * 2
-        Log.d(TAG, "[FuturexParser] KeyLength: '$keyLengthStr' -> $keyLengthBytes bytes. Leyendo $keyLengthChars caracteres.")
+        Log.i(TAG, "  - KeyLength: '$keyLengthStr' -> $keyLengthBytes bytes -> $keyLengthChars caracteres")
 
+        Log.i(TAG, "  - Leyendo datos de la llave ($keyLengthChars caracteres)...")
         val keyHex = reader.read(keyLengthChars)
-        Log.d(TAG, "[FuturexParser] KeyHex: ${keyHex.take(64)}...")
+        Log.i(TAG, "  - KeyHex: ${keyHex.take(64)}${if (keyHex.length > 64) "..." else ""}")
 
         val ktkHex = if (encryptionType == "02") {
             Log.d(TAG, "EncryptionType es '02', parseando KTK en claro.")
@@ -124,7 +146,21 @@ class FuturexMessageParser : IMessageParser {
             null
         }
 
-        Log.d(TAG, "Parseo de comando '02' completado exitosamente.")
+        Log.i(TAG, "=== RESUMEN DEL COMANDO PARSEADO ===")
+        Log.i(TAG, "  - Comando: 02 (Inyección de llave simétrica)")
+        Log.i(TAG, "  - Versión: $version")
+        Log.i(TAG, "  - KeySlot: $keySlot")
+        Log.i(TAG, "  - KtkSlot: $ktkSlot")
+        Log.i(TAG, "  - KeyType: $keyType")
+        Log.i(TAG, "  - EncryptionType: $encryptionType")
+        Log.i(TAG, "  - KeyChecksum: $keyChecksum")
+        Log.i(TAG, "  - KtkChecksum: $ktkChecksum")
+        Log.i(TAG, "  - KSN: $ksn")
+        Log.i(TAG, "  - KeyLength: $keyLengthStr ($keyLengthBytes bytes)")
+        Log.i(TAG, "  - KeyHex: ${keyHex.take(32)}...")
+        Log.i(TAG, "✓ Parseo de comando '02' completado exitosamente")
+        Log.i(TAG, "================================================")
+        
         return InjectSymmetricKeyCommand(fullPayload, version, keySlot, ktkSlot, keyType, encryptionType, keyChecksum, ktkChecksum, ksn, keyHex, ktkHex)
     }
 

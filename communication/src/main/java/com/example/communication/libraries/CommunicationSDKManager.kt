@@ -44,7 +44,7 @@ object CommunicationSDKManager : ICommunicationManager {
 
     override fun getComController(): IComController? {
         // --- CORREGIDO --- Se cambió "getApnController" a "getComController" en el log
-        Log.d("CommSDKManager", "Delegando getComController a ${SystemConfig.managerSelected}")
+        //Log.d("CommSDKManager", "Delegando getComController a ${SystemConfig.managerSelected}")
         return try {
             manager.getComController()
         } catch (e: Exception) {
@@ -57,7 +57,7 @@ object CommunicationSDKManager : ICommunicationManager {
         when (manager) {
             is AisinoCommunicationManager -> (manager as AisinoCommunicationManager).safeRescanIfInitialized()
             // Otros managers podrían implementar lógica futura
-            else -> Log.d("CommSDKManager", "rescanIfSupported: no soportado para ${SystemConfig.managerSelected}")
+            else -> ""//Log.d("CommSDKManager", "rescanIfSupported: no soportado para ${SystemConfig.managerSelected}")
         }
     }
 

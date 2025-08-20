@@ -18,4 +18,5 @@ object NewposCommunicationManager: ICommunicationManager {
     override fun release() {
         // No-op
     }
+
 }

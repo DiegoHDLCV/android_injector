@@ -24,6 +24,7 @@ import com.example.persistence.entities.ProfileEntity
 import com.vigatec.injector.viewmodel.InjectionStatus
 import com.vigatec.injector.viewmodel.KeyInjectionState
 import com.vigatec.injector.viewmodel.KeyInjectionViewModel
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +35,9 @@ fun KeyInjectionModal(
 
     LaunchedEffect(Unit) {
         viewModel.snackbarEvent.collect { message ->
+            Log.i("KeyInjectionModal", "=== EVENTO SNACKBAR FUTUREX ===")
+            Log.i("KeyInjectionModal", "Mensaje: $message")
+            Log.i("KeyInjectionModal", "================================================")
             // Aquí podrías mostrar un Snackbar si es necesario
         }
     }
@@ -86,7 +90,11 @@ fun KeyInjectionModal(
                             }
                             
                             if (state.status == InjectionStatus.IDLE || state.status == InjectionStatus.SUCCESS || state.status == InjectionStatus.ERROR) {
-                                IconButton(onClick = { viewModel.hideInjectionModal() }) {
+                                IconButton(onClick = { 
+                                    Log.i("KeyInjectionModal", "=== CERRANDO MODAL FUTUREX DESDE UI ===")
+                                    Log.i("KeyInjectionModal", "Usuario presionó botón 'Cerrar'")
+                                    viewModel.hideInjectionModal() 
+                                }) {
                                     Icon(
                                         Icons.Default.Close,
                                         contentDescription = "Cerrar",
@@ -134,7 +142,11 @@ fun KeyInjectionModal(
                             when (state.status) {
                                 InjectionStatus.IDLE -> {
                                     Button(
-                                        onClick = { viewModel.startKeyInjection() },
+                                        onClick = { 
+                                            Log.i("KeyInjectionModal", "=== INICIANDO INYECCIÓN FUTUREX DESDE UI ===")
+                                            Log.i("KeyInjectionModal", "Usuario presionó botón 'Iniciar Inyección'")
+                                            viewModel.startKeyInjection() 
+                                        },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primary
                                         )
@@ -150,13 +162,21 @@ fun KeyInjectionModal(
                                 }
                                 InjectionStatus.SUCCESS -> {
                                     TextButton(
-                                        onClick = { viewModel.hideInjectionModal() },
+                                        onClick = { 
+                                            Log.i("KeyInjectionModal", "=== CERRANDO MODAL FUTUREX DESDE UI (ÉXITO) ===")
+                                            Log.i("KeyInjectionModal", "Usuario presionó botón 'Cerrar' en estado de éxito")
+                                            viewModel.hideInjectionModal() 
+                                        },
                                         modifier = Modifier.padding(end = 12.dp)
                                     ) {
                                         Text("Cerrar")
                                     }
                                     Button(
-                                        onClick = { viewModel.hideInjectionModal() },
+                                        onClick = { 
+                                            Log.i("KeyInjectionModal", "=== CERRANDO MODAL FUTUREX DESDE UI (ÉXITO) ===")
+                                            Log.i("KeyInjectionModal", "Usuario presionó botón 'Completado'")
+                                            viewModel.hideInjectionModal() 
+                                        },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primary
                                         )
@@ -172,13 +192,21 @@ fun KeyInjectionModal(
                                 }
                                 InjectionStatus.ERROR -> {
                                     TextButton(
-                                        onClick = { viewModel.hideInjectionModal() },
+                                        onClick = { 
+                                            Log.i("KeyInjectionModal", "=== CERRANDO MODAL FUTUREX DESDE UI (ERROR) ===")
+                                            Log.i("KeyInjectionModal", "Usuario presionó botón 'Cerrar' en estado de error")
+                                            viewModel.hideInjectionModal() 
+                                        },
                                         modifier = Modifier.padding(end = 12.dp)
                                     ) {
                                         Text("Cerrar")
                                     }
                                     Button(
-                                        onClick = { viewModel.startKeyInjection() },
+                                        onClick = { 
+                                            Log.i("KeyInjectionModal", "=== REINTENTANDO INYECCIÓN FUTUREX DESDE UI ===")
+                                            Log.i("KeyInjectionModal", "Usuario presionó botón 'Reintentar'")
+                                            viewModel.startKeyInjection() 
+                                        },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.error
                                         )

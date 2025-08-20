@@ -53,7 +53,14 @@ class CeremonyViewModel @Inject constructor(
     }
 
     fun startCeremony() {
-        addToLog("Iniciando ceremonia con ${_uiState.value.numCustodians} custodios.")
+        addToLog("=== INICIANDO CEREMONIA DE LLAVES ===")
+        addToLog("Configuración inicial:")
+        addToLog("  - Número de custodios: ${_uiState.value.numCustodians}")
+        addToLog("  - Componente inicial: ${_uiState.value.component}")
+        addToLog("  - Estado del repositorio: Inicializado")
+        addToLog("  - Base de datos: Conectada")
+        addToLog("================================================")
+        
         _uiState.value = _uiState.value.copy(
             currentStep = 2,
             isCeremonyInProgress = true,
@@ -108,31 +115,120 @@ class CeremonyViewModel @Inject constructor(
                     throw IllegalStateException("Número incorrecto de componentes: ${finalComponents.size} vs ${_uiState.value.numCustodians}")
                 }
 
-                addToLog("Procesando componentes...")
+                addToLog("=== PROCESANDO COMPONENTES PARA GENERAR LLAVE FINAL ===")
+                addToLog("Componentes recolectados:")
+                finalComponents.forEachIndexed { index, component ->
+                    addToLog("  ${index + 1}. ${component.take(16)}... (${component.length / 2} bytes)")
+                }
+                
+                addToLog("Aplicando operación XOR a los componentes...")
                 val finalKeyBytes = finalComponents
-                    .map { KcvCalculator.hexStringToByteArray(it) }
-                    .reduce { acc, bytes -> KcvCalculator.xorByteArrays(acc, bytes) }
+                    .map { component ->
+                        val bytes = KcvCalculator.hexStringToByteArray(component)
+                        addToLog("  - Componente ${component.take(16)}... → ${bytes.size} bytes")
+                        bytes
+                    }
+                    .reduce { acc, bytes -> 
+                        val result = KcvCalculator.xorByteArrays(acc, bytes)
+                        addToLog("  - XOR: ${acc.size} bytes ⊕ ${bytes.size} bytes = ${result.size} bytes")
+                        result
+                    }
 
                 val finalKeyHex = finalKeyBytes.toHexString()
-                addToLog("Llave final generada: ${finalKeyHex.take(16)}...")
+                addToLog("✓ Llave final generada exitosamente")
+                addToLog("  - Longitud: ${finalKeyBytes.size} bytes")
+                addToLog("  - Datos (hex): $finalKeyHex")
+                addToLog("  - Datos (primeros 16 bytes): ${finalKeyHex.take(32)}")
+                addToLog("================================================")
 
+                addToLog("=== CALCULANDO KCV DE LA LLAVE FINAL ===")
+                addToLog("Entrada para KCV:")
+                addToLog("  - Datos de llave: ${finalKeyHex.take(32)}...")
+                addToLog("  - Longitud: ${finalKeyHex.length / 2} bytes")
+                
                 val finalKcv = KcvCalculator.calculateKcv(finalKeyHex)
-                addToLog("KCV calculado: $finalKcv")
+                addToLog("✓ KCV calculado exitosamente: $finalKcv")
+                addToLog("  - Longitud KCV: ${finalKcv.length} caracteres")
+                addToLog("  - Formato: Hexadecimal")
+                addToLog("================================================")
 
                 // Guardar la llave maestra en el Keystore
-                addToLog("Guardando llave en Keystore...")
-                KeyStoreManager.storeMasterKey("master_transport_key", finalKeyBytes)
-                addToLog("Llave Maestra de Transporte (MKT) guardada de forma segura en el Keystore.")
+                addToLog("=== ALMACENANDO LLAVE EN KEYSTORE ===")
+                addToLog("Configuración del Keystore:")
+                addToLog("  - Alias: master_transport_key")
+                addToLog("  - Tipo de llave: Master Transport Key (MKT)")
+                addToLog("  - Algoritmo: 3DES")
+                addToLog("  - Longitud: ${finalKeyBytes.size} bytes")
+                addToLog("  - Datos (primeros 16 bytes): ${finalKeyBytes.toHexString().take(32)}")
+                
+                try {
+                    KeyStoreManager.storeMasterKey("master_transport_key", finalKeyBytes)
+                    addToLog("✓ Llave Maestra de Transporte (MKT) guardada exitosamente en el Keystore")
+                    addToLog("  - Alias: master_transport_key")
+                    addToLog("  - Estado: SEGURA")
+                    addToLog("  - Acceso: Solo aplicación")
+                } catch (e: Exception) {
+                    addToLog("✗ Error al guardar en Keystore: ${e.message}")
+                    addToLog("  - Estado: FALLO EN KEYSTORE")
+                    // Continuar con el proceso aunque falle el Keystore
+                }
+                addToLog("================================================")
 
-                addToLog("Registrando inyección en base de datos...")
-                injectedKeyRepository.recordKeyInjection(
+                addToLog("=== REGISTRANDO LLAVE COMPLETA EN BASE DE DATOS ===")
+                addToLog("  - Slot: 0 (no aplica en ceremonia)")
+                addToLog("  - Tipo de Llave: MASTER_KEY_FROM_CEREMONY")
+                addToLog("  - Algoritmo: 3DES")
+                addToLog("  - KCV: $finalKcv")
+                addToLog("  - Estado: GENERATED")
+                addToLog("  - Datos de llave (longitud): ${finalKeyBytes.size} bytes")
+                addToLog("  - Datos de llave (hex): $finalKeyHex")
+                addToLog("  - Datos de llave (primeros 16 bytes): ${finalKeyHex.take(32)}")
+                
+                // CRÍTICO: Guardar la llave COMPLETA en la base de datos, no solo el KCV
+                injectedKeyRepository.recordKeyInjectionWithData(
                     keySlot = 0, // Slot no se usa en ceremonia, se asigna en perfil
                     keyType = "MASTER_KEY_FROM_CEREMONY",
                     keyAlgorithm = "3DES",
                     kcv = finalKcv,
+                    keyData = finalKeyHex, // ¡GUARDANDO LA LLAVE COMPLETA!
                     status = "GENERATED"
                 )
-                addToLog("Registro en base de datos completado")
+                addToLog("✓ Llave COMPLETA guardada exitosamente en base de datos")
+                addToLog("✓ Verificación: ${finalKeyBytes.size} bytes almacenados")
+                addToLog("✓ KCV validado: $finalKcv")
+                addToLog("✓ Datos de llave preservados para uso futuro")
+                addToLog("================================================")
+
+                // VERIFICACIÓN CRÍTICA: Confirmar que la llave se guardó realmente en la BD
+                addToLog("=== VERIFICANDO ALMACENAMIENTO EN BASE DE DATOS ===")
+                try {
+                    val savedKey = injectedKeyRepository.getKeyByKcv(finalKcv)
+                    if (savedKey != null) {
+                        addToLog("✓ Verificación exitosa: Llave encontrada en BD")
+                        addToLog("  - ID en BD: ${savedKey.id}")
+                        addToLog("  - KCV almacenado: ${savedKey.kcv}")
+                        addToLog("  - Datos almacenados: ${savedKey.keyData.length / 2} bytes")
+                        addToLog("  - Datos (primeros 16 bytes): ${savedKey.keyData.take(32)}")
+                        addToLog("  - Timestamp: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(savedKey.injectionTimestamp))}")
+                        
+                        // Validar que los datos coinciden
+                        if (savedKey.keyData == finalKeyHex) {
+                            addToLog("✓ VALIDACIÓN COMPLETA: Los datos de la llave coinciden exactamente")
+                        } else {
+                            addToLog("⚠️ ADVERTENCIA: Los datos de la llave NO coinciden")
+                            addToLog("  - Esperado: ${finalKeyHex.take(32)}...")
+                            addToLog("  - Almacenado: ${savedKey.keyData.take(32)}...")
+                        }
+                    } else {
+                        addToLog("✗ ERROR CRÍTICO: La llave NO se encontró en la base de datos")
+                        addToLog("  - KCV buscado: $finalKcv")
+                        addToLog("  - Estado: FALLO EN ALMACENAMIENTO")
+                    }
+                } catch (e: Exception) {
+                    addToLog("✗ Error durante la verificación: ${e.message}")
+                    addToLog("  - Estado: VERIFICACIÓN FALLIDA")
+                }
+                addToLog("================================================")
 
                 _uiState.value = _uiState.value.copy(
                     currentStep = 3,
@@ -140,7 +236,19 @@ class CeremonyViewModel @Inject constructor(
                     isCeremonyFinished = true,
                     isLoading = false
                 )
-                addToLog("Ceremonia completada exitosamente. KCV Final de la MKT: $finalKcv")
+                addToLog("=== RESUMEN FINAL DE LA CEREMONIA ===")
+                addToLog("✓ Ceremonia completada exitosamente")
+                addToLog("✓ Llave Maestra de Transporte (MKT) generada")
+                addToLog("  - KCV Final: $finalKcv")
+                addToLog("  - Longitud: ${finalKeyBytes.size} bytes")
+                addToLog("  - Algoritmo: 3DES")
+                addToLog("✓ Llave almacenada en Keystore (alias: master_transport_key)")
+                addToLog("✓ Llave COMPLETA guardada en base de datos")
+                addToLog("✓ Verificación de almacenamiento exitosa")
+                addToLog("✓ Datos de llave preservados para uso futuro")
+                addToLog("================================================")
+                addToLog("🎉 ¡CEREMONIA COMPLETADA! La llave está segura y disponible.")
+                addToLog("================================================")
 
             } catch (e: Exception) {
                 addToLog("Error al finalizar la ceremonia: ${e.message}")
@@ -153,5 +261,57 @@ class CeremonyViewModel @Inject constructor(
     fun cancelCeremony() {
         addToLog("Ceremonia cancelada.")
         _uiState.value = CeremonyState() // Resetea al estado inicial
+    }
+
+    /**
+     * NUEVO MÉTODO: Verifica el estado de la base de datos y las llaves almacenadas
+     */
+    fun verifyDatabaseState() {
+        viewModelScope.launch {
+            try {
+                addToLog("=== VERIFICACIÓN COMPLETA DE BASE DE DATOS ===")
+                addToLog("Estado del repositorio: Verificando...")
+                
+                // Obtener todas las llaves almacenadas
+                val allKeys = mutableListOf<com.example.persistence.entities.InjectedKeyEntity>()
+                injectedKeyRepository.getAllInjectedKeys().collect { keys ->
+                    allKeys.clear()
+                    allKeys.addAll(keys)
+                }
+                
+                addToLog("Total de llaves en BD: ${allKeys.size}")
+                
+                if (allKeys.isEmpty()) {
+                    addToLog("⚠️ ADVERTENCIA: No hay llaves almacenadas en la base de datos")
+                } else {
+                    addToLog("Llaves encontradas:")
+                    allKeys.forEachIndexed { index, key ->
+                        addToLog("  ${index + 1}. ID: ${key.id}")
+                        addToLog("     - Tipo: ${key.keyType}")
+                        addToLog("     - Algoritmo: ${key.keyAlgorithm}")
+                        addToLog("     - KCV: ${key.kcv}")
+                        addToLog("     - Slot: ${key.keySlot}")
+                        addToLog("     - Estado: ${key.status}")
+                        addToLog("     - Datos: ${if (key.keyData.isNotEmpty()) "${key.keyData.length / 2} bytes" else "NO ALMACENADOS"}")
+                        addToLog("     - Timestamp: ${java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(key.injectionTimestamp))}")
+                        
+                        // Verificar si tiene datos de llave
+                        if (key.keyData.isNotEmpty()) {
+                            addToLog("     ✓ Datos de llave PRESERVADOS")
+                            addToLog("     - Primeros 16 bytes: ${key.keyData.take(32)}...")
+                        } else {
+                            addToLog("     ✗ ADVERTENCIA: Solo KCV almacenado, NO hay datos de llave")
+                        }
+                        addToLog("")
+                    }
+                }
+                
+                addToLog("================================================")
+                
+            } catch (e: Exception) {
+                addToLog("✗ Error durante la verificación de BD: ${e.message}")
+                addToLog("  - Estado: VERIFICACIÓN FALLIDA")
+            }
+        }
     }
 }

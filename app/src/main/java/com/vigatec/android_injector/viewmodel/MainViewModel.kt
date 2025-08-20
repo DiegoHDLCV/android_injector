@@ -76,8 +76,16 @@ class MainViewModel @Inject constructor(
     private lateinit var messageFormatter: IMessageFormatter
 
     init {
+        Log.i(TAG, "=== INICIALIZANDO MAINVIEWMODEL ===")
+        Log.i(TAG, "Configuración inicial:")
+        Log.i(TAG, "  - Manager seleccionado: ${SystemConfig.managerSelected}")
+        Log.i(TAG, "  - Protocolo seleccionado: ${SystemConfig.commProtocolSelected}")
+        Log.i(TAG, "  - Rol del dispositivo: ${SystemConfig.deviceRole}")
+        
         setupProtocolHandlers()
-        Log.i(TAG, "MainViewModel creado.")
+        
+        Log.i(TAG, "✓ MainViewModel inicializado completamente")
+        Log.i(TAG, "================================================")
     }
 
     private fun ensureComControllerIsReady(): Boolean {
@@ -107,15 +115,34 @@ class MainViewModel @Inject constructor(
     }
 
     private fun setupProtocolHandlers() {
+        Log.i(TAG, "=== SETUP PROTOCOL HANDLERS ===")
+        Log.i(TAG, "Protocolo seleccionado: ${SystemConfig.commProtocolSelected}")
+        
         messageParser = when (SystemConfig.commProtocolSelected) {
-            CommProtocol.LEGACY -> LegacyMessageParser()
-            CommProtocol.FUTUREX -> FuturexMessageParser()
+            CommProtocol.LEGACY -> {
+                Log.i(TAG, "Creando LegacyMessageParser")
+                LegacyMessageParser()
+            }
+            CommProtocol.FUTUREX -> {
+                Log.i(TAG, "Creando FuturexMessageParser")
+                FuturexMessageParser()
+            }
         }
+        
         messageFormatter = when (SystemConfig.commProtocolSelected) {
-            CommProtocol.LEGACY -> LegacyMessageFormatter
-            CommProtocol.FUTUREX -> FuturexMessageFormatter
+            CommProtocol.LEGACY -> {
+                Log.i(TAG, "Usando LegacyMessageFormatter")
+                LegacyMessageFormatter
+            }
+            CommProtocol.FUTUREX -> {
+                Log.i(TAG, "Usando FuturexMessageFormatter")
+                FuturexMessageFormatter
+            }
         }
-        Log.i(TAG, "Protocolo de comunicación establecido en: ${SystemConfig.commProtocolSelected}")
+        
+        Log.i(TAG, "✓ Parser configurado: ${messageParser::class.simpleName}")
+        Log.i(TAG, "✓ Formatter configurado: ${messageFormatter::class.simpleName}")
+        Log.i(TAG, "================================================")
     }
 
     fun setProtocol(protocol: CommProtocol) = viewModelScope.launch {
@@ -140,6 +167,11 @@ class MainViewModel @Inject constructor(
         parity: EnumCommConfParity = EnumCommConfParity.NOPAR,
         dataBits: EnumCommConfDataBits = EnumCommConfDataBits.DB_8
     ) = viewModelScope.launch {
+        Log.i(TAG, "=== START LISTENING SOLICITADO ===")
+        Log.i(TAG, "Estado actual: ${_connectionStatus.value}")
+        Log.i(TAG, "Parser configurado: ${if (::messageParser.isInitialized) messageParser::class.simpleName else "NO INICIALIZADO"}")
+        Log.i(TAG, "Formatter configurado: ${if (::messageFormatter.isInitialized) messageFormatter::class.simpleName else "NO INICIALIZADO"}")
+        
         connectionMutex.withLock {
             if (listeningJob?.isActive == true) {
                 Log.w(TAG, "startListening: La escucha ya está activa, cancelando nueva solicitud.")
@@ -233,17 +265,51 @@ class MainViewModel @Inject constructor(
                         Log.v(TAG, "RAW_SERIAL_IN (HEX): $hexString (ASCII: '$receivedString')")
                         CommLog.i(TAG, "RX ${bytesRead}B: $hexString")
 
+                        // ⚠️ CRÍTICO: Enviar datos al parser para procesamiento
+                        Log.i(TAG, "=== PROCESANDO DATOS RECIBIDOS ===")
+                        Log.i(TAG, "Bytes recibidos: ${received.size}")
+                        Log.i(TAG, "Parser configurado: ${messageParser::class.simpleName}")
+                        Log.i(TAG, "Protocolo actual: ${SystemConfig.commProtocolSelected}")
+                        
+                        try {
+                            Log.i(TAG, "Enviando datos al parser Futurex...")
+                            messageParser.appendData(received)
+                            Log.i(TAG, "✓ Datos enviados al parser")
+                            
+                            // Procesar mensajes parseados
+                            Log.i(TAG, "Intentando parsear mensajes...")
+                            var parsedMessage = messageParser.nextMessage()
+                            var messageCount = 0
+                            
+                            while (parsedMessage != null) {
+                                messageCount++
+                                Log.i(TAG, "Mensaje parseado #$messageCount: $parsedMessage")
+                                processParsedCommand(parsedMessage)
+                                parsedMessage = messageParser.nextMessage()
+                            }
+                            
+                            if (messageCount == 0) {
+                                Log.i(TAG, "⚠️ No se pudo parsear ningún mensaje completo")
+                            } else {
+                                Log.i(TAG, "✓ Se procesaron $messageCount mensajes")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "✗ Error procesando datos: ${e.message}", e)
+                        }
+                        
+                        Log.i(TAG, "================================================")
+
                         _snackbarEvent.emit("Datos recibidos: ${bytesRead} bytes")
                     } else {
                         silentReads++
                         if (!anyDataEver && silentReads % 5 == 0) {
-                            Log.i(TAG, "${silentReads} lecturas silenciosas AISINO - intentando re-scan")
+                            //Log.i(TAG, "${silentReads} lecturas silenciosas AISINO - intentando re-scan")
                             CommunicationSDKManager.rescanIfSupported()
                             comController = CommunicationSDKManager.getComController()
                             if (comController != null) {
                                 comController!!.init(baudRate, parity, dataBits)
                                 comController!!.open()
-                                Log.i(TAG, "Re-scan aplicado y puerto reabierto")
+                                //Log.i(TAG, "Re-scan aplicado y puerto reabierto")
                             }
                         }
                     }
