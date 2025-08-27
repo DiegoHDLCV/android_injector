@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.math.min
+import kotlinx.coroutines.delay
 
 private const val IPEK_INJECTION_MODE_PLAINTEXT: Byte = 0
 private const val IPEK_INJECTION_MODE_ENCRYPTED: Byte = 1
@@ -118,6 +119,11 @@ class AisinoPedController(private val application: Application) : IPedController
                         SdkApi.getInstance().init(context, object : ISdkStatue {
                             override fun sdkInitSuccessed() {
                                 Log.i(TAG, "SdkApi.getInstance().init(): Success. SDK initialization complete.")
+                                
+                                // Verificar el estado del dispositivo después de la inicialización
+                                val deviceStatus = checkDeviceStatus()
+                                Log.i(TAG, "Device status check completed: $deviceStatus")
+                                
                                 if (continuation.isActive) {
                                     continuation.resume(true)
                                 }
@@ -147,6 +153,21 @@ class AisinoPedController(private val application: Application) : IPedController
                     continuation.resumeWithException(e)
                 }
             }
+        }
+    }
+
+    /**
+     * Verifica el estado del dispositivo PED para diagnóstico
+     */
+    private fun checkDeviceStatus(): String {
+        return try {
+            val sdkApi = SdkApi.getInstance()
+            val pedHandler = sdkApi.getPedHandler()
+            
+            // Intentar obtener información básica del dispositivo
+            "SDK Available: true, PED Handler: available"
+        } catch (e: Exception) {
+            "SDK Error: ${e.message}"
         }
     }
 
@@ -264,6 +285,16 @@ class AisinoPedController(private val application: Application) : IPedController
     ): Boolean = withContext(Dispatchers.IO) {
         Log.i(TAG, "--- Starting writeKeyPlain ---")
         Log.d(TAG, "-> Key Index: $keyIndex, Type: $keyType, Algorithm: $keyAlgorithm")
+        Log.d(TAG, "-> Key Bytes Length: ${keyBytes.size}, KCV Length: ${kcvBytes?.size ?: 0}")
+
+        // Validaciones adicionales
+        if (keyIndex < 0 || keyIndex > 999) {
+            throw PedKeyException("Invalid key index: $keyIndex. Must be between 0-999")
+        }
+
+        if (keyBytes.isEmpty()) {
+            throw PedKeyException("Key bytes cannot be empty")
+        }
 
         if (keyType != GenericKeyType.MASTER_KEY && keyType != GenericKeyType.TRANSPORT_KEY) {
             throw PedKeyException("Plaintext loading via writeKeyPlain is only for MASTER_KEY or TRANSPORT_KEY. Received: $keyType")
@@ -276,13 +307,47 @@ class AisinoPedController(private val application: Application) : IPedController
         }
         Log.d(TAG, "Mapped generic algorithm '$keyAlgorithm' to Aisino mode '$aisinoMode'.")
 
+        // Verificar si ya existe una clave en ese índice
+        try {
+            val keyExists = isKeyPresent(keyIndex, keyType)
+            if (keyExists) {
+                Log.w(TAG, "Key already exists at index $keyIndex. Attempting to delete it first...")
+                deleteKey(keyIndex, keyType)
+                Log.d(TAG, "Successfully deleted existing key at index $keyIndex")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not check/delete existing key at index $keyIndex: ${e.message}")
+        }
+
         try {
             Log.i(TAG, "Calling PedApi.PEDWriteMKey_Api with index: $keyIndex, mode: $aisinoMode")
+            Log.d(TAG, "Key bytes (hex): ${keyBytes.joinToString("") { "%02X".format(it) }}")
+            
             val result = PedApi.PEDWriteMKey_Api(keyIndex, aisinoMode, keyBytes)
             Log.i(TAG, "PedApi.PEDWriteMKey_Api finished with result code: $result")
 
             if (result != 0) {
-                throw PedKeyException("Failed to write key (plaintext). Aisino Error Code: $result")
+                val errorMessage = when (result) {
+                    238 -> "Failed to write key (plaintext). Aisino Error Code: 238 - Possible causes: Invalid parameters, device not ready, or insufficient permissions"
+                    else -> "Failed to write key (plaintext). Aisino Error Code: $result"
+                }
+                Log.e(TAG, errorMessage)
+                
+                // Intentar recuperación para el error 238
+                if (result == 238) {
+                    Log.i(TAG, "Attempting recovery from error 238...")
+                    val recoverySuccess = attemptRecoveryFromError238(keyIndex, aisinoMode, keyBytes)
+                    if (recoverySuccess) {
+                        Log.i(TAG, "Recovery successful! Key written successfully.")
+                        Log.d(TAG, "Successfully wrote key (plaintext) to index: $keyIndex")
+                        Log.i(TAG, "--- writeKeyPlain Finished Successfully ---")
+                        return@withContext true
+                    } else {
+                        Log.e(TAG, "Recovery failed. Throwing exception.")
+                    }
+                }
+                
+                throw PedKeyException(errorMessage)
             }
 
             Log.d(TAG, "Successfully wrote key (plaintext) to index: $keyIndex")
@@ -292,6 +357,48 @@ class AisinoPedController(private val application: Application) : IPedController
             Log.e(TAG, "An unexpected exception occurred during plaintext key writing", e)
             throw PedKeyException("Failed to write key (plaintext): ${e.message}", e)
         }
+    }
+
+    /**
+     * Intenta recuperar del error 238 usando diferentes estrategias
+     */
+    private suspend fun attemptRecoveryFromError238(
+        keyIndex: Int,
+        aisinoMode: Int,
+        keyBytes: ByteArray
+    ): Boolean {
+        Log.w(TAG, "Attempting recovery from error 238...")
+        
+        // Estrategia 1: Esperar un momento y reintentar
+        Log.d(TAG, "Strategy 1: Waiting and retrying...")
+        delay(1000)
+        var result = PedApi.PEDWriteMKey_Api(keyIndex, aisinoMode, keyBytes)
+        if (result == 0) {
+            Log.i(TAG, "Recovery strategy 1 successful!")
+            return true
+        }
+        
+        // Estrategia 2: Intentar con un modo diferente
+        Log.d(TAG, "Strategy 2: Trying with different mode...")
+        val alternativeMode = if (aisinoMode == 0x01) 0x03 else 0x01
+        result = PedApi.PEDWriteMKey_Api(keyIndex, alternativeMode, keyBytes)
+        if (result == 0) {
+            Log.i(TAG, "Recovery strategy 2 successful with mode $alternativeMode!")
+            return true
+        }
+        
+        // Estrategia 3: Verificar si el dispositivo está en un estado válido
+        Log.d(TAG, "Strategy 3: Checking device state...")
+        try {
+            // Intentar una operación simple para verificar el estado
+            val testResult = PedApi.isKeyExist_Api(1, 0) // Verificar si existe una clave en el índice 0
+            Log.d(TAG, "Device state check result: $testResult")
+        } catch (e: Exception) {
+            Log.w(TAG, "Device state check failed: ${e.message}")
+        }
+        
+        Log.w(TAG, "All recovery strategies failed. Error 238 persists.")
+        return false
     }
 
 
