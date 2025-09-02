@@ -374,6 +374,10 @@ class MainViewModel @Inject constructor(
                     _snackbarEvent.emit("Recibido CMD: Leer Serial")
                     handleReadSerial(message)
                 }
+                is WriteSerialCommand -> {
+                    _snackbarEvent.emit("Recibido CMD: Escribir Serial")
+                    handleWriteSerial(message)
+                }
                 is DeleteKeyCommand -> {
                     _snackbarEvent.emit("Recibido CMD: Eliminar TODAS las Llaves")
                     handleDeleteAllKeys(message)
@@ -648,6 +652,47 @@ class MainViewModel @Inject constructor(
             Log.i(TAG, "Respuesta de número de serie enviada.")
         }
     }
+
+    private fun handleWriteSerial(command: WriteSerialCommand) {
+        viewModelScope.launch(Dispatchers.IO) {
+            Log.i(TAG, "Manejando comando para escribir número de serie: $command")
+            Log.i(TAG, "Número de serie a escribir: ${command.serialNumber}")
+
+            var responseCode = FuturexErrorCode.SUCCESSFUL.code
+            var logMessage = ""
+
+            try {
+                // Validar longitud del número de serie
+                if (command.serialNumber.length != 16) {
+                    throw Exception("Número de serie inválido: debe tener 16 caracteres (recibido: ${command.serialNumber.length})")
+                }
+
+                // En una implementación real, aquí se escribiría el número de serie en memoria no volátil
+                // Por ahora, solo simulamos el proceso
+                Log.i(TAG, "Simulando escritura del número de serie: ${command.serialNumber}")
+                
+                // TODO: Implementar escritura real del número de serie según el hardware
+                // Esto podría involucrar escribir a EEPROM, flash, o un archivo de configuración
+
+                logMessage = "Número de serie '${command.serialNumber}' escrito exitosamente"
+                Log.i(TAG, logMessage)
+
+            } catch (e: Exception) {
+                logMessage = "Error escribiendo número de serie: ${e.message}"
+                responseCode = FuturexErrorCode.DEVICE_IS_BUSY.code
+                Log.e(TAG, logMessage, e)
+            }
+
+            val responsePayload = messageFormatter.format(
+                "04",
+                listOf(responseCode)
+            )
+
+            sendData(responsePayload)
+            _snackbarEvent.emit(logMessage)
+            Log.i(TAG, "Respuesta de escritura de número de serie enviada con código: $responseCode")
+        }
+    }
     
     private fun handlePollRequest() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -689,7 +734,11 @@ class MainViewModel @Inject constructor(
             "05" -> GenericKeyType.WORKING_PIN_KEY
             "04" -> GenericKeyType.WORKING_MAC_KEY
             "0C" -> GenericKeyType.WORKING_DATA_ENCRYPTION_KEY
-            "03", "08" -> GenericKeyType.DUKPT_INITIAL_KEY
+            "02" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT Initial Key (solo pruebas)
+            "03" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT 3DES IPEK
+            "08" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT 3DES BDK
+            "0B" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT AES IPEK
+            "10" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT AES BDK
             else -> throw PedKeyException("Tipo de llave Futurex no soportado: $futurexKeyType")
         }
     }

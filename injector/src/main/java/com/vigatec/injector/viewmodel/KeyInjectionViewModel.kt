@@ -386,7 +386,14 @@ class KeyInjectionViewModel @Inject constructor(
         val encryptionType = "00" // Carga en claro por ahora
         val keyChecksum = selectedKey.kcv.take(4) // Checksum de la llave
         val ktkChecksum = "0000" // Checksum KTK (no usado en carga en claro)
-        val ksn = "00000000000000000000" // KSN (20 caracteres)
+        
+        // KSN: Para llaves DUKPT usar KSN real, para otras llaves usar zeros
+        val ksn = if (isDukptKeyType(keyType)) {
+            generateKsn(keyConfig, selectedKey) // Generar KSN para llaves DUKPT
+        } else {
+            "00000000000000000000" // KSN por defecto para llaves no-DUKPT
+        }
+        
         // CRÍTICO: La longitud debe ser en formato ASCII HEX según documentación Futurex
         // Ejemplo: 16 bytes = "010", 32 bytes = "020", 48 bytes = "030"
         val keyLength = String.format("%03X", keyLengthBytes) // Longitud en ASCII HEX (3 dígitos)
@@ -502,7 +509,10 @@ class KeyInjectionViewModel @Inject constructor(
             "PIN" -> "05" // PIN Encryption Key
             "MAC" -> "04" // MAC Key
             "TDES", "3DES" -> "01" // Master Session Key
-            "DUKPT" -> "08" // DUKPT 3DES BDK Key
+            "DUKPT", "DUKPT_3DES" -> "08" // DUKPT 3DES BDK Key
+            "DUKPT_AES" -> "10" // DUKPT AES BDK Key
+            "DUKPT_INITIAL", "IPEK" -> "03" // DUKPT 3DES IPEK
+            "DUKPT_AES_INITIAL", "AES_IPEK" -> "0B" // DUKPT AES IPEK
             "DATA" -> "0C" // Data Encryption Key
             else -> "01" // Default to Master Session Key
         }
@@ -511,18 +521,59 @@ class KeyInjectionViewModel @Inject constructor(
         return mappedType
     }
 
+    /**
+     * Verifica si el tipo de llave es DUKPT y requiere KSN
+     */
+    private fun isDukptKeyType(keyType: String): Boolean {
+        return when (keyType) {
+            "02", "03", "08", "0B", "10" -> true // Tipos DUKPT según manual Futurex
+            else -> false
+        }
+    }
+
+    /**
+     * Genera un KSN (Key Serial Number) para llaves DUKPT
+     * El KSN debe ser 20 caracteres hexadecimales según el manual Futurex
+     */
+    private fun generateKsn(keyConfig: KeyConfiguration, selectedKey: InjectedKeyEntity): String {
+        Log.i(TAG, "=== GENERANDO KSN PARA LLAVE DUKPT ===")
+        
+        // Por defecto, usar el KCV como base para generar un KSN único
+        // En un entorno real, el KSN debería ser proporcionado por el sistema de gestión de llaves
+        val baseKsn = selectedKey.kcv.padEnd(16, '0').take(16) // Base de 16 caracteres
+        val suffix = String.format("%04X", keyConfig.slot) // Suffix de 4 caracteres basado en slot
+        val ksn = (baseKsn + suffix).uppercase()
+        
+        Log.i(TAG, "KSN generado:")
+        Log.i(TAG, "  - Base (KCV): ${selectedKey.kcv}")
+        Log.i(TAG, "  - Slot: ${keyConfig.slot}")
+        Log.i(TAG, "  - KSN final: $ksn")
+        Log.i(TAG, "  - Longitud: ${ksn.length} caracteres")
+        
+        if (ksn.length != 20) {
+            Log.w(TAG, "Ajustando longitud del KSN a 20 caracteres")
+            return ksn.padEnd(20, '0').take(20)
+        }
+        
+        Log.i(TAG, "✓ KSN generado exitosamente: $ksn")
+        Log.i(TAG, "================================================")
+        
+        return ksn
+    }
+
     private fun getKeyTypeDescription(keyType: String): String {
         return when (keyType) {
             "01" -> "Master Session Key (TDES/3DES)"
-            "02" -> "PIN Encryption Key"
-            "03" -> "MAC Key"
-            "04" -> "MAC Key (alternativo)"
-            "05" -> "PIN Encryption Key (alternativo)"
-            "08" -> "DUKPT 3DES BDK Key"
-            "0B" -> "DUKPT AES BDK Key"
+            "02" -> "DUKPT Initial Key (Solo pruebas)"
+            "03" -> "DUKPT 3DES IPEK (Llave inicial DUKPT 3DES)"
+            "04" -> "3DES MAC Key"
+            "05" -> "3DES PIN Encryption Key"
+            "06" -> "3DES Key Transfer Key (KTK)"
+            "08" -> "DUKPT 3DES BDK (Base Derivation Key)"
+            "0B" -> "DUKPT AES IPEK (Llave inicial DUKPT AES)"
             "0C" -> "Data Encryption Key"
-            "10" -> "DUKPT AES Session Key"
-            else -> "Tipo desconocido"
+            "10" -> "DUKPT AES BDK (Base Derivation Key AES)"
+            else -> "Tipo desconocido ($keyType)"
         }
     }
 
@@ -712,5 +763,216 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - Slot: ${keyConfig.slot}")
         Log.i(TAG, "  - Tipo: ${keyConfig.keyType}")
         Log.i(TAG, "================================================")
+    }
+
+    /**
+     * Envía comando para leer el número de serie del dispositivo
+     */
+    suspend fun readDeviceSerial(): String? {
+        if (comController == null) {
+            Log.e(TAG, "No se puede leer número de serie: controlador no inicializado")
+            return null
+        }
+
+        return try {
+            Log.i(TAG, "=== LEYENDO NÚMERO DE SERIE FUTUREX ===")
+            
+            // Construir comando 03 para leer número de serie
+            val command = "03"
+            val version = "01"
+            val readSerialCommand = messageFormatter!!.format(command, listOf(version))
+            
+            Log.i(TAG, "Enviando comando de lectura de serial...")
+            sendData(readSerialCommand)
+            
+            // Esperar respuesta
+            val response = waitForResponse()
+            
+            // Parsear respuesta
+            messageParser!!.appendData(response)
+            val parsedMessage = messageParser!!.nextMessage()
+            
+            when (parsedMessage) {
+                is InjectSymmetricKeyResponse -> {
+                    if (parsedMessage.responseCode == "00" && parsedMessage.rawPayload.length >= 6) {
+                        val serialNumber = parsedMessage.rawPayload.substring(4)
+                        Log.i(TAG, "✓ Número de serie leído: $serialNumber")
+                        return serialNumber
+                    } else {
+                        Log.e(TAG, "Error leyendo serial: ${parsedMessage.responseCode}")
+                        return null
+                    }
+                }
+                else -> {
+                    Log.e(TAG, "Respuesta inesperada al leer serial: $parsedMessage")
+                    return null
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Excepción leyendo número de serie", e)
+            null
+        } finally {
+            Log.i(TAG, "================================================")
+        }
+    }
+
+    /**
+     * Envía comando para escribir el número de serie del dispositivo
+     */
+    suspend fun writeDeviceSerial(serialNumber: String): Boolean {
+        if (comController == null) {
+            Log.e(TAG, "No se puede escribir número de serie: controlador no inicializado")
+            return false
+        }
+
+        if (serialNumber.length != 16) {
+            Log.e(TAG, "Número de serie inválido: debe tener 16 caracteres")
+            return false
+        }
+
+        return try {
+            Log.i(TAG, "=== ESCRIBIENDO NÚMERO DE SERIE FUTUREX ===")
+            Log.i(TAG, "Número de serie: $serialNumber")
+            
+            // Construir comando 04 para escribir número de serie
+            val command = "04"
+            val version = "01"
+            val writeSerialCommand = messageFormatter!!.format(command, listOf(version, serialNumber))
+            
+            Log.i(TAG, "Enviando comando de escritura de serial...")
+            sendData(writeSerialCommand)
+            
+            // Esperar respuesta
+            val response = waitForResponse()
+            
+            // Parsear respuesta
+            messageParser!!.appendData(response)
+            val parsedMessage = messageParser!!.nextMessage()
+            
+            when (parsedMessage) {
+                is InjectSymmetricKeyResponse -> {
+                    val success = parsedMessage.responseCode == "00"
+                    if (success) {
+                        Log.i(TAG, "✓ Número de serie escrito exitosamente")
+                    } else {
+                        Log.e(TAG, "Error escribiendo serial: ${parsedMessage.responseCode}")
+                    }
+                    return success
+                }
+                else -> {
+                    Log.e(TAG, "Respuesta inesperada al escribir serial: $parsedMessage")
+                    return false
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Excepción escribiendo número de serie", e)
+            false
+        } finally {
+            Log.i(TAG, "================================================")
+        }
+    }
+
+    /**
+     * Envía comando para eliminar todas las llaves del dispositivo
+     */
+    suspend fun deleteAllKeys(): Boolean {
+        if (comController == null) {
+            Log.e(TAG, "No se puede eliminar llaves: controlador no inicializado")
+            return false
+        }
+
+        return try {
+            Log.i(TAG, "=== ELIMINANDO TODAS LAS LLAVES FUTUREX ===")
+            
+            // Construir comando 05 para eliminar todas las llaves
+            val command = "05"
+            val version = "01"
+            val deleteAllCommand = messageFormatter!!.format(command, listOf(version))
+            
+            Log.i(TAG, "Enviando comando de eliminación total...")
+            sendData(deleteAllCommand)
+            
+            // Esperar respuesta
+            val response = waitForResponse()
+            
+            // Parsear respuesta
+            messageParser!!.appendData(response)
+            val parsedMessage = messageParser!!.nextMessage()
+            
+            when (parsedMessage) {
+                is InjectSymmetricKeyResponse -> {
+                    val success = parsedMessage.responseCode == "00"
+                    if (success) {
+                        Log.i(TAG, "✓ Todas las llaves eliminadas exitosamente")
+                    } else {
+                        Log.e(TAG, "Error eliminando llaves: ${parsedMessage.responseCode}")
+                    }
+                    return success
+                }
+                else -> {
+                    Log.e(TAG, "Respuesta inesperada al eliminar llaves: $parsedMessage")
+                    return false
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Excepción eliminando todas las llaves", e)
+            false
+        } finally {
+            Log.i(TAG, "================================================")
+        }
+    }
+
+    /**
+     * Envía comando para eliminar una llave específica
+     */
+    suspend fun deleteSingleKey(keySlot: Int, keyType: String): Boolean {
+        if (comController == null) {
+            Log.e(TAG, "No se puede eliminar llave: controlador no inicializado")
+            return false
+        }
+
+        return try {
+            Log.i(TAG, "=== ELIMINANDO LLAVE ESPECÍFICA FUTUREX ===")
+            Log.i(TAG, "Slot: $keySlot, Tipo: $keyType")
+            
+            // Construir comando 06 para eliminar llave específica
+            val command = "06"
+            val version = "01"
+            val slotHex = keySlot.toString(16).padStart(2, '0').uppercase()
+            val typeHex = mapKeyTypeToFuturex(keyType)
+            
+            val deleteSingleCommand = messageFormatter!!.format(command, listOf(version, slotHex, typeHex))
+            
+            Log.i(TAG, "Enviando comando de eliminación específica...")
+            sendData(deleteSingleCommand)
+            
+            // Esperar respuesta
+            val response = waitForResponse()
+            
+            // Parsear respuesta
+            messageParser!!.appendData(response)
+            val parsedMessage = messageParser!!.nextMessage()
+            
+            when (parsedMessage) {
+                is InjectSymmetricKeyResponse -> {
+                    val success = parsedMessage.responseCode == "00"
+                    if (success) {
+                        Log.i(TAG, "✓ Llave en slot $keySlot eliminada exitosamente")
+                    } else {
+                        Log.e(TAG, "Error eliminando llave: ${parsedMessage.responseCode}")
+                    }
+                    return success
+                }
+                else -> {
+                    Log.e(TAG, "Respuesta inesperada al eliminar llave: $parsedMessage")
+                    return false
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Excepción eliminando llave específica", e)
+            false
+        } finally {
+            Log.i(TAG, "================================================")
+        }
     }
 } 

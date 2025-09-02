@@ -23,4 +23,8 @@ class ProfileRepository @Inject constructor(
     suspend fun deleteProfile(profile: ProfileEntity) {
         profileDao.deleteProfile(profile)
     }
+
+    suspend fun getProfileNamesByKeyKcv(kcv: String): List<String> {
+        return profileDao.getProfileNamesByKeyKcv(kcv)
+    }
 }

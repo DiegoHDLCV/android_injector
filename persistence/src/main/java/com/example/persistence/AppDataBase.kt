@@ -25,7 +25,7 @@ import com.example.persistence.entities.ProfileEntity
         InjectedKeyEntity::class,
         ProfileEntity::class
     ],
-    version = 3, // Se incrementa la versión por el nuevo esquema
+    version = 7, // Se incrementa la versión por el campo assignedProfileName
     exportSchema = true
 )
 @TypeConverters(Converters::class)

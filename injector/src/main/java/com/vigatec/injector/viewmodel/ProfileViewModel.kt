@@ -90,19 +90,34 @@ class ProfileViewModel @Inject constructor(
     fun onSaveProfile() {
         viewModelScope.launch {
             val formData = _state.value.formData
+            
+            // Validar que el nombre no esté vacío
+            if (formData.name.trim().isEmpty()) {
+                // Aquí podrías mostrar un error al usuario
+                return@launch
+            }
+            
             val profile = ProfileEntity(
                 id = formData.id ?: 0,
-                name = formData.name,
+                name = formData.name.trim(),
                 description = formData.description,
                 applicationType = formData.appType,
                 keyConfigurations = formData.keyConfigurations
             )
-            if (formData.id == null) {
-                profileRepository.insertProfile(profile)
-            } else {
-                profileRepository.updateProfile(profile)
+            
+            try {
+                // Guardar o actualizar el perfil
+                if (formData.id == null) {
+                    profileRepository.insertProfile(profile)
+                } else {
+                    profileRepository.updateProfile(profile)
+                }
+                
+                onDismissCreateModal()
+            } catch (e: Exception) {
+                // Manejar el error - en una implementación real mostrarías esto al usuario
+                android.util.Log.e("ProfileViewModel", "Error saving profile", e)
             }
-            onDismissCreateModal()
         }
     }
 

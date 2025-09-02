@@ -33,7 +33,7 @@ class InjectedKeyRepository @Inject constructor(
                 keyAlgorithm = keyAlgorithm,
                 kcv = kcv,
                 status = status,
-                injectionTimestamp = System.currentTimeMillis()
+                injectionTimestamp = System.currentTimeMillis(),
             )
             injectedKeyDao.insertOrUpdate(injectedKey)
             Log.d(TAG, "Key injection recorded: Slot $keySlot, Type $keyType, Status $status")
@@ -73,13 +73,25 @@ class InjectedKeyRepository @Inject constructor(
                 kcv = kcv,
                 keyData = keyData,
                 status = status,
-                injectionTimestamp = System.currentTimeMillis()
+                injectionTimestamp = System.currentTimeMillis(),
             )
             
-            injectedKeyDao.insertOrUpdate(injectedKey)
-            Log.i(TAG, "✓ Llave registrada exitosamente en base de datos con ID: ${injectedKey.id}")
-            Log.i(TAG, "✓ Datos de la llave guardados: ${keyData.length / 2} bytes")
-            Log.i(TAG, "✓ KCV validado: $kcv")
+            // Para llaves de ceremonia, usar insertIfNotExists para evitar sobrescritura
+            val insertedId = if (keyType == "CEREMONY_KEY") {
+                Log.i(TAG, "Llave de ceremonia detectada - usando insertIfNotExists para evitar sobrescritura")
+                injectedKeyDao.insertIfNotExists(injectedKey)
+            } else {
+                injectedKeyDao.insertOrUpdate(injectedKey)
+                injectedKey.id
+            }
+            
+            if (insertedId > 0) {
+                Log.i(TAG, "✓ Llave registrada exitosamente en base de datos con ID: $insertedId")
+                Log.i(TAG, "✓ Datos de la llave guardados: ${keyData.length / 2} bytes")
+                Log.i(TAG, "✓ KCV validado: $kcv")
+            } else {
+                Log.w(TAG, "⚠️ Llave con KCV $kcv ya existe - no se sobrescribió")
+            }
             Log.i(TAG, "================================================")
             
         } catch (e: Exception) {
@@ -180,4 +192,5 @@ class InjectedKeyRepository @Inject constructor(
     suspend fun getKeyByKcv(kcv: String): InjectedKeyEntity? {
         return injectedKeyDao.getKeyByKcv(kcv)
     }
+
 }

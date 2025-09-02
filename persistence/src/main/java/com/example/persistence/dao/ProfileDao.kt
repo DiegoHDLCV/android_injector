@@ -17,4 +17,7 @@ interface ProfileDao {
 
     @Delete
     suspend fun deleteProfile(profile: ProfileEntity)
+
+    @Query("SELECT name FROM profiles WHERE keyConfigurations LIKE '%' || :kcv || '%'")
+    suspend fun getProfileNamesByKeyKcv(kcv: String): List<String>
 } 

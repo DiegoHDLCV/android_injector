@@ -8,12 +8,15 @@ import androidx.room.PrimaryKey
 
 /**
  * Representa los metadatos de una llave criptográfica que ha sido inyectada en el PED.
- * NO almacena el valor de la llave en sí, solo la información para su gestión y auditoría.
- * Se usa un índice compuesto para asegurar que solo haya un registro por ranura y tipo de llave.
+ * Almacena tanto los metadatos como los datos de la llave para su gestión y auditoría.
+ * Se usa un índice único en KCV para evitar duplicados de la misma llave.
  */
 @Entity(
     tableName = "injected_keys",
-    indices = [Index(value = ["keySlot", "keyType"], unique = true)]
+    indices = [
+        Index(value = ["keySlot", "keyType"], unique = false), // Permite múltiples llaves por slot/tipo
+        Index(value = ["kcv"], unique = true) // KCV debe ser único (identifica la llave)
+    ]
 )
 data class InjectedKeyEntity(
     @PrimaryKey(autoGenerate = true)

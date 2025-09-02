@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.persistence.entities.InjectedKeyEntity
 import com.example.persistence.repository.InjectedKeyRepository
+import com.example.persistence.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,8 +12,13 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class KeyWithProfiles(
+    val key: InjectedKeyEntity,
+    val assignedProfiles: List<String> = emptyList()
+)
+
 data class KeyVaultState(
-    val keys: List<InjectedKeyEntity> = emptyList(),
+    val keysWithProfiles: List<KeyWithProfiles> = emptyList(),
     val loading: Boolean = true,
     val selectedKey: InjectedKeyEntity? = null,
     val showDeleteModal: Boolean = false,
@@ -21,7 +27,8 @@ data class KeyVaultState(
 
 @HiltViewModel
 class KeyVaultViewModel @Inject constructor(
-    private val injectedKeyRepository: InjectedKeyRepository
+    private val injectedKeyRepository: InjectedKeyRepository,
+    private val profileRepository: ProfileRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(KeyVaultState())
@@ -35,7 +42,11 @@ class KeyVaultViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(loading = true)
             injectedKeyRepository.getAllInjectedKeys().collect { keys ->
-                _uiState.value = _uiState.value.copy(keys = keys, loading = false)
+                val keysWithProfiles = keys.map { key ->
+                    val profiles = profileRepository.getProfileNamesByKeyKcv(key.kcv)
+                    KeyWithProfiles(key = key, assignedProfiles = profiles)
+                }
+                _uiState.value = _uiState.value.copy(keysWithProfiles = keysWithProfiles, loading = false)
             }
         }
     }

@@ -175,20 +175,21 @@ class CeremonyViewModel @Inject constructor(
                 addToLog("================================================")
 
                 addToLog("=== REGISTRANDO LLAVE COMPLETA EN BASE DE DATOS ===")
-                addToLog("  - Slot: 0 (no aplica en ceremonia)")
-                addToLog("  - Tipo de Llave: MASTER_KEY_FROM_CEREMONY")
-                addToLog("  - Algoritmo: 3DES")
+                addToLog("  - Slot: NO ASIGNADO (se define en perfil)")
+                addToLog("  - Tipo de Llave: NO ASIGNADO (se define en perfil)")
+                addToLog("  - Algoritmo: NO ASIGNADO (se define en perfil)")
                 addToLog("  - KCV: $finalKcv")
                 addToLog("  - Estado: GENERATED")
                 addToLog("  - Datos de llave (longitud): ${finalKeyBytes.size} bytes")
                 addToLog("  - Datos de llave (hex): $finalKeyHex")
                 addToLog("  - Datos de llave (primeros 16 bytes): ${finalKeyHex.take(32)}")
                 
-                // CRÍTICO: Guardar la llave COMPLETA en la base de datos, no solo el KCV
+                // CRÍTICO: Guardar la llave SOLO con KCV y datos, sin asignar slot/tipo/algoritmo
+                // Estos parámetros se definirán cuando se use la llave en un perfil
                 injectedKeyRepository.recordKeyInjectionWithData(
-                    keySlot = 0, // Slot no se usa en ceremonia, se asigna en perfil
-                    keyType = "MASTER_KEY_FROM_CEREMONY",
-                    keyAlgorithm = "3DES",
+                    keySlot = -1, // -1 indica que no hay slot asignado (se asigna en perfil)
+                    keyType = "CEREMONY_KEY", // Tipo genérico para llaves de ceremonia
+                    keyAlgorithm = "UNASSIGNED", // No se asigna algoritmo específico
                     kcv = finalKcv,
                     keyData = finalKeyHex, // ¡GUARDANDO LA LLAVE COMPLETA!
                     status = "GENERATED"
@@ -214,15 +215,17 @@ class CeremonyViewModel @Inject constructor(
                         // Validar que los datos coinciden
                         if (savedKey.keyData == finalKeyHex) {
                             addToLog("✓ VALIDACIÓN COMPLETA: Los datos de la llave coinciden exactamente")
+                            addToLog("✓ La llave se agregó al almacén sin sobrescribir llaves existentes")
                         } else {
                             addToLog("⚠️ ADVERTENCIA: Los datos de la llave NO coinciden")
                             addToLog("  - Esperado: ${finalKeyHex.take(32)}...")
                             addToLog("  - Almacenado: ${savedKey.keyData.take(32)}...")
                         }
                     } else {
-                        addToLog("✗ ERROR CRÍTICO: La llave NO se encontró en la base de datos")
-                        addToLog("  - KCV buscado: $finalKcv")
-                        addToLog("  - Estado: FALLO EN ALMACENAMIENTO")
+                        addToLog("ℹ️ La llave ya existía en la base de datos (no se sobrescribió)")
+                        addToLog("  - KCV: $finalKcv")
+                        addToLog("  - Estado: DUPLICADO IGNORADO")
+                        addToLog("  - Esta llave ya estaba disponible en el almacén")
                     }
                 } catch (e: Exception) {
                     addToLog("✗ Error durante la verificación: ${e.message}")
@@ -238,16 +241,19 @@ class CeremonyViewModel @Inject constructor(
                 )
                 addToLog("=== RESUMEN FINAL DE LA CEREMONIA ===")
                 addToLog("✓ Ceremonia completada exitosamente")
-                addToLog("✓ Llave Maestra de Transporte (MKT) generada")
+                addToLog("✓ Llave criptográfica generada desde componentes")
                 addToLog("  - KCV Final: $finalKcv")
                 addToLog("  - Longitud: ${finalKeyBytes.size} bytes")
-                addToLog("  - Algoritmo: 3DES")
+                addToLog("  - Algoritmo: Se definirá en el perfil")
+                addToLog("  - Slot: Se asignará en el perfil")
+                addToLog("  - Tipo: Se especificará en el perfil")
                 addToLog("✓ Llave almacenada en Keystore (alias: master_transport_key)")
                 addToLog("✓ Llave COMPLETA guardada en base de datos")
                 addToLog("✓ Verificación de almacenamiento exitosa")
                 addToLog("✓ Datos de llave preservados para uso futuro")
                 addToLog("================================================")
-                addToLog("🎉 ¡CEREMONIA COMPLETADA! La llave está segura y disponible.")
+                addToLog("🎉 ¡CEREMONIA COMPLETADA! La llave está disponible para configurar en perfiles.")
+                addToLog("ℹ️ Usa el KCV '$finalKcv' para seleccionar esta llave en un perfil.")
                 addToLog("================================================")
 
             } catch (e: Exception) {

@@ -11,11 +11,18 @@ interface InjectedKeyDao {
 
     /**
      * Inserta una nueva entidad de llave. Si ya existe una llave con el mismo
-     * slot y tipo (gracias al índice único en la entidad), la reemplaza.
+     * KCV (gracias al índice único en KCV), la reemplaza.
      * Esto es útil para actualizar el estado si una llave se reinyecta.
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(key: InjectedKeyEntity)
+
+    /**
+     * Inserta una nueva entidad de llave. Si ya existe una llave con el mismo
+     * KCV, la ignora (no la sobrescribe). Útil para llaves de ceremonia.
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfNotExists(key: InjectedKeyEntity): Long
 
     /**
      * Obtiene todas las llaves inyectadas de la base de datos, ordenadas por
@@ -80,4 +87,5 @@ interface InjectedKeyDao {
 
     @Query("UPDATE injected_keys SET status = :newStatus WHERE id = :keyId")
     suspend fun updateKeyStatusById(keyId: Long, newStatus: String)
+
 }

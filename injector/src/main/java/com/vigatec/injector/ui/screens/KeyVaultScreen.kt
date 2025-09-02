@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.persistence.entities.InjectedKeyEntity
 import com.vigatec.injector.viewmodel.KeyVaultViewModel
+import com.vigatec.injector.viewmodel.KeyWithProfiles
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -44,7 +45,7 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-            } else if (state.keys.isEmpty()) {
+            } else if (state.keysWithProfiles.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No hay llaves almacenadas.", color = MaterialTheme.colorScheme.onBackground)
                 }
@@ -55,8 +56,12 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(state.keys) { key ->
-                        KeyCard(key = key, onDelete = { viewModel.onShowDeleteModal(it) })
+                    items(state.keysWithProfiles) { keyWithProfiles ->
+                        KeyCard(
+                            key = keyWithProfiles.key, 
+                            assignedProfiles = keyWithProfiles.assignedProfiles,
+                            onDelete = { viewModel.onShowDeleteModal(it) }
+                        )
                     }
                 }
             }
@@ -97,26 +102,76 @@ fun KeyVaultTopBar(onRefresh: () -> Unit, onClearAll: () -> Unit, loading: Boole
 }
 
 @Composable
-fun KeyCard(key: InjectedKeyEntity, onDelete: (InjectedKeyEntity) -> Unit) {
+fun KeyCard(
+    key: InjectedKeyEntity, 
+    assignedProfiles: List<String> = emptyList(),
+    onDelete: (InjectedKeyEntity) -> Unit
+) {
+    val isCeremonyKey = key.keyType == "CEREMONY_KEY"
+    
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isCeremonyKey) 
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            else 
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.VpnKey, contentDescription = "Key", tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = key.kcv,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                Icon(
+                    Icons.Default.VpnKey, 
+                    contentDescription = "Key", 
+                    tint = if (isCeremonyKey) 
+                        MaterialTheme.colorScheme.primary 
+                    else 
+                        MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(24.dp)
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = key.kcv,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+//                    if (isCeremonyKey) {
+//                        Text(
+//                            text = "Llave de Ceremonia",
+//                            style = MaterialTheme.typography.bodySmall,
+//                            color = MaterialTheme.colorScheme.primary,
+//                            fontWeight = FontWeight.Medium
+//                        )
+//                    }
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text("Slot: ${key.keySlot}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Tipo: ${key.keyType}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Algoritmo: ${key.keyAlgorithm}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            
+            // Solo mostrar detalles técnicos para llaves que NO son de ceremonia
+            if (!isCeremonyKey) {
+                Text("Slot: ${key.keySlot}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Tipo: ${key.keyType}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Algoritmo: ${key.keyAlgorithm}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                // Para llaves de ceremonia, mostrar información relevante
+                Text("Longitud: ${key.keyData.length / 2} bytes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            
+            // Mostrar los perfiles asignados para todas las llaves
+            Text(
+                text = if (assignedProfiles.isNotEmpty()) 
+                    "Perfil${if (assignedProfiles.size > 1) "es" else ""}: ${assignedProfiles.joinToString(", ")}" 
+                else 
+                    "Sin asignar",
+                style = MaterialTheme.typography.bodySmall, 
+                color = if (assignedProfiles.isNotEmpty()) 
+                    MaterialTheme.colorScheme.primary 
+                else 
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
             Text("Fecha: ${formatDate(key.injectionTimestamp)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
             Button(
