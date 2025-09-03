@@ -39,3 +39,4 @@ include(":communication")
 include(":format")
 
 include(":injector")
+include(":dev_injector")
