@@ -25,7 +25,7 @@ import com.example.persistence.entities.ProfileEntity
         InjectedKeyEntity::class,
         ProfileEntity::class
     ],
-    version = 7, // Se incrementa la versión por el campo assignedProfileName
+    version = 9, // Se incrementa la versión para restricción única en slot+tipo
     exportSchema = true
 )
 @TypeConverters(Converters::class)

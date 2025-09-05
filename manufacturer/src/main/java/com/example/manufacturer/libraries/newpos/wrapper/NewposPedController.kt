@@ -328,22 +328,41 @@ class NewposPedController(private val context: Context) : IPedController {
             ?: throw PedKeyException("Unsupported key type for deleteKey: $keyType")
 
         try {
-            Log.d(TAG, "Calling deleteKey: KS=$npKeySystem, KT=$npKeyType, KeyIdx=$keyIndex")
+            Log.i(TAG, "--- Starting deleteKey operation ---")
+            Log.i(TAG, "Parameters:")
+            Log.i(TAG, "  - keyIndex: $keyIndex")
+            Log.i(TAG, "  - keyType: $keyType") 
+            Log.i(TAG, "  - mapped npKeySystem: $npKeySystem")
+            Log.i(TAG, "  - mapped npKeyType: $npKeyType")
+            
+            Log.d(TAG, "Calling NewPOS pedInstance.deleteKey($npKeySystem, $npKeyType, $keyIndex)")
             pedInstance.deleteKey(npKeySystem, npKeyType, keyIndex)
+            Log.i(TAG, "✅ NewPOS deleteKey completed successfully - key removed from slot $keyIndex")
             return true // The function is void, so if no exception is thrown, it was successful.
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting key [$keyType/$keyIndex]", e)
+            Log.e(TAG, "❌ NewPOS deleteKey failed for [$keyType/$keyIndex]", e)
+            Log.e(TAG, "Exception details: ${e.message}")
             throw PedKeyException("Failed to delete key [$keyType/$keyIndex]: ${e.message}", e)
         }
     }
 
     override suspend fun deleteAllKeys(): Boolean {
         try {
-            Log.i(TAG, "Calling clearUserKeys to delete all working keys.")
+            Log.i(TAG, "--- Starting deleteAllKeys operation ---")
+            Log.i(TAG, "Operation: Mass deletion of all working keys from NewPOS device")
+            Log.i(TAG, "NewPOS method: clearUserKeys() - eliminates all user injected keys")
+            
+            Log.d(TAG, "Calling NewPOS pedInstance.clearUserKeys()")
             pedInstance.clearUserKeys()
+            
+            Log.i(TAG, "✅ NewPOS clearUserKeys completed successfully")
+            Log.i(TAG, "✅ ALL working keys have been removed from the device")
+            Log.i(TAG, "Note: Master keys and system keys remain untouched")
             return true // The function is void.
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting all keys", e)
+            Log.e(TAG, "❌ NewPOS clearUserKeys failed during mass deletion", e)
+            Log.e(TAG, "Exception details: ${e.message}")
+            Log.e(TAG, "This means some or all keys may still be present in the device")
             throw PedKeyException("Failed to delete all keys: ${e.message}", e)
         }
     }

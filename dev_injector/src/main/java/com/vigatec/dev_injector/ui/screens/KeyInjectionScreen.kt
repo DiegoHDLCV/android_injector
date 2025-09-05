@@ -174,6 +174,21 @@ fun KeyInjectionScreen(
                     isError = uiState.kcvError != null,
                     supportingText = uiState.kcvError?.let { { Text(it) } }
                 )
+                
+                // Master Key Slot - Solo mostrar para Working Keys
+                val isWorkingKey = uiState.keyType.contains("WORKING")
+                if (isWorkingKey) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedTextField(
+                        value = uiState.masterKeyIndex,
+                        onValueChange = viewModel::updateMasterKeyIndex,
+                        label = { Text("Master Key Slot") },
+                        modifier = Modifier.fillMaxWidth(),
+                        isError = uiState.masterKeyIndexError != null,
+                        supportingText = uiState.masterKeyIndexError?.let { { Text(it) } }
+                            ?: { Text("Slot donde está la Master Key para cifrar esta Working Key") }
+                    )
+                }
             }
         }
 

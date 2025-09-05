@@ -40,6 +40,9 @@ fun SimpleInjectedKeysScreen(
                     IconButton(onClick = { viewModel.refreshKeys() }) {
                         Icon(Icons.Default.Refresh, "Actualizar")
                     }
+                    IconButton(onClick = { viewModel.scanHardwareKeys() }) {
+                        Icon(Icons.Default.Search, "Escanear Hardware")
+                    }
                     if (uiState.keys.isNotEmpty()) {
                         IconButton(onClick = { viewModel.clearAllKeys() }) {
                             Icon(Icons.Default.DeleteSweep, "Limpiar todo")
@@ -96,6 +99,36 @@ fun SimpleInjectedKeysScreen(
                     ) {
                         items(uiState.keys) { key ->
                             SimpleKeyCard(key = key)
+                        }
+                        
+                        // Información del hardware (si está disponible)
+                        uiState.hardwareKeysInfo?.let { info ->
+                            item {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                                    )
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(16.dp)
+                                    ) {
+                                        Text(
+                                            text = "Estado del Hardware",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = info,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

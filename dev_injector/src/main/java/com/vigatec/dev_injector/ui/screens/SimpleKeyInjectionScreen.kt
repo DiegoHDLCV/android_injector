@@ -79,6 +79,22 @@ fun SimpleKeyInjectionScreen(
             }
         }
         
+        // Master Key Slot - Solo mostrar para Working Keys
+        val isWorkingKey = uiState.keyType.contains("WORKING")
+        if (isWorkingKey) {
+            OutlinedTextField(
+                value = uiState.masterKeyIndex,
+                onValueChange = viewModel::updateMasterKeyIndex,
+                label = { Text("Master Key Slot") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = uiState.masterKeyIndexError != null,
+                supportingText = uiState.masterKeyIndexError?.let { { Text(it) } }
+                    ?: { Text("Slot donde está la Master Key para cifrar") }
+            )
+        }
+        
         // Valor de llave (con valor por defecto)
         OutlinedTextField(
             value = uiState.keyValue,

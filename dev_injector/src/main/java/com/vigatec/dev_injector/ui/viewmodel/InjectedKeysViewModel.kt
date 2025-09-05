@@ -137,16 +137,31 @@ class InjectedKeysViewModel @Inject constructor(
             try {
                 val pedController = KeySDKManager.getPedController()
                 if (pedController != null) {
+                    Log.d(TAG, "deleteKey: 2. PED Controller obtenido: ${pedController::class.java.simpleName}")
+                    
                     val genericKeyType = mapStringToGenericKeyType(key.keyType)
-                    Log.d(TAG, "deleteKey: 2. Intentando borrar del hardware (Slot: ${key.keySlot}, Tipo: $genericKeyType)...")
+                    Log.d(TAG, "deleteKey: 2. Parámetros de eliminación:")
+                    Log.d(TAG, "  - Slot: ${key.keySlot}")
+                    Log.d(TAG, "  - Tipo original: ${key.keyType}")
+                    Log.d(TAG, "  - Tipo mapeado: $genericKeyType")
+                    Log.d(TAG, "  - Algoritmo: ${key.keyAlgorithm}")
+                    Log.d(TAG, "  - KCV: ${key.kcv}")
+                    
+                    Log.i(TAG, "deleteKey: 2. Llamando a pedController.deleteKey(${key.keySlot}, $genericKeyType)...")
                     hardwareSuccess = pedController.deleteKey(key.keySlot, genericKeyType)
-                    Log.i(TAG, "deleteKey: 2. Respuesta del hardware: $hardwareSuccess")
+                    
+                    if (hardwareSuccess) {
+                        Log.i(TAG, "deleteKey: 2. ✅ ÉXITO - NewPOS eliminó la llave del slot ${key.keySlot}")
+                    } else {
+                        Log.w(TAG, "deleteKey: 2. ❌ FALLÓ - NewPOS retornó false para el slot ${key.keySlot}")
+                    }
                 } else {
-                    Log.e(TAG, "deleteKey: 2. Controlador PED no disponible.")
+                    Log.e(TAG, "deleteKey: 2. ❌ CRÍTICO - Controlador PED no disponible.")
                     _snackbarMessage.emit("Error: Controlador no disponible.")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "deleteKey: 2. Excepción durante el borrado de hardware.", e)
+                Log.e(TAG, "deleteKey: 2. ❌ EXCEPCIÓN durante el borrado de hardware en slot ${key.keySlot}", e)
+                Log.e(TAG, "deleteKey: 2. Detalles de la excepción: ${e.message}")
                 _snackbarMessage.emit("El proceso de borrado fue interrumpido.")
             }
 
@@ -185,15 +200,33 @@ class InjectedKeysViewModel @Inject constructor(
             try {
                 val pedController = KeySDKManager.getPedController()
                 if (pedController != null) {
-                    Log.d(TAG, "deleteAllKeys: 2. Intentando borrar del hardware...")
+                    Log.d(TAG, "deleteAllKeys: 2. PED Controller obtenido: ${pedController::class.java.simpleName}")
+                    
+                    val keyCount = _uiState.value.injectedKeys.size
+                    Log.d(TAG, "deleteAllKeys: 2. Información del borrado:")
+                    Log.d(TAG, "  - Número de llaves a eliminar: $keyCount")
+                    Log.d(TAG, "  - Llaves en la base de datos:")
+                    _uiState.value.injectedKeys.forEach { key ->
+                        Log.d(TAG, "    * Slot ${key.keySlot}: ${key.keyType} (KCV: ${key.kcv})")
+                    }
+                    
+                    Log.i(TAG, "deleteAllKeys: 2. Llamando a pedController.deleteAllKeys() -> NewPOS.clearUserKeys()...")
                     hardwareSuccess = pedController.deleteAllKeys()
-                    Log.i(TAG, "deleteAllKeys: 2. Respuesta del hardware: $hardwareSuccess")
+                    
+                    if (hardwareSuccess) {
+                        Log.i(TAG, "deleteAllKeys: 2. ✅ ÉXITO - NewPOS eliminó TODAS las llaves del dispositivo")
+                        Log.i(TAG, "deleteAllKeys: 2. Se eliminaron $keyCount llaves del hardware")
+                    } else {
+                        Log.w(TAG, "deleteAllKeys: 2. ❌ FALLÓ - NewPOS retornó false al intentar eliminar todas las llaves")
+                    }
                 } else {
-                    Log.e(TAG, "deleteAllKeys: 2. Controlador PED no disponible.")
+                    Log.e(TAG, "deleteAllKeys: 2. ❌ CRÍTICO - Controlador PED no disponible.")
                     _snackbarMessage.emit("Error: Controlador no disponible.")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "deleteAllKeys: 2. Excepción durante el borrado de hardware.", e)
+                Log.e(TAG, "deleteAllKeys: 2. ❌ EXCEPCIÓN durante el borrado de hardware", e)
+                Log.e(TAG, "deleteAllKeys: 2. Detalles de la excepción: ${e.message}")
+                Log.e(TAG, "deleteAllKeys: 2. Stacktrace: ${e.stackTraceToString()}")
                 _snackbarMessage.emit("El proceso de borrado fue interrumpido.")
             }
 

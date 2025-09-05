@@ -76,21 +76,20 @@ class InjectedKeyRepository @Inject constructor(
                 injectionTimestamp = System.currentTimeMillis(),
             )
             
-            // Para llaves de ceremonia, usar insertIfNotExists para evitar sobrescritura
-            val insertedId = if (keyType == "CEREMONY_KEY") {
+            if (keyType == "CEREMONY_KEY") {
                 Log.i(TAG, "Llave de ceremonia detectada - usando insertIfNotExists para evitar sobrescritura")
-                injectedKeyDao.insertIfNotExists(injectedKey)
+                val insertedId = injectedKeyDao.insertIfNotExists(injectedKey)
+                if (insertedId > 0) {
+                    Log.i(TAG, "✓ Llave de ceremonia registrada exitosamente con ID: $insertedId")
+                } else {
+                    Log.w(TAG, "⚠️ Llave de ceremonia con KCV $kcv ya existe - no se sobrescribió")
+                }
             } else {
+                Log.i(TAG, "Llave regular detectada - usando insertOrUpdate para permitir actualizaciones")
                 injectedKeyDao.insertOrUpdate(injectedKey)
-                injectedKey.id
-            }
-            
-            if (insertedId > 0) {
-                Log.i(TAG, "✓ Llave registrada exitosamente en base de datos con ID: $insertedId")
+                Log.i(TAG, "✓ Llave registrada/actualizada exitosamente en base de datos")
                 Log.i(TAG, "✓ Datos de la llave guardados: ${keyData.length / 2} bytes")
-                Log.i(TAG, "✓ KCV validado: $kcv")
-            } else {
-                Log.w(TAG, "⚠️ Llave con KCV $kcv ya existe - no se sobrescribió")
+                Log.i(TAG, "✓ KCV: $kcv")
             }
             Log.i(TAG, "================================================")
             
