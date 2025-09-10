@@ -55,13 +55,15 @@ El comando "02" se utiliza para inyectar llaves simétricas:
 
 ### Tipos de Llave Soportados
 
-| Tipo | Código | Descripción |
-|------|--------|-------------|
-| PIN | "05" | PIN Encryption Key |
-| MAC | "04" | MAC Key |
-| TDES/3DES | "01" | Master Session Key |
-| DUKPT | "08" | DUKPT 3DES BDK Key |
-| DATA | "0C" | Data Encryption Key |
+| Tipo | Código | Descripción | KSN Requerido |
+|------|--------|-------------|---------------|
+| PIN | "05" | PIN Encryption Key | No |
+| MAC | "04" | MAC Key | No |
+| TDES/3DES | "01" | Master Session Key | No |
+| AES | "01" | Master Session Key | No |
+| DUKPT_TDES | "08" | DUKPT 3DES BDK Key | Sí |
+| DUKPT_AES | "10" | DUKPT AES BDK Key | Sí |
+| DATA | "0C" | Data Encryption Key | No |
 
 ## Uso
 
@@ -79,9 +81,20 @@ El comando "02" se utiliza para inyectar llaves simétricas:
 Cada perfil debe tener configuraciones de llaves con:
 
 - **Uso**: Descripción del uso (PIN, MAC, etc.)
-- **Tipo**: Tipo de llave (TDES, AES, etc.)
+- **Tipo**: Tipo de llave (TDES, AES, DUKPT_TDES, DUKPT_AES, PIN, MAC, DATA)
 - **Slot**: Posición donde se inyectará
 - **Llave Seleccionada**: KCV de la llave a inyectar
+- **KSN**: Key Serial Number (solo para llaves DUKPT, 20 caracteres hexadecimales)
+
+### Manejo del KSN (Key Serial Number)
+
+Para llaves DUKPT, el KSN es fundamental:
+
+- **Obligatorio**: Todas las llaves DUKPT_TDES y DUKPT_AES requieren KSN
+- **Formato**: Exactamente 20 caracteres hexadecimales (0-9, A-F)
+- **Ejemplo**: `F876543210000000000A`
+- **Validación**: Se valida automáticamente en la interfaz
+- **Generación automática**: Si no se especifica KSN, se genera uno basado en KCV + Slot
 
 ## Configuración Técnica
 

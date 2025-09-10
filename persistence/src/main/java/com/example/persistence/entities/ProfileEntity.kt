@@ -19,5 +19,6 @@ data class KeyConfiguration(
     val keyType: String,
     val slot: String,
     val selectedKey: String,
-    val injectionMethod: String
+    val injectionMethod: String,
+    val ksn: String = "" // KSN para llaves DUKPT (20 caracteres hex)
 ) 

@@ -197,7 +197,8 @@ class SimpleKeyInjectionViewModel @Inject constructor(
                             statusMessage = "Inyectando DUKPT Initial Key en texto plano..."
                         )
                         Log.d(TAG, "Injecting DUKPT_INITIAL_KEY as plain text")
-                        
+
+                        Log.d(TAG, "Using KSN: ${state.ksnValue}")
                         // Convertir KSN de hex a bytes
                         val ksnBytes = if (state.ksnValue.isNotEmpty()) {
                             hexToBytes(state.ksnValue)
