@@ -10,6 +10,7 @@ import com.example.manufacturer.base.models.PedKeyData
 import com.example.persistence.repository.InjectedKeyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import android.util.Log
+import com.vigatec.utils.KcvCalculator.calculateKcv
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -253,7 +254,7 @@ class SimpleKeyInjectionViewModel @Inject constructor(
                 if (success) {
                     Log.i(TAG, "Key injection SUCCESSFUL for slot $slot")
                     
-                    val kcv = calculateSimpleKcv(keyBytes)
+                    val kcv = calculateKcv(state.keyValue)
                     
                     Log.d(TAG, "Calculated KCV: $kcv")
                     
