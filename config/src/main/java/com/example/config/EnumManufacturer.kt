@@ -26,6 +26,7 @@ fun getManufacturerFromString(deviceName: String): EnumManufacturer {
         // Ahora busca "NEWPOS" O el modelo específico "NEW9220"
         deviceName.contains("NEWPOS", ignoreCase = true) -> EnumManufacturer.NEWPOS
         deviceName.contains("NEW9220", ignoreCase = true) -> EnumManufacturer.NEWPOS // <-- AÑADE ESTA LÍNEA
+        deviceName.contains("NEW9830", ignoreCase = true) -> EnumManufacturer.NEWPOS
 
         // Lógica para Vanstone/Aisino
         deviceName.contains("Vanstone", ignoreCase = true) -> EnumManufacturer.AISINO

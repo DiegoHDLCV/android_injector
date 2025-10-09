@@ -45,15 +45,15 @@ class NewposKeyInjectionTests {
     }
 
     // --- Definiciones de Claves y Slots ---
-    private val masterKeyIndex = 10
+    private val masterKeyIndex = 3
     private val masterKeyType = KeyType.MASTER_KEY
     private val plainMasterKeyBytes = "CB79E0898F2907C24A13516BEAE904A2".hexToBytes()
-    
+
     // Nueva definición para Transport Key
     private val transportKeyIndex = 15
     private val transportKeyType = KeyType.TRANSPORT_KEY
     private val plainTransportKeyBytes = "A1B2C3D4E5F60708090A0B0C0D0E0F10".hexToBytes()
-    
+
     private val dataKeyIndex = 11
     private val dataKeyType = KeyType.WORKING_DATA_ENCRYPTION_KEY
     private val plainDataKeyBytes = "892FF24F80C13461760E1349083862D9".hexToBytes()
@@ -135,6 +135,7 @@ class NewposKeyInjectionTests {
 
         println("STEP 2: Encrypting the DATA key in software and injecting it.")
         val encryptedKeyData = softwareEncrypt(plainMasterKeyBytes, plainDataKeyBytes)
+        println("  -> Encrypted DATA Key (Hex): ${encryptedKeyData.toHexString()}") // Log agregado
         val writeSuccess = pedController.writeKey(dataKeyIndex, dataKeyType, keyAlgorithm, PedKeyData(encryptedKeyData), masterKeyIndex, masterKeyType)
 
         assertTrue("The encrypted data key injection call must complete successfully", writeSuccess)
@@ -149,6 +150,7 @@ class NewposKeyInjectionTests {
 
         println("STEP 2: Encrypting the MAC key in software and injecting it.")
         val encryptedKeyData = softwareEncrypt(plainMasterKeyBytes, plainMacKeyBytes)
+        println("  -> Encrypted MAC Key (Hex): ${encryptedKeyData.toHexString()}") // Log agregado
         val writeSuccess = pedController.writeKey(macKeyIndex, macKeyType, keyAlgorithm, PedKeyData(encryptedKeyData), masterKeyIndex, masterKeyType)
 
         assertTrue("Encrypted MAC key injection call must complete successfully", writeSuccess)
@@ -163,6 +165,7 @@ class NewposKeyInjectionTests {
 
         println("STEP 2: Encrypting the PIN key in software and injecting it.")
         val encryptedKeyData = softwareEncrypt(plainMasterKeyBytes, plainPinKeyBytes)
+        println("  -> Encrypted PIN Key (Hex): ${encryptedKeyData.toHexString()}") // Log agregado
         val writeSuccess = pedController.writeKey(pinKeyIndex, pinKeyType, keyAlgorithm, PedKeyData(encryptedKeyData), masterKeyIndex, masterKeyType)
 
         assertTrue("Encrypted PIN key injection call must complete successfully", writeSuccess)
@@ -173,15 +176,15 @@ class NewposKeyInjectionTests {
     fun testInjectTransportKeyPlaintext_VerifyCallSuccess() = runBlocking {
         println("\n--- START TEST: NEWPOS - TRANSPORT KEY PLAINTEXT INJECTION ---")
         println("STEP 1: Injecting Transport Key in clear text into slot $transportKeyIndex.")
-        
+
         try {
             val writeSuccess = pedController.writeKeyPlain(transportKeyIndex, transportKeyType, keyAlgorithm, plainTransportKeyBytes, null)
             assertTrue("Transport key plaintext injection must complete successfully", writeSuccess)
-            
+
             println("STEP 2: Verifying the Transport Key is present in the PED.")
             val isPresent = pedController.isKeyPresent(transportKeyIndex, transportKeyType)
             assertTrue("Transport key must be present after injection", isPresent)
-            
+
             println("SUCCESS: Transport Key plaintext injection completed successfully.")
             println("  -> This validates the fix for NewPOS error code 2255 with TRANSPORT_KEY injection.")
         } catch (e: Exception) {
