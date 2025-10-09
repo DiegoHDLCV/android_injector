@@ -95,6 +95,21 @@ fun SimpleKeyInjectionScreen(
             )
         }
         
+        // KSN - Solo mostrar para DUKPT Initial Key
+        val isDukptInitialKey = uiState.keyType == "DUKPT_INITIAL_KEY"
+        if (isDukptInitialKey) {
+            OutlinedTextField(
+                value = uiState.ksnValue,
+                onValueChange = viewModel::updateKsnValue,
+                label = { Text("KSN (Hex)") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                isError = uiState.ksnValueError != null,
+                supportingText = uiState.ksnValueError?.let { { Text(it) } }
+                    ?: { Text("Key Serial Number - 20 caracteres hex (10 bytes)") }
+            )
+        }
+        
         // Valor de llave (con valor por defecto)
         OutlinedTextField(
             value = uiState.keyValue,

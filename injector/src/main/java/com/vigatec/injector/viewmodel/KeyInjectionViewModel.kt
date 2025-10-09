@@ -387,9 +387,15 @@ class KeyInjectionViewModel @Inject constructor(
         val keyChecksum = selectedKey.kcv.take(4) // Checksum de la llave
         val ktkChecksum = "0000" // Checksum KTK (no usado en carga en claro)
         
-        // KSN: Para llaves DUKPT usar KSN real, para otras llaves usar zeros
+        // KSN: Para llaves DUKPT usar KSN del perfil o generar uno, para otras llaves usar zeros
         val ksn = if (isDukptKeyType(keyType)) {
-            generateKsn(keyConfig, selectedKey) // Generar KSN para llaves DUKPT
+            if (keyConfig.ksn.isNotEmpty() && keyConfig.ksn.length == 20) {
+                Log.i(TAG, "Usando KSN proporcionado en el perfil: ${keyConfig.ksn}")
+                keyConfig.ksn.uppercase()
+            } else {
+                Log.i(TAG, "KSN no válido en perfil, generando automáticamente...")
+                generateKsn(keyConfig, selectedKey) // Generar KSN para llaves DUKPT
+            }
         } else {
             "00000000000000000000" // KSN por defecto para llaves no-DUKPT
         }
@@ -509,7 +515,8 @@ class KeyInjectionViewModel @Inject constructor(
             "PIN" -> "05" // PIN Encryption Key
             "MAC" -> "04" // MAC Key
             "TDES", "3DES" -> "01" // Master Session Key
-            "DUKPT", "DUKPT_3DES" -> "08" // DUKPT 3DES BDK Key
+            "AES" -> "01" // Master Session Key (AES)
+            "DUKPT", "DUKPT_TDES", "DUKPT_3DES" -> "08" // DUKPT 3DES BDK Key
             "DUKPT_AES" -> "10" // DUKPT AES BDK Key
             "DUKPT_INITIAL", "IPEK" -> "03" // DUKPT 3DES IPEK
             "DUKPT_AES_INITIAL", "AES_IPEK" -> "0B" // DUKPT AES IPEK
@@ -529,6 +536,13 @@ class KeyInjectionViewModel @Inject constructor(
             "02", "03", "08", "0B", "10" -> true // Tipos DUKPT según manual Futurex
             else -> false
         }
+    }
+
+    /**
+     * Verifica si el tipo de llave configurado en el perfil es DUKPT
+     */
+    private fun isDukptKeyTypeFromConfig(keyType: String): Boolean {
+        return keyType.uppercase().contains("DUKPT")
     }
 
     /**
@@ -563,12 +577,12 @@ class KeyInjectionViewModel @Inject constructor(
 
     private fun getKeyTypeDescription(keyType: String): String {
         return when (keyType) {
-            "01" -> "Master Session Key (TDES/3DES)"
+            "01" -> "Master Session Key (TDES/3DES/AES)"
             "02" -> "DUKPT Initial Key (Solo pruebas)"
             "03" -> "DUKPT 3DES IPEK (Llave inicial DUKPT 3DES)"
-            "04" -> "3DES MAC Key"
-            "05" -> "3DES PIN Encryption Key"
-            "06" -> "3DES Key Transfer Key (KTK)"
+            "04" -> "MAC Key"
+            "05" -> "PIN Encryption Key"
+            "06" -> "Key Transfer Key (KTK)"
             "08" -> "DUKPT 3DES BDK (Base Derivation Key)"
             "0B" -> "DUKPT AES IPEK (Llave inicial DUKPT AES)"
             "0C" -> "Data Encryption Key"
@@ -714,14 +728,25 @@ class KeyInjectionViewModel @Inject constructor(
         // Verificar longitud de la llave
         val keyLengthBytes = selectedKey.keyData.length / 2
         val validLengths = when (keyConfig.keyType.uppercase()) {
-            "TDES", "3DES" -> listOf(16, 32, 48) // 128, 256, 384 bits
-            "AES" -> listOf(16, 24, 32) // 128, 192, 256 bits
-            "DUKPT" -> listOf(16, 32, 48) // 128, 256, 384 bits
+            "TDES", "3DES", "DUKPT_TDES", "DUKPT_3DES" -> listOf(16, 32, 48) // 128, 256, 384 bits
+            "AES", "DUKPT_AES" -> listOf(16, 24, 32) // 128, 192, 256 bits
+            "PIN", "MAC", "DATA" -> listOf(16, 24, 32) // 128, 192, 256 bits
+            "DUKPT" -> listOf(16, 32, 48) // 128, 256, 384 bits (genérico)
             else -> listOf(16, 32, 48) // Longitudes por defecto
         }
 
         if (keyLengthBytes !in validLengths) {
             throw Exception("Longitud de llave inválida para ${keyConfig.keyType}: $keyLengthBytes bytes. Válidas: $validLengths")
+        }
+
+        // Verificar KSN para llaves DUKPT
+        if (isDukptKeyTypeFromConfig(keyConfig.keyType)) {
+            if (keyConfig.ksn.isNotEmpty() && keyConfig.ksn.length != 20) {
+                throw Exception("KSN inválido para llave DUKPT: debe tener exactamente 20 caracteres hexadecimales")
+            }
+            if (keyConfig.ksn.isNotEmpty() && !keyConfig.ksn.matches(Regex("^[0-9A-Fa-f]+$"))) {
+                throw Exception("KSN contiene caracteres inválidos: solo se permiten dígitos hexadecimales")
+            }
         }
 
         // Verificar que keyData sea hexadecimal válido

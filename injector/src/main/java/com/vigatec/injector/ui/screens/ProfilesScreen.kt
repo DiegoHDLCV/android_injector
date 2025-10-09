@@ -991,7 +991,7 @@ fun KeyConfigurationItem(
     onRemove: () -> Unit
 ) {
     val usageOptions = remember { listOf("PIN", "MAC", "DATA", "KEK") }
-    val keyTypeOptions = remember { listOf("TDES", "AES") }
+    val keyTypeOptions = remember { listOf("TDES", "AES", "DUKPT_TDES", "DUKPT_AES", "PIN", "MAC", "DATA") }
 
     // Estados UI
     var usageExpanded by rememberSaveable { mutableStateOf(false) }
@@ -1186,6 +1186,34 @@ fun KeyConfigurationItem(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    // Campo KSN (solo visible para llaves DUKPT)
+                    val isDukptKey = config.keyType.contains("DUKPT", ignoreCase = true)
+                    if (isDukptKey) {
+                        OutlinedTextField(
+                            value = config.ksn,
+                            onValueChange = { raw ->
+                                val filtered = raw.uppercase()
+                                    .filter { it in "0123456789ABCDEF" }
+                                    .take(20)
+                                onUpdate(config.id, "ksn", filtered)
+                            },
+                            label = { Text("KSN (Key Serial Number)") },
+                            placeholder = { Text("F876543210000000000A") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                            supportingText = {
+                                Text(
+                                    "Exactamente 20 dígitos hexadecimales para DUKPT",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (config.ksn.length == 20) MaterialTheme.colorScheme.primary 
+                                           else MaterialTheme.colorScheme.error
+                                )
+                            },
+                            isError = isDukptKey && config.ksn.length != 20,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
 
                 Column(
@@ -1364,6 +1392,34 @@ fun KeyConfigurationItem(
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    // Campo KSN (solo visible para llaves DUKPT)
+                    val isDukptKey = config.keyType.contains("DUKPT", ignoreCase = true)
+                    if (isDukptKey) {
+                        OutlinedTextField(
+                            value = config.ksn,
+                            onValueChange = { raw ->
+                                val filtered = raw.uppercase()
+                                    .filter { it in "0123456789ABCDEF" }
+                                    .take(20)
+                                onUpdate(config.id, "ksn", filtered)
+                            },
+                            label = { Text("KSN (Key Serial Number)") },
+                            placeholder = { Text("F876543210000000000A") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                            supportingText = {
+                                Text(
+                                    "Exactamente 20 dígitos hexadecimales para DUKPT",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (config.ksn.length == 20) MaterialTheme.colorScheme.primary 
+                                           else MaterialTheme.colorScheme.error
+                                )
+                            },
+                            isError = isDukptKey && config.ksn.length != 20,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
 
                     ExposedDropdownMenuBox(
                         expanded = keyExpanded,

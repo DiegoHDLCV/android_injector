@@ -10,6 +10,7 @@ import com.example.manufacturer.base.models.PedKeyData
 import com.example.persistence.repository.InjectedKeyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import android.util.Log
+import com.vigatec.utils.KcvCalculator.calculateKcv
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,10 +26,13 @@ data class SimpleKeyInjectionUiState(
     val masterKeyIndex: String = "0",
     // Para master keys: slot de la KTK (Key Transport Key) 
     val ktkSlot: String = "15",
+    // Para DUKPT: KSN (Key Serial Number)
+    val ksnValue: String = "F8765432100000000000", // KSN por defecto
     val keySlotError: String? = null,
     val keyValueError: String? = null,
     val masterKeyIndexError: String? = null,
     val ktkSlotError: String? = null,
+    val ksnValueError: String? = null,
     val isLoading: Boolean = false,
     val statusMessage: String? = null
 )
@@ -78,6 +82,14 @@ class SimpleKeyInjectionViewModel @Inject constructor(
         )
     }
 
+    fun updateKsnValue(ksn: String) {
+        val cleanKsn = ksn.uppercase().replace(" ", "")
+        _uiState.value = _uiState.value.copy(
+            ksnValue = cleanKsn,
+            ksnValueError = validateKsnValue(cleanKsn)
+        )
+    }
+
     fun injectKey() {
         val state = _uiState.value
         
@@ -95,13 +107,18 @@ class SimpleKeyInjectionViewModel @Inject constructor(
             validateSlot(state.ktkSlot)
         } else null
         
+        val ksnValueError = if (keyType == KeyType.DUKPT_INITIAL_KEY) {
+            validateKsnValue(state.ksnValue)
+        } else null
+        
         if (slotError != null || keyValueError != null || 
-            masterKeyIndexError != null || ktkSlotError != null) {
+            masterKeyIndexError != null || ktkSlotError != null || ksnValueError != null) {
             _uiState.value = state.copy(
                 keySlotError = slotError,
                 keyValueError = keyValueError,
                 masterKeyIndexError = masterKeyIndexError,
-                ktkSlotError = ktkSlotError
+                ktkSlotError = ktkSlotError,
+                ksnValueError = ksnValueError
             )
             return
         }
@@ -175,6 +192,32 @@ class SimpleKeyInjectionViewModel @Inject constructor(
                         Log.d(TAG, "writeKeyPlain returned: $result for MASTER_KEY in slot $slot")
                         result
                     }
+                    KeyType.DUKPT_INITIAL_KEY -> {
+                        // DUKPT Initial Key: inyección en texto plano con KSN
+                        _uiState.value = _uiState.value.copy(
+                            statusMessage = "Inyectando DUKPT Initial Key en texto plano..."
+                        )
+                        Log.d(TAG, "Injecting DUKPT_INITIAL_KEY as plain text")
+
+                        Log.d(TAG, "Using KSN: ${state.ksnValue}")
+                        // Convertir KSN de hex a bytes
+                        val ksnBytes = if (state.ksnValue.isNotEmpty()) {
+                            hexToBytes(state.ksnValue)
+                        } else {
+                            // KSN por defecto si no se especifica
+                            hexToBytes("F8765432100000000000")
+                        }
+                        
+                        val result = pedController.writeDukptInitialKey(
+                            groupIndex = slot, 
+                            keyAlgorithm = keyAlgorithm, 
+                            keyBytes = keyBytes, 
+                            initialKsn = ksnBytes, 
+                            keyChecksum = null
+                        )
+                        Log.d(TAG, "writeDukptInitialKey returned: $result for DUKPT_INITIAL_KEY in slot $slot")
+                        result
+                    }
                     else -> {
                         // Working Keys: cifrado en software con Master Key (como en el test)
                         val masterKeySlot = state.masterKeyIndex.toInt()
@@ -211,7 +254,7 @@ class SimpleKeyInjectionViewModel @Inject constructor(
                 if (success) {
                     Log.i(TAG, "Key injection SUCCESSFUL for slot $slot")
                     
-                    val kcv = calculateSimpleKcv(keyBytes)
+                    val kcv = calculateKcv(state.keyValue)
                     
                     Log.d(TAG, "Calculated KCV: $kcv")
                     
@@ -284,6 +327,17 @@ class SimpleKeyInjectionViewModel @Inject constructor(
         }
         if (value.length != 32) {
             return "32 caracteres hex"
+        }
+        return null
+    }
+
+    private fun validateKsnValue(value: String): String? {
+        if (value.isEmpty()) return "Requerido"
+        if (!value.matches(Regex("^[0-9A-Fa-f]*$"))) {
+            return "Solo hex (0-9, A-F)"
+        }
+        if (value.length != 20) {
+            return "20 caracteres hex (10 bytes)"
         }
         return null
     }

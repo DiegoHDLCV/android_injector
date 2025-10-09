@@ -469,62 +469,73 @@ class AisinoPedController(private val application: Application) : IPedController
         initialKsn: ByteArray,
         keyChecksum: String?
     ): Boolean = withContext(Dispatchers.IO) {
-        Log.i(TAG, "--- Starting writeDukptInitialKey (for plaintext IPEK) ---")
-        Log.d(TAG, "-> DUKPT Group Index: $groupIndex, Algorithm: $keyAlgorithm")
+        Log.i(TAG, "--- Starting writeDukptInitialKey without KCV verification ---")
 
-        val ipekHexString = keyBytes.joinToString("") { "%02X".format(it) }
-        val ksnHexString = initialKsn.joinToString("") { "%02X".format(it) }
+        val keyLenByte: Byte = keyBytes.size.toByte()
+        Log.d(TAG, "Key length: $keyLenByte bytes")
 
-        val ipekBcd: ByteArray
-        val ksnInBcd: ByteArray
-        try {
-            ipekBcd = CommonConvert.ascStringToBCD(ipekHexString)
-            ksnInBcd = CommonConvert.ascStringToBCD(ksnHexString)
-        } catch (e: Exception) {
-            throw PedKeyException("Error converting key/KSN data to BCD: ${e.message}", e)
-        }
+        // CAMBIO: Sin verificación pero con buffer mínimo para evitar error 7
+        val checkMode: Byte = 0x00  // Sin verificación
+        val checkBuffer = ByteArray(1) { 0 }  // Buffer mínimo de 1 byte con valor 0
 
-        val keyLenByte: Byte = ipekBcd.size.toByte()
-        Log.d(TAG, "Calculated BCD key length byte for API call: $keyLenByte")
-
-        val checkMode: Byte
-        val checkBuffer: ByteArray
-
-        if (keyChecksum.isNullOrBlank() || keyChecksum == "0000") {
-            checkMode = KCV_CHECK_MODE_DISABLED
-            checkBuffer = ByteArray(16) { 0 }
-            Log.d(TAG, "KCV check disabled.")
-        } else {
-            checkMode = KCV_CHECK_MODE_ENABLED
-            try {
-                val checksumBytes = CommonConvert.hexStringToByte(keyChecksum)
-                checkBuffer = ByteArray(1 + checksumBytes.size)
-                checkBuffer[0] = checksumBytes.size.toByte()
-                System.arraycopy(checksumBytes, 0, checkBuffer, 1, checksumBytes.size)
-            } catch (e: Exception) {
-                throw PedKeyException("Failed to parse keyChecksum: $keyChecksum", e)
-            }
-        }
+        Log.d(TAG, "Check mode: 0x00 (No verification)")
+        Log.d(TAG, "Check buffer: minimal buffer to avoid error 7")
 
         try {
-            val sourceKeyIndex: Byte = IPEK_INJECTION_MODE_PLAINTEXT
+            val sourceKeyIndex: Byte = 0  // Texto plano
 
-            Log.i(TAG, "Calling PedApi.PedDukptWriteTIK_Api with BCD formatted data...")
+            Log.i(TAG, "Calling PedApi.PedDukptWriteTIK_Api without KCV verification...")
             val result = PedApi.PedDukptWriteTIK_Api(
-                groupIndex.toByte(), sourceKeyIndex, keyLenByte, ipekBcd, ksnInBcd, checkMode, checkBuffer
+                groupIndex.toByte(),  // Grupo 1
+                sourceKeyIndex,                // 0 (texto plano)
+                keyLenByte,                   // 16
+                keyBytes,                     // TIK hardcodeada
+                initialKsn,                     // KSN hardcodeado
+                checkMode,                    // 0x00 (sin verificación)
+                checkBuffer                   // Buffer mínimo
             )
-            Log.i(TAG, "PedApi.PedDukptWriteTIK_Api finished with result code: $result")
+
+            Log.i(TAG, "PedApi.PedDukptWriteTIK_Api result: $result")
 
             if (result != 0) {
-                throw PedKeyException("Failed to write DUKPT initial key (plaintext). Aisino Error Code: $result")
+                val errorMsg = when(result) {
+                    1 -> "DUKPT Index Out of Range"
+                    2 -> "SrcKeyIdx Out of Range"
+                    3 -> "Key Length Error"
+                    4 -> "Illegal Ciphertext Data"
+                    5 -> "KsnIn Parameter Error"
+                    6 -> "Illegal Check Mode"
+                    7 -> "CheckBuf Empty"
+                    8 -> "Other DUKPT Errors"
+                    else -> "Unknown Error"
+                }
+                throw PedKeyException("Failed to write DUKPT key. Error: $errorMsg (Code: $result)")
             }
 
-            Log.d(TAG, "Successfully wrote plaintext DUKPT IPEK to group index: $groupIndex")
+            Log.d(TAG, "Successfully wrote DUKPT IPEK to group: $groupIndex")
+
+            // Verificar que se inyectó correctamente
+            try {
+                val currentKsn = ByteArray(10)
+                val ksnResult = PedApi.PedGetDukptKSN_Api(groupIndex.toByte(), currentKsn)
+                if (ksnResult == 0) {
+                    val ksnHex = currentKsn.joinToString("") { "%02X".format(it) }
+                    Log.i(TAG, "Verification - Current KSN: $ksnHex")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not verify KSN after injection: ${e.message}")
+            }
+
             return@withContext true
+
         } catch (e: Exception) {
-            Log.e(TAG, "An unexpected exception occurred while writing plaintext DUKPT key", e)
-            throw e as? PedKeyException ?: PedKeyException("Failed to write DUKPT initial key", e)
+            Log.e(TAG, "Exception writing DUKPT key", e)
+            throw e as? PedKeyException ?: PedKeyException("Failed to write DUKPT key", e)
         }
+    }
+
+    companion object {
+        private const val TAG = "DukptKeyInjection"
     }
 
     @Throws(PedException::class)

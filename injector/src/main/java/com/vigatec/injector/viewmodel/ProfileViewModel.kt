@@ -135,7 +135,8 @@ class ProfileViewModel @Inject constructor(
             keyType = "",
             slot = "",
             selectedKey = "",
-            injectionMethod = "auto"
+            injectionMethod = "auto",
+            ksn = ""
         )
         onFormDataChange(_state.value.formData.copy(keyConfigurations = currentConfigs + newConfig))
     }
@@ -154,6 +155,7 @@ class ProfileViewModel @Inject constructor(
                     "keyType" -> it.copy(keyType = value)
                     "slot" -> it.copy(slot = value)
                     "selectedKey" -> it.copy(selectedKey = value)
+                    "ksn" -> it.copy(ksn = value)
                     else -> it
                 }
             } else {
