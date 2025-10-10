@@ -54,7 +54,9 @@ class InjectedKeyRepository @Inject constructor(
         keyAlgorithm: String,
         kcv: String,
         keyData: String,
-        status: String = "SUCCESSFUL"
+        status: String = "SUCCESSFUL",
+        isKEK: Boolean = false,
+        customName: String = ""
     ) {
         try {
             Log.i(TAG, "=== REGISTRANDO INYECCIÓN DE LLAVE CON DATOS COMPLETOS ===")
@@ -65,7 +67,9 @@ class InjectedKeyRepository @Inject constructor(
             Log.i(TAG, "Datos de llave (longitud): ${keyData.length / 2} bytes")
             Log.i(TAG, "Datos de llave (primeros 32 bytes): ${keyData.take(64)}")
             Log.i(TAG, "Estado: $status")
-            
+            Log.i(TAG, "Es KEK: $isKEK")
+            Log.i(TAG, "Nombre personalizado: ${if (customName.isEmpty()) "(Sin nombre)" else customName}")
+
             val injectedKey = InjectedKeyEntity(
                 keySlot = keySlot,
                 keyType = keyType,
@@ -74,6 +78,8 @@ class InjectedKeyRepository @Inject constructor(
                 keyData = keyData,
                 status = status,
                 injectionTimestamp = System.currentTimeMillis(),
+                isKEK = isKEK,
+                customName = customName
             )
             
             if (keyType == "CEREMONY_KEY") {
@@ -190,6 +196,25 @@ class InjectedKeyRepository @Inject constructor(
      */
     suspend fun getKeyByKcv(kcv: String): InjectedKeyEntity? {
         return injectedKeyDao.getKeyByKcv(kcv)
+    }
+
+    /**
+     * Actualiza el estado de una llave por su KCV.
+     * Útil para marcar KEKs como EXPORTED o INACTIVE.
+     */
+    suspend fun updateKeyStatus(kcv: String, newStatus: String) {
+        try {
+            val key = injectedKeyDao.getKeyByKcv(kcv)
+            if (key != null) {
+                injectedKeyDao.updateKeyStatusById(key.id, newStatus)
+                Log.d(TAG, "Estado de llave actualizado: KCV=$kcv, nuevo estado=$newStatus")
+            } else {
+                Log.w(TAG, "No se encontró llave con KCV=$kcv para actualizar estado")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al actualizar estado de llave por KCV", e)
+            throw e
+        }
     }
 
 }

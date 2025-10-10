@@ -25,7 +25,7 @@ import com.example.persistence.entities.ProfileEntity
         InjectedKeyEntity::class,
         ProfileEntity::class
     ],
-    version = 9, // Se incrementa la versión para restricción única en slot+tipo
+    version = 10, // Se incrementa la versión para agregar campos isKEK y customName
     exportSchema = true
 )
 @TypeConverters(Converters::class)

@@ -34,5 +34,9 @@ data class InjectedKeyEntity(
 
     // Metadatos de auditoría
     val injectionTimestamp: Long = System.currentTimeMillis(),
-    val status: String          // Estado de la última operación (ej: "SUCCESSFUL", "FAILED").
+    val status: String,         // Estado de la última operación (ej: "SUCCESSFUL", "FAILED", "ACTIVE", "EXPORTED", "INACTIVE").
+
+    // Campos para KEK y personalización
+    val isKEK: Boolean = false, // Flag para identificar si es una KEK (Key Encryption Key)
+    val customName: String = "" // Nombre personalizado para la llave (opcional)
 )

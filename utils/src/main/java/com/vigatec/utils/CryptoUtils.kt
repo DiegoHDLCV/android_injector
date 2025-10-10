@@ -162,7 +162,7 @@ object KcvCalculator {
     }
 
     // Función auxiliar para convertir hex string a ByteArray
-    private fun hexStringToByteArray(hex: String): ByteArray {
+    fun hexStringToByteArray(hex: String): ByteArray {
         val cleanHex = hex.replace("\\s".toRegex(), "").uppercase()
         require(cleanHex.length % 2 == 0) { "Hex string debe tener longitud par" }
 
@@ -201,5 +201,181 @@ object KcvCalculator {
 
         // Comparación de métodos
         calculateKcvComparison(testKey)
+    }
+}
+
+/**
+ * Utilidad para cifrar y descifrar datos usando 3DES (Triple DES)
+ * Se usa para cifrar llaves con la KEK (Key Encryption Key)
+ */
+object TripleDESCrypto {
+
+    private val TAG = "TripleDESCrypto"
+
+    /**
+     * Cifra datos usando 3DES con una KEK
+     *
+     * @param plainData Datos en claro (hex string)
+     * @param kekData Llave de cifrado KEK (hex string)
+     * @return Datos cifrados (hex string)
+     */
+    fun encryptWithKEK(plainData: String, kekData: String): String {
+        try {
+            Log.d(TAG, "=== CIFRANDO CON KEK ===")
+            Log.d(TAG, "Datos en claro (hex): ${plainData.take(32)}... (${plainData.length / 2} bytes)")
+            Log.d(TAG, "KEK (hex): ${kekData.take(32)}... (${kekData.length / 2} bytes)")
+
+            val plainBytes = KcvCalculator.hexStringToByteArray(plainData)
+            val kekBytes = KcvCalculator.hexStringToByteArray(kekData)
+
+            Log.d(TAG, "Longitud datos: ${plainBytes.size} bytes")
+            Log.d(TAG, "Longitud KEK: ${kekBytes.size} bytes")
+
+            // Validar longitud de KEK
+            if (kekBytes.size != 16 && kekBytes.size != 24) {
+                throw IllegalArgumentException("KEK debe ser de 16 o 24 bytes, recibido: ${kekBytes.size}")
+            }
+
+            // Validar que los datos sean múltiplo de 8 (bloque 3DES)
+            if (plainBytes.size % 8 != 0) {
+                throw IllegalArgumentException("Los datos deben ser múltiplo de 8 bytes, recibido: ${plainBytes.size}")
+            }
+
+            // Crear cipher 3DES en modo ECB sin padding
+            val keySpec = SecretKeySpec(kekBytes, "DESede")
+            val cipher = Cipher.getInstance("DESede/ECB/NoPadding")
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec)
+
+            // Cifrar
+            val encryptedBytes = cipher.doFinal(plainBytes)
+            val encryptedHex = encryptedBytes.joinToString("") { "%02X".format(it) }
+
+            Log.d(TAG, "Datos cifrados (hex): ${encryptedHex.take(32)}...")
+            Log.d(TAG, "Longitud cifrada: ${encryptedBytes.size} bytes")
+            Log.d(TAG, "✓ Cifrado exitoso")
+
+            return encryptedHex
+
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ Error al cifrar con KEK: ${e.message}", e)
+            throw e
+        }
+    }
+
+    /**
+     * Descifra datos usando 3DES con una KEK
+     *
+     * @param encryptedData Datos cifrados (hex string)
+     * @param kekData Llave de descifrado KEK (hex string)
+     * @return Datos en claro (hex string)
+     */
+    fun decryptWithKEK(encryptedData: String, kekData: String): String {
+        try {
+            Log.d(TAG, "=== DESCIFRANDO CON KEK ===")
+            Log.d(TAG, "Datos cifrados (hex): ${encryptedData.take(32)}... (${encryptedData.length / 2} bytes)")
+            Log.d(TAG, "KEK (hex): ${kekData.take(32)}... (${kekData.length / 2} bytes)")
+
+            val encryptedBytes = KcvCalculator.hexStringToByteArray(encryptedData)
+            val kekBytes = KcvCalculator.hexStringToByteArray(kekData)
+
+            Log.d(TAG, "Longitud cifrada: ${encryptedBytes.size} bytes")
+            Log.d(TAG, "Longitud KEK: ${kekBytes.size} bytes")
+
+            // Validar longitud de KEK
+            if (kekBytes.size != 16 && kekBytes.size != 24) {
+                throw IllegalArgumentException("KEK debe ser de 16 o 24 bytes, recibido: ${kekBytes.size}")
+            }
+
+            // Validar que los datos sean múltiplo de 8 (bloque 3DES)
+            if (encryptedBytes.size % 8 != 0) {
+                throw IllegalArgumentException("Los datos cifrados deben ser múltiplo de 8 bytes, recibido: ${encryptedBytes.size}")
+            }
+
+            // Crear cipher 3DES en modo ECB sin padding
+            val keySpec = SecretKeySpec(kekBytes, "DESede")
+            val cipher = Cipher.getInstance("DESede/ECB/NoPadding")
+            cipher.init(Cipher.DECRYPT_MODE, keySpec)
+
+            // Descifrar
+            val decryptedBytes = cipher.doFinal(encryptedBytes)
+            val decryptedHex = decryptedBytes.joinToString("") { "%02X".format(it) }
+
+            Log.d(TAG, "Datos descifrados (hex): ${decryptedHex.take(32)}...")
+            Log.d(TAG, "Longitud descifrada: ${decryptedBytes.size} bytes")
+            Log.d(TAG, "✓ Descifrado exitoso")
+
+            return decryptedHex
+
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ Error al descifrar con KEK: ${e.message}", e)
+            throw e
+        }
+    }
+
+    /**
+     * Cifra una llave completa para envío al SubPOS
+     * Incluye validaciones y logs detallados
+     *
+     * @param keyData Datos de la llave en claro (hex)
+     * @param kekData KEK para cifrar (hex)
+     * @param keyKcv KCV de la llave para validación
+     * @return Llave cifrada (hex)
+     */
+    fun encryptKeyForTransmission(keyData: String, kekData: String, keyKcv: String): String {
+        try {
+            Log.d(TAG, "=== CIFRANDO LLAVE PARA TRANSMISIÓN ===")
+            Log.d(TAG, "KCV de la llave: $keyKcv")
+
+            // Validar que la llave sea de longitud válida
+            val keyBytes = KcvCalculator.hexStringToByteArray(keyData)
+            if (keyBytes.size != 8 && keyBytes.size != 16 && keyBytes.size != 24) {
+                throw IllegalArgumentException("Llave debe ser de 8, 16 o 24 bytes, recibido: ${keyBytes.size}")
+            }
+
+            // Cifrar
+            val encryptedKey = encryptWithKEK(keyData, kekData)
+
+            // Validar KCV después de cifrado (el KCV original debe ser preservado)
+            Log.d(TAG, "✓ Llave cifrada exitosamente")
+            Log.d(TAG, "  - KCV original: $keyKcv")
+            Log.d(TAG, "  - Longitud original: ${keyBytes.size} bytes")
+            Log.d(TAG, "  - Longitud cifrada: ${encryptedKey.length / 2} bytes")
+
+            return encryptedKey
+
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ Error al cifrar llave para transmisión: ${e.message}", e)
+            throw e
+        }
+    }
+
+    /**
+     * Prueba de cifrado/descifrado round-trip
+     * Útil para validar que el cifrado y descifrado funcionan correctamente
+     */
+    fun testRoundTrip() {
+        Log.d(TAG, "=== PRUEBA ROUND-TRIP DE CIFRADO ===")
+
+        // Datos de prueba
+        val testKey = "AABBCCDDEEFF00112233445566778899" // 16 bytes (llave a cifrar)
+        val testKEK = "6C096C2884EB17CF7144D890E1D456CC" // 16 bytes (KEK)
+
+        Log.d(TAG, "Llave original: $testKey")
+        Log.d(TAG, "KEK: $testKEK")
+
+        // Cifrar
+        val encrypted = encryptWithKEK(testKey, testKEK)
+        Log.d(TAG, "Llave cifrada: $encrypted")
+
+        // Descifrar
+        val decrypted = decryptWithKEK(encrypted, testKEK)
+        Log.d(TAG, "Llave descifrada: $decrypted")
+
+        // Validar
+        val success = testKey.equals(decrypted, ignoreCase = true)
+        Log.d(TAG, if (success) "✓ ROUND-TRIP EXITOSO" else "✗ ROUND-TRIP FALLIDO")
+        Log.d(TAG, "Original:    $testKey")
+        Log.d(TAG, "Descifrado:  $decrypted")
+        Log.d(TAG, "¿Coincide?: $success")
     }
 }

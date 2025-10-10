@@ -54,6 +54,7 @@ data class KeyInjectionState(
 class KeyInjectionViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val injectedKeyRepository: InjectedKeyRepository,
+    private val kekManager: com.vigatec.injector.manager.KEKManager,
     private val application: android.app.Application
 ) : ViewModel() {
 
@@ -175,14 +176,18 @@ class KeyInjectionViewModel @Inject constructor(
         viewModelScope.launch {
             val profile = _state.value.currentProfile ?: return@launch
             val keyConfigs = profile.keyConfigurations
-            
+
             Log.i(TAG, "=== INICIANDO PROCESO DE INYECCIÓN FUTUREX ===")
             Log.i(TAG, "Perfil: ${profile.name}")
+            Log.i(TAG, "¿Usa KEK?: ${profile.useKEK}")
+            if (profile.useKEK) {
+                Log.i(TAG, "KEK seleccionada (KCV): ${profile.selectedKEKKcv}")
+            }
             Log.i(TAG, "Configuraciones de llave: ${keyConfigs.size}")
             keyConfigs.forEachIndexed { index, config ->
                 Log.i(TAG, "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
             }
-            
+
             if (keyConfigs.isEmpty()) {
                 Log.w(TAG, "El perfil no tiene configuraciones de llaves")
                 _snackbarEvent.emit("El perfil no tiene configuraciones de llaves")
@@ -204,19 +209,78 @@ class KeyInjectionViewModel @Inject constructor(
                         log = _state.value.log + "Deteniendo polling para iniciar inyección...\n"
                     )
                     pollingService.stopPolling()
-                    
+
                     // Esperar un momento para asegurar que el puerto esté libre
                     kotlinx.coroutines.delay(1000)
                 }
-                
+
                 // Inicializar comunicación
                 Log.i(TAG, "Inicializando comunicación serial...")
                 initializeCommunication()
-                
+
                 _state.value = _state.value.copy(
                     status = InjectionStatus.INJECTING,
                     log = _state.value.log + "Conexión establecida. Iniciando inyección...\n"
                 )
+
+                // === PASO 1: VERIFICAR Y EXPORTAR KEK SI ES NECESARIO ===
+                if (profile.useKEK && profile.selectedKEKKcv.isNotEmpty()) {
+                    Log.i(TAG, "=== VERIFICANDO EXPORTACIÓN DE KEK ===")
+                    _state.value = _state.value.copy(
+                        log = _state.value.log + "Verificando KEK para cifrado...\n"
+                    )
+
+                    // Obtener la KEK de la base de datos
+                    val kek = injectedKeyRepository.getKeyByKcv(profile.selectedKEKKcv)
+
+                    if (kek == null) {
+                        Log.e(TAG, "KEK no encontrada con KCV: ${profile.selectedKEKKcv}")
+                        throw Exception("KEK seleccionada no encontrada en la base de datos")
+                    }
+
+                    Log.i(TAG, "KEK encontrada:")
+                    Log.i(TAG, "  - KCV: ${kek.kcv}")
+                    Log.i(TAG, "  - Nombre: ${kek.customName.ifEmpty { "Sin nombre" }}")
+                    Log.i(TAG, "  - Estado: ${kek.status}")
+                    Log.i(TAG, "  - Es KEK: ${kek.isKEK}")
+
+                    // Verificar si la KEK ya fue exportada
+                    if (kek.status != "EXPORTED") {
+                        Log.i(TAG, "KEK aún no exportada. Exportando KEK al SubPOS...")
+                        _state.value = _state.value.copy(
+                            log = _state.value.log + "Exportando KEK al SubPOS (en claro, solo una vez)...\n"
+                        )
+
+                        // Exportar la KEK (slot fijo 00 para KEK, en claro)
+                        try {
+                            exportKEKToDevice(kek)
+
+                            // Actualizar estado de KEK a EXPORTED
+                            Log.i(TAG, "Actualizando estado de KEK a EXPORTED...")
+                            injectedKeyRepository.updateKeyStatus(kek.kcv, "EXPORTED")
+
+                            Log.i(TAG, "✓ KEK exportada y marcada como EXPORTED exitosamente")
+                            _state.value = _state.value.copy(
+                                log = _state.value.log + "✓ KEK exportada exitosamente al slot 00\n"
+                            )
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error al exportar KEK", e)
+                            throw Exception("Error al exportar KEK: ${e.message}")
+                        }
+                    } else {
+                        Log.i(TAG, "✓ KEK ya fue exportada previamente")
+                        _state.value = _state.value.copy(
+                            log = _state.value.log + "✓ KEK ya exportada previamente\n"
+                        )
+                    }
+
+                    Log.i(TAG, "================================================")
+                } else {
+                    Log.i(TAG, "Perfil no usa KEK - las llaves se enviarán en claro")
+                    _state.value = _state.value.copy(
+                        log = _state.value.log + "Perfil sin KEK - enviando llaves en claro\n"
+                    )
+                }
 
                 // Procesar cada configuración de llave
                 for ((index, keyConfig) in keyConfigs.withIndex()) {
@@ -377,15 +441,72 @@ class KeyInjectionViewModel @Inject constructor(
             throw Exception("Longitud de llave inválida: $keyLengthBytes bytes. Debe ser 16, 32 o 48 bytes.")
         }
 
+        // === INTEGRACIÓN CON KEK ===
+        Log.i(TAG, "=== VERIFICANDO KEK PARA CIFRADO ===")
+        val hasActiveKEK = kotlinx.coroutines.runBlocking { kekManager.hasActiveKEK() }
+        val kekData = kotlinx.coroutines.runBlocking { kekManager.getActiveKEKData() }
+        val kekKcv = kotlinx.coroutines.runBlocking { kekManager.getActiveKEKKcv() }
+        val kekSlot = kotlinx.coroutines.runBlocking { kekManager.getActiveKEKSlot() } ?: 0
+
+        Log.i(TAG, "¿Hay KEK activa?: $hasActiveKEK")
+        if (hasActiveKEK) {
+            Log.i(TAG, "  - KCV de KEK: $kekKcv")
+            Log.i(TAG, "  - Slot de KEK: $kekSlot")
+        }
+
+        // Decidir tipo de encriptación y datos de llave
+        val encryptionType: String
+        val finalKeyData: String
+        val ktkSlotStr: String
+        val ktkChecksum: String
+
+        if (hasActiveKEK && kekData != null && kekKcv != null) {
+            // MODO CIFRADO: Usar KEK para cifrar la llave
+            Log.i(TAG, "=== MODO CIFRADO CON KEK ===")
+            Log.i(TAG, "Cifrando llave con KEK antes de enviar...")
+
+            try {
+                // Cifrar la llave con la KEK usando TripleDESCrypto
+                finalKeyData = com.vigatec.utils.TripleDESCrypto.encryptKeyForTransmission(
+                    keyData = selectedKey.keyData,
+                    kekData = kekData,
+                    keyKcv = selectedKey.kcv
+                )
+
+                encryptionType = "01" // Cifrado bajo KTK pre-cargada
+                ktkSlotStr = kekSlot.toString().padStart(2, '0')
+                ktkChecksum = kekKcv.take(4)
+
+                Log.i(TAG, "✓ Llave cifrada exitosamente")
+                Log.i(TAG, "  - Datos originales (primeros 32): ${selectedKey.keyData.take(32)}...")
+                Log.i(TAG, "  - Datos cifrados (primeros 32): ${finalKeyData.take(32)}...")
+                Log.i(TAG, "  - Tipo de encriptación: $encryptionType (Cifrado bajo KTK)")
+                Log.i(TAG, "  - Slot de KTK: $ktkSlotStr")
+                Log.i(TAG, "  - Checksum de KTK: $ktkChecksum")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "✗ Error al cifrar llave con KEK: ${e.message}", e)
+                throw Exception("Error al cifrar llave con KEK: ${e.message}")
+            }
+
+        } else {
+            // MODO CLARO: Sin KEK, enviar llave en claro
+            Log.i(TAG, "=== MODO CLARO SIN KEK ===")
+            Log.w(TAG, "⚠️ No hay KEK activa - enviando llave en CLARO")
+            Log.w(TAG, "⚠️ RECOMENDACIÓN: Generar y exportar KEK primero")
+
+            encryptionType = "00" // Carga en claro
+            finalKeyData = selectedKey.keyData
+            ktkSlotStr = "00"
+            ktkChecksum = "0000"
+        }
+
         // Construir comando "02" de Futurex para inyección de llave simétrica
         val command = "02" // Comando de inyección simétrica
         val version = "01" // Versión del comando
         val keySlot = keyConfig.slot.padStart(2, '0') // Slot de la llave
-        val ktkSlot = "00" // Slot KTK (por defecto 0)
         val keyType = mapKeyTypeToFuturex(keyConfig.keyType) // Tipo de llave
-        val encryptionType = "00" // Carga en claro por ahora
-        val keyChecksum = selectedKey.kcv.take(4) // Checksum de la llave
-        val ktkChecksum = "0000" // Checksum KTK (no usado en carga en claro)
+        val keyChecksum = selectedKey.kcv.take(4) // Checksum de la llave (ORIGINAL, no cambia)
         
         // KSN: Para llaves DUKPT usar KSN del perfil o generar uno, para otras llaves usar zeros
         val ksn = if (isDukptKeyType(keyType)) {
@@ -403,16 +524,17 @@ class KeyInjectionViewModel @Inject constructor(
         // CRÍTICO: La longitud debe ser en formato ASCII HEX según documentación Futurex
         // Ejemplo: 16 bytes = "010", 32 bytes = "020", 48 bytes = "030"
         val keyLength = String.format("%03X", keyLengthBytes) // Longitud en ASCII HEX (3 dígitos)
-        val keyHex = selectedKey.keyData // Datos de la llave en hex
+        // IMPORTANTE: Usar finalKeyData (que puede estar cifrado o en claro según KEK)
+        val keyHex = finalKeyData // Datos de la llave (cifrados con KEK o en claro)
 
         // Logs detallados de la estructura Futurex
         Log.i(TAG, "=== ESTRUCTURA FUTUREX PARA INYECCIÓN DE LLAVE ===")
         Log.i(TAG, "Comando: $command (Inyección de llave simétrica)")
         Log.i(TAG, "Versión: $version")
         Log.i(TAG, "Slot de llave: $keySlot (${keyConfig.slot})")
-        Log.i(TAG, "Slot KTK: $ktkSlot")
+        Log.i(TAG, "Slot KTK: $ktkSlotStr")
         Log.i(TAG, "Tipo de llave: $keyType (${keyConfig.keyType})")
-        Log.i(TAG, "Tipo de encriptación: $encryptionType (Carga en claro)")
+        Log.i(TAG, "Tipo de encriptación: $encryptionType (${if (encryptionType == "00") "Carga en claro" else "Cifrado bajo KTK"})")
         Log.i(TAG, "Checksum de llave: $keyChecksum (KCV: ${selectedKey.kcv})")
         Log.i(TAG, "Checksum KTK: $ktkChecksum")
         Log.i(TAG, "KSN: $ksn (20 caracteres)")
@@ -421,7 +543,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - Valor: '$keyLength'")
         Log.i(TAG, "  - Validación: ${if (keyLength.length == 3 && keyLength.all { it.isLetterOrDigit() }) "✓ Válido" else "✗ Inválido"}")
         Log.i(TAG, "Datos de llave (hex): ${keyHex.take(64)}${if (keyHex.length > 64) "..." else ""}")
-        Log.i(TAG, "Longitud total del payload: ${command.length + version.length + keySlot.length + ktkSlot.length + keyType.length + encryptionType.length + keyChecksum.length + ktkChecksum.length + ksn.length + keyLength.length + keyHex.length} caracteres")
+        Log.i(TAG, "Longitud total del payload: ${command.length + version.length + keySlot.length + ktkSlotStr.length + keyType.length + encryptionType.length + keyChecksum.length + ktkChecksum.length + ksn.length + keyLength.length + keyHex.length} caracteres")
         
         // Log de mapeo de tipo de llave
         Log.i(TAG, "=== MAPEO DE TIPO DE LLAVE FUTUREX ===")
@@ -435,7 +557,7 @@ class KeyInjectionViewModel @Inject constructor(
         }
         
         // Para el protocolo Futurex, concatenamos todo en un solo string
-        val payload = command + version + keySlot + ktkSlot + keyType + encryptionType + 
+        val payload = command + version + keySlot + ktkSlotStr + keyType + encryptionType +
                      keyChecksum + ktkChecksum + ksn + keyLength + keyHex
 
         Log.i(TAG, "=== PAYLOAD FINAL FUTUREX ===")
@@ -444,7 +566,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - Comando: $command")
         Log.i(TAG, "  - Versión: $version")
         Log.i(TAG, "  - Slot: $keySlot")
-        Log.i(TAG, "  - KTK Slot: $ktkSlot")
+        Log.i(TAG, "  - KTK Slot: $ktkSlotStr")
         Log.i(TAG, "  - Tipo: $keyType")
         Log.i(TAG, "  - Encriptación: $encryptionType")
         Log.i(TAG, "  - Checksum: $keyChecksum")
@@ -455,16 +577,16 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "================================================")
 
         // Construir el payload manualmente para Futurex
-        val payloadString = command + version + keySlot + ktkSlot + keyType + encryptionType + 
+        val payloadString = command + version + keySlot + ktkSlotStr + keyType + encryptionType +
                            keyChecksum + ktkChecksum + ksn + keyLength + keyHex
-        
+
         Log.i(TAG, "=== PAYLOAD MANUAL FUTUREX ===")
         Log.i(TAG, "Payload string: $payloadString")
         Log.i(TAG, "Longitud payload: ${payloadString.length} caracteres")
         Log.i(TAG, "================================================")
-        
+
         // DEBUG: Verificar cálculo del LRC
-        val fields = listOf(version, keySlot, ktkSlot, keyType, encryptionType, 
+        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType,
                            keyChecksum, ktkChecksum, ksn, keyLength, keyHex)
         debugLrcCalculation(command, fields)
         
@@ -1000,4 +1122,94 @@ class KeyInjectionViewModel @Inject constructor(
             Log.i(TAG, "================================================")
         }
     }
-} 
+
+    /**
+     * Exporta una KEK al dispositivo SubPOS en claro (sin cifrar)
+     * La KEK se envía al slot 00 (fijo para KEKs) usando el comando de inyección Futurex
+     */
+    private suspend fun exportKEKToDevice(kek: InjectedKeyEntity) {
+        Log.i(TAG, "=== EXPORTANDO KEK AL SUBPOS ===")
+        Log.i(TAG, "KEK a exportar:")
+        Log.i(TAG, "  - KCV: ${kek.kcv}")
+        Log.i(TAG, "  - Nombre: ${kek.customName.ifEmpty { "Sin nombre" }}")
+        Log.i(TAG, "  - Longitud: ${kek.keyData.length / 2} bytes")
+
+        // Validar que la KEK tenga datos
+        if (kek.keyData.isEmpty()) {
+            throw Exception("KEK no tiene datos para exportar")
+        }
+
+        val keyLengthBytes = kek.keyData.length / 2
+        if (keyLengthBytes !in listOf(16, 24, 32)) {
+            throw Exception("Longitud de KEK inválida: $keyLengthBytes bytes")
+        }
+
+        // Construir comando Futurex para exportar KEK
+        // IMPORTANTE: KEK siempre va en CLARO (encryptionType = "00")
+        val command = "02" // Comando de inyección simétrica
+        val version = "01"
+        val keySlot = "00" // Slot fijo para KEK
+        val ktkSlotStr = "00" // No hay KTK superior (KEK se envía en claro)
+        val keyType = "06" // Tipo 06 = Key Transfer Key (KTK/KEK)
+        val encryptionType = "00" // EN CLARO (sin cifrar)
+        val keyChecksum = kek.kcv.take(4)
+        val ktkChecksum = "0000" // No hay KTK superior
+        val ksn = "00000000000000000000" // KEK no usa KSN
+        val keyLength = String.format("%03X", keyLengthBytes)
+        val keyHex = kek.keyData
+
+        Log.i(TAG, "=== ESTRUCTURA FUTUREX PARA EXPORTACIÓN DE KEK ===")
+        Log.i(TAG, "Comando: $command")
+        Log.i(TAG, "Versión: $version")
+        Log.i(TAG, "Slot de llave: $keySlot (fijo para KEK)")
+        Log.i(TAG, "Slot KTK: $ktkSlotStr (no aplica)")
+        Log.i(TAG, "Tipo de llave: $keyType (KEK/KTK)")
+        Log.i(TAG, "Tipo de encriptación: $encryptionType (EN CLARO)")
+        Log.i(TAG, "Checksum de llave: $keyChecksum")
+        Log.i(TAG, "Checksum KTK: $ktkChecksum (no aplica)")
+        Log.i(TAG, "KSN: $ksn (no aplica)")
+        Log.i(TAG, "Longitud de llave: $keyLength ($keyLengthBytes bytes)")
+        Log.i(TAG, "Datos de KEK (primeros 32 bytes): ${keyHex.take(64)}...")
+
+        // Formatear comando Futurex
+        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType,
+                           keyChecksum, ktkChecksum, ksn, keyLength, keyHex)
+        val formattedCommand = messageFormatter!!.format(command, fields)
+
+        Log.i(TAG, "Comando formateado: ${formattedCommand.size} bytes")
+        Log.i(TAG, "Enviando KEK al SubPOS...")
+
+        // Enviar comando
+        sendData(formattedCommand)
+
+        // Esperar respuesta
+        Log.i(TAG, "Esperando respuesta del dispositivo...")
+        val response = waitForResponse()
+
+        // Procesar respuesta
+        Log.i(TAG, "Procesando respuesta...")
+        messageParser!!.appendData(response)
+        val parsedMessage = messageParser!!.nextMessage()
+
+        when (parsedMessage) {
+            is InjectSymmetricKeyResponse -> {
+                if (parsedMessage.responseCode == "00") {
+                    Log.i(TAG, "✓ KEK exportada exitosamente al SubPOS")
+                    Log.i(TAG, "  - Slot: 00")
+                    Log.i(TAG, "  - KCV: ${kek.kcv}")
+                } else {
+                    val errorCode = FuturexErrorCode.fromCode(parsedMessage.responseCode)
+                    val errorMsg = errorCode?.description ?: "Error desconocido"
+                    Log.e(TAG, "✗ Error al exportar KEK: $errorMsg (Código: ${parsedMessage.responseCode})")
+                    throw Exception("Error al exportar KEK: $errorMsg")
+                }
+            }
+            else -> {
+                Log.e(TAG, "✗ Respuesta inesperada al exportar KEK: $parsedMessage")
+                throw Exception("Respuesta inesperada al exportar KEK")
+            }
+        }
+
+        Log.i(TAG, "================================================")
+    }
+}

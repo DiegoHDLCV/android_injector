@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.example.persistence.repository.InjectedKeyRepository
 import com.vigatec.utils.KcvCalculator
 import com.vigatec.utils.KeyStoreManager
-import com.vigatec.utils.KcvCalculator.toHexString
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +24,10 @@ data class CeremonyState(
     val isLoading: Boolean = false,
     val isCeremonyInProgress: Boolean = false,
     val isCeremonyFinished: Boolean = false,
+
+    // Nuevos campos para configuración de llave
+    val isKEK: Boolean = false,        // Si la llave es KEK
+    val customName: String = ""        // Nombre personalizado
 )
 
 @HiltViewModel
@@ -50,6 +53,19 @@ class CeremonyViewModel @Inject constructor(
 
     fun onToggleShowComponent() {
         _uiState.value = _uiState.value.copy(showComponent = !_uiState.value.showComponent)
+    }
+
+    fun onToggleIsKEK(isKEK: Boolean) {
+        _uiState.value = _uiState.value.copy(isKEK = isKEK)
+        if (isKEK) {
+            addToLog("Llave marcada como KEK (Key Encryption Key)")
+        } else {
+            addToLog("Llave marcada como operacional")
+        }
+    }
+
+    fun onCustomNameChange(name: String) {
+        _uiState.value = _uiState.value.copy(customName = name)
     }
 
     fun startCeremony() {
@@ -134,7 +150,7 @@ class CeremonyViewModel @Inject constructor(
                         result
                     }
 
-                val finalKeyHex = finalKeyBytes.toHexString()
+                val finalKeyHex = finalKeyBytes.joinToString("") { "%02X".format(it) }
                 addToLog("✓ Llave final generada exitosamente")
                 addToLog("  - Longitud: ${finalKeyBytes.size} bytes")
                 addToLog("  - Datos (hex): $finalKeyHex")
@@ -159,7 +175,7 @@ class CeremonyViewModel @Inject constructor(
                 addToLog("  - Tipo de llave: Master Transport Key (MKT)")
                 addToLog("  - Algoritmo: 3DES")
                 addToLog("  - Longitud: ${finalKeyBytes.size} bytes")
-                addToLog("  - Datos (primeros 16 bytes): ${finalKeyBytes.toHexString().take(32)}")
+                addToLog("  - Datos (primeros 16 bytes): ${finalKeyBytes.joinToString("") { "%02X".format(it) }.take(32)}")
                 
                 try {
                     KeyStoreManager.storeMasterKey("master_transport_key", finalKeyBytes)
@@ -176,23 +192,32 @@ class CeremonyViewModel @Inject constructor(
 
                 addToLog("=== REGISTRANDO LLAVE COMPLETA EN BASE DE DATOS ===")
                 addToLog("  - Slot: NO ASIGNADO (se define en perfil)")
-                addToLog("  - Tipo de Llave: NO ASIGNADO (se define en perfil)")
+
+                // Determinar tipo de llave según configuración
+                val keyType = if (_uiState.value.isKEK) "KEK" else "CEREMONY_KEY"
+                val keyStatus = if (_uiState.value.isKEK) "ACTIVE" else "GENERATED"
+
+                addToLog("  - Tipo de Llave: $keyType ${if (_uiState.value.isKEK) "(Key Encryption Key)" else "(Operacional)"}")
                 addToLog("  - Algoritmo: NO ASIGNADO (se define en perfil)")
                 addToLog("  - KCV: $finalKcv")
-                addToLog("  - Estado: GENERATED")
+                addToLog("  - Estado: $keyStatus")
+                addToLog("  - Es KEK: ${if (_uiState.value.isKEK) "SÍ" else "NO"}")
+                addToLog("  - Nombre: ${_uiState.value.customName.ifEmpty { "(Sin nombre)" }}")
                 addToLog("  - Datos de llave (longitud): ${finalKeyBytes.size} bytes")
                 addToLog("  - Datos de llave (hex): $finalKeyHex")
                 addToLog("  - Datos de llave (primeros 16 bytes): ${finalKeyHex.take(32)}")
-                
+
                 // CRÍTICO: Guardar la llave SOLO con KCV y datos, sin asignar slot/tipo/algoritmo
                 // Estos parámetros se definirán cuando se use la llave en un perfil
                 injectedKeyRepository.recordKeyInjectionWithData(
                     keySlot = -1, // -1 indica que no hay slot asignado (se asigna en perfil)
-                    keyType = "CEREMONY_KEY", // Tipo genérico para llaves de ceremonia
+                    keyType = keyType, // KEK o CEREMONY_KEY según configuración
                     keyAlgorithm = "UNASSIGNED", // No se asigna algoritmo específico
                     kcv = finalKcv,
                     keyData = finalKeyHex, // ¡GUARDANDO LA LLAVE COMPLETA!
-                    status = "GENERATED"
+                    status = keyStatus,
+                    isKEK = _uiState.value.isKEK, // Marcar si es KEK
+                    customName = _uiState.value.customName // Nombre personalizado
                 )
                 addToLog("✓ Llave COMPLETA guardada exitosamente en base de datos")
                 addToLog("✓ Verificación: ${finalKeyBytes.size} bytes almacenados")

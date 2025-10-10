@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
 import androidx.compose.material.icons.filled.Cable
 import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Radio
@@ -48,8 +49,7 @@ val bottomBarDestinations = listOf(
     BottomBarDestination(MainScreen.Dashboard.route, Icons.Default.Dashboard),
     BottomBarDestination(MainScreen.KeyVault.route, Icons.Default.VpnKey),
     BottomBarDestination(MainScreen.Ceremony.route, Icons.Default.Security),
-    BottomBarDestination(MainScreen.Profiles.route, Icons.Default.AccountBox),
-    BottomBarDestination(MainScreen.RawDataListener.route, Icons.Default.Cable)
+    BottomBarDestination(MainScreen.Profiles.route, Icons.Default.AccountBox)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

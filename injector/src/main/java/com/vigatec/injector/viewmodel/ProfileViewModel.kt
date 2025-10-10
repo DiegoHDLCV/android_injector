@@ -30,7 +30,9 @@ data class ProfileFormData(
     val name: String = "",
     val description: String = "",
     val appType: String = "",
-    val keyConfigurations: List<KeyConfiguration> = emptyList()
+    val keyConfigurations: List<KeyConfiguration> = emptyList(),
+    val useKEK: Boolean = false,
+    val selectedKEKKcv: String = ""
 )
 
 @HiltViewModel
@@ -71,7 +73,9 @@ class ProfileViewModel @Inject constructor(
                 name = profile.name,
                 description = profile.description,
                 appType = profile.applicationType,
-                keyConfigurations = profile.keyConfigurations
+                keyConfigurations = profile.keyConfigurations,
+                useKEK = profile.useKEK,
+                selectedKEKKcv = profile.selectedKEKKcv
             )
         } else {
             ProfileFormData()
@@ -102,7 +106,9 @@ class ProfileViewModel @Inject constructor(
                 name = formData.name.trim(),
                 description = formData.description,
                 applicationType = formData.appType,
-                keyConfigurations = formData.keyConfigurations
+                keyConfigurations = formData.keyConfigurations,
+                useKEK = formData.useKEK,
+                selectedKEKKcv = formData.selectedKEKKcv
             )
             
             try {

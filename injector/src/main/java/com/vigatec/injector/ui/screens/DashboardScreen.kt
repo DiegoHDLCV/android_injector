@@ -58,8 +58,7 @@ fun DashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item(key = "welcome") { WelcomeCard(username = username) }
-        item(key = "connection") { ConnectionStatusCard(dashboardState, viewModel) }
+        //item(key = "connection") { ConnectionStatusCard(dashboardState, viewModel) }
         item(key = "stats") { 
             if (dashboardState.isLoading) {
                 DashboardStatsSkeleton()
@@ -67,8 +66,8 @@ fun DashboardScreen(
                 DashboardStats(stats = dashboardState.stats)
             }
         }
-        item(key = "quick_actions") { QuickActionsCard(navController) }
-        item(key = "system_health") { SystemHealthCard(dashboardState) }
+        //item(key = "quick_actions") { QuickActionsCard(navController) }
+        //item(key = "system_health") { SystemHealthCard(dashboardState) }
         item(key = "comm_logs") { CommLogsCard(dashboardState.commLogs) }
     }
 }

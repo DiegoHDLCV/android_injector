@@ -103,48 +103,73 @@ fun KeyVaultTopBar(onRefresh: () -> Unit, onClearAll: () -> Unit, loading: Boole
 
 @Composable
 fun KeyCard(
-    key: InjectedKeyEntity, 
+    key: InjectedKeyEntity,
     assignedProfiles: List<String> = emptyList(),
     onDelete: (InjectedKeyEntity) -> Unit
 ) {
     val isCeremonyKey = key.keyType == "CEREMONY_KEY"
-    
+    val isKEK = key.isKEK
+
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isCeremonyKey) 
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-            else 
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor = when {
+                isKEK -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                isCeremonyKey -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            }
         ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Icon(
-                    Icons.Default.VpnKey, 
-                    contentDescription = "Key", 
-                    tint = if (isCeremonyKey) 
-                        MaterialTheme.colorScheme.primary 
-                    else 
-                        MaterialTheme.colorScheme.onSurface,
+                    Icons.Default.VpnKey,
+                    contentDescription = "Key",
+                    tint = when {
+                        isKEK -> MaterialTheme.colorScheme.tertiary
+                        isCeremonyKey -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text(
-                        text = key.kcv,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-//                    if (isCeremonyKey) {
-//                        Text(
-//                            text = "Llave de Ceremonia",
-//                            style = MaterialTheme.typography.bodySmall,
-//                            color = MaterialTheme.colorScheme.primary,
-//                            fontWeight = FontWeight.Medium
-//                        )
-//                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = key.kcv,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        // Badge KEK
+                        if (isKEK) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.tertiary
+                            ) {
+                                Text(
+                                    text = "KEK",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onTertiary,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                    // Mostrar nombre personalizado si existe
+                    if (key.customName.isNotEmpty()) {
+                        Text(
+                            text = key.customName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -157,21 +182,44 @@ fun KeyCard(
             } else {
                 // Para llaves de ceremonia, mostrar información relevante
                 Text("Longitud: ${key.keyData.length / 2} bytes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                // Mostrar estado si es KEK
+                if (isKEK) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Estado: ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = when (key.status) {
+                                "ACTIVE" -> Color(0xFF4CAF50)
+                                "EXPORTED" -> Color(0xFF2196F3)
+                                else -> MaterialTheme.colorScheme.surfaceVariant
+                            }
+                        ) {
+                            Text(
+                                text = key.status,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
             }
-            
+
             // Mostrar los perfiles asignados para todas las llaves
             Text(
-                text = if (assignedProfiles.isNotEmpty()) 
-                    "Perfil${if (assignedProfiles.size > 1) "es" else ""}: ${assignedProfiles.joinToString(", ")}" 
-                else 
+                text = if (assignedProfiles.isNotEmpty())
+                    "Perfil${if (assignedProfiles.size > 1) "es" else ""}: ${assignedProfiles.joinToString(", ")}"
+                else
                     "Sin asignar",
-                style = MaterialTheme.typography.bodySmall, 
-                color = if (assignedProfiles.isNotEmpty()) 
-                    MaterialTheme.colorScheme.primary 
-                else 
+                style = MaterialTheme.typography.bodySmall,
+                color = if (assignedProfiles.isNotEmpty())
+                    MaterialTheme.colorScheme.primary
+                else
                     MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
+
             Text("Fecha: ${formatDate(key.injectionTimestamp)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
             Button(

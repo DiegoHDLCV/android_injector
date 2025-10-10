@@ -10,7 +10,11 @@ data class ProfileEntity(
     val name: String,
     val description: String,
     val applicationType: String,
-    val keyConfigurations: List<KeyConfiguration>
+    val keyConfigurations: List<KeyConfiguration>,
+
+    // Configuración de cifrado KEK
+    val useKEK: Boolean = false,          // Activar cifrado con KEK
+    val selectedKEKKcv: String = ""       // KCV de la KEK seleccionada
 )
 
 data class KeyConfiguration(
