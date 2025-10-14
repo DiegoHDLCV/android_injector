@@ -41,14 +41,11 @@ import kotlinx.coroutines.flow.collectLatest
 fun MainScreen(navController: NavHostController) {
     val viewModel: MainViewModel = hiltViewModel()
     val status by viewModel.connectionStatus.collectAsState()
-    // Auto-start listening once when arriving from Splash (after SDKs ready)
-    var autoStarted by remember { mutableStateOf(false) }
-    LaunchedEffect(status) {
-        if (!autoStarted && status == ConnectionStatus.DISCONNECTED) {
-            viewModel.startListening()
-            autoStarted = true
-        }
-    }
+    val cableDetected by viewModel.cableConnected.collectAsState()
+
+    // ELIMINADO: Auto-start automático. Ahora el usuario controla cuándo iniciar la escucha
+    // o se puede detectar el cable y auto-iniciar
+
     val commLogs by CommLog.entries.collectAsState()
     val logcatLines by LogcatReader.lines.collectAsState()
     val rawDataReceived by viewModel.rawReceivedData.collectAsState()
@@ -85,6 +82,44 @@ fun MainScreen(navController: NavHostController) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
+            // Indicador de cable USB con más detalle
+            androidx.compose.material3.Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = androidx.compose.material3.CardDefaults.cardColors(
+                    containerColor = if (cableDetected) Color.Green.copy(alpha = 0.2f) else Color.Red.copy(alpha = 0.2f)
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (cableDetected) "🔌 Cable USB CONECTADO" else "⚠️ Cable USB NO DETECTADO",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = if (cableDetected) Color(0xFF006400) else Color.Red
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = if (cableDetected) 
+                            "✓ Puerto físico disponible. Pulse 'Iniciar Escucha' para comenzar." 
+                        else 
+                            "✗ Puerto no disponible. Conecte el cable USB y espere unos segundos.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (cableDetected) Color(0xFF006400) else Color.Red,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text("Estado Conexión Serial:", style = MaterialTheme.typography.titleLarge)
             Text(status.name, style = MaterialTheme.typography.headlineMedium, color = when(status) {
                 ConnectionStatus.LISTENING -> Color.Green
@@ -238,7 +273,7 @@ fun MainScreen(navController: NavHostController) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Panel de Logs de Comunicación
+            // Panel de Logs de Comunicación (incluye detección de cable)
             CommLogsPanel(entries = commLogs)
 
             // Panel de Logcat (proceso actual)

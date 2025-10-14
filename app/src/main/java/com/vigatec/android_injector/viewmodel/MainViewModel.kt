@@ -24,6 +24,7 @@ import com.example.persistence.repository.InjectedKeyRepository
 import com.vigatec.android_injector.ui.events.UiEvent
 import com.example.communication.polling.CommLog
 import com.vigatec.utils.FormatUtils
+import com.vigatec.android_injector.util.UsbCableDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -67,13 +68,20 @@ class MainViewModel @Inject constructor(
     private val _rawReceivedData = MutableStateFlow("")
     val rawReceivedData = _rawReceivedData.asStateFlow()
 
+    private val _cableConnected = MutableStateFlow(false)
+    val cableConnected = _cableConnected.asStateFlow()
+
     private var comController: IComController? = null
     private var pedController: IPedController? = null
     private var listeningJob: Job? = null
+    private var cableDetectionJob: Job? = null
     private val connectionMutex = Mutex()
     
     private lateinit var messageParser: IMessageParser
     private lateinit var messageFormatter: IMessageFormatter
+    
+    // Detector de cable USB usando múltiples métodos
+    private val usbCableDetector = UsbCableDetector(application.applicationContext)
 
     init {
         Log.i(TAG, "=== INICIALIZANDO MAINVIEWMODEL ===")
@@ -81,9 +89,10 @@ class MainViewModel @Inject constructor(
         Log.i(TAG, "  - Manager seleccionado: ${SystemConfig.managerSelected}")
         Log.i(TAG, "  - Protocolo seleccionado: ${SystemConfig.commProtocolSelected}")
         Log.i(TAG, "  - Rol del dispositivo: ${SystemConfig.deviceRole}")
-        
+
         setupProtocolHandlers()
-        
+        startCableDetection()  // Iniciar detección de cable automáticamente
+
         Log.i(TAG, "✓ MainViewModel inicializado completamente")
         Log.i(TAG, "================================================")
     }
@@ -796,9 +805,115 @@ class MainViewModel @Inject constructor(
         return Tr31KeyBlock(tr31String, versionId, blockLength, keyUsage, algorithm, modeOfUse, keyVersionNumber, exportability, optionalBlocks, encryptedPayload, mac)
     }
 
+    private fun startCableDetection() {
+        Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
+        Log.i(TAG, "║ INICIANDO DETECCIÓN AUTOMÁTICA DE CABLE USB")
+        Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
+
+        cableDetectionJob = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                try {
+                    val detected = detectCableConnection()
+
+                    if (detected != _cableConnected.value) {
+                        _cableConnected.value = detected
+
+                        if (detected) {
+                            Log.i(TAG, "║ ✅ CABLE USB DETECTADO!")
+                            Log.i(TAG, "║    El usuario puede iniciar la escucha manualmente")
+                            CommLog.i(TAG, "🔌 ✅ CABLE USB CONECTADO - Listo para comunicación")
+                            _snackbarEvent.emit("Cable USB detectado. Pulse 'Iniciar Escucha' para comenzar.")
+                        } else {
+                            Log.w(TAG, "║ ⚠️  CABLE USB DESCONECTADO")
+                            CommLog.w(TAG, "⚠️ CABLE USB DESCONECTADO - Reconecte el cable")
+                            _snackbarEvent.emit("Cable USB desconectado")
+                        }
+                    }
+
+                    // Chequear cada 3 segundos
+                    kotlinx.coroutines.delay(3000)
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "║ ❌ Error en detección de cable", e)
+                    kotlinx.coroutines.delay(5000) // Esperar más tiempo si hay error
+                }
+            }
+        }
+
+        Log.i(TAG, "║ ✓ Job de detección de cable iniciado")
+        Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
+    }
+
+    private fun detectCableConnection(): Boolean {
+        // Si ya está escuchando, asumir que el cable está conectado
+        if (_connectionStatus.value == ConnectionStatus.LISTENING) {
+            Log.v(TAG, "║ 🔍 Detección: Ya escuchando → Cable asumido como PRESENTE ✓")
+            return true
+        }
+
+        // Si está en proceso de conectar/cerrar, mantener estado anterior
+        if (_connectionStatus.value == ConnectionStatus.INITIALIZING ||
+            _connectionStatus.value == ConnectionStatus.OPENING ||
+            _connectionStatus.value == ConnectionStatus.CLOSING) {
+            Log.v(TAG, "║ 🔍 Detección: En transición, manteniendo estado actual")
+            return _cableConnected.value
+        }
+
+        // Solo detectar cuando está DISCONNECTED o ERROR
+        return try {
+            CommLog.d(TAG, "🔍 Iniciando detección de cable USB (4 métodos)...")
+            
+            // NUEVA DETECCIÓN: Usar 4 métodos diferentes para mayor confiabilidad
+            // Método 1: UsbManager (detecta dispositivos USB físicamente conectados) - MÁS CONFIABLE
+            val method1Result = usbCableDetector.detectUsingUsbManager()
+            
+            // Método 2: Verificar nodos de dispositivo en /dev/ con permisos de acceso
+            val method2Result = usbCableDetector.detectUsingDeviceNodes()
+            
+            // Método 3: Archivos del sistema /sys/bus/usb con interfaz serial
+            val method3Result = usbCableDetector.detectUsingSystemFiles()
+            
+            // Método 4: Puertos TTY USB en /sys/class/tty/
+            val method4Result = usbCableDetector.detectUsingTtyClass()
+            
+            // Contar cuántos métodos detectaron
+            val methodsCount = listOf(method1Result, method2Result, method3Result, method4Result).count { it }
+            
+            // LÓGICA MÁS ESTRICTA: Cable presente si AL MENOS 2 de 4 métodos lo detectan
+            // O si el método 1 (UsbManager - más confiable) lo detecta
+            val detected = methodsCount >= 2 || method1Result
+            
+            // Mostrar qué métodos específicos detectaron
+            val detectingMethods = mutableListOf<String>()
+            if (method1Result) detectingMethods.add("UsbManager")
+            if (method2Result) detectingMethods.add("/dev/")
+            if (method3Result) detectingMethods.add("/sys/bus/usb")
+            if (method4Result) detectingMethods.add("/sys/class/tty")
+            
+            if (detected) {
+                val methodsList = detectingMethods.joinToString(", ")
+                CommLog.i(TAG, "✅ Cable USB DETECTADO ($methodsCount/4 métodos)")
+                CommLog.d(TAG, "  → Métodos que detectaron: $methodsList")
+            } else {
+                CommLog.w(TAG, "⚠️ Cable USB NO DETECTADO ($methodsCount/4 métodos, requiere ≥2)")
+                if (methodsCount == 1) {
+                    CommLog.w(TAG, "  → Solo 1 método detectó: ${detectingMethods.firstOrNull() ?: "ninguno"} (insuficiente)")
+                }
+            }
+            
+            detected
+            
+        } catch (e: Exception) {
+            CommLog.e(TAG, "❌ Excepción en detección: ${e.message}")
+            false
+        }
+    }
+
     override fun onCleared() {
         Log.i(TAG, "ViewModel onCleared: Deteniendo escucha y liberando...")
         viewModelScope.launch {
+            cableDetectionJob?.cancel()
+            cableDetectionJob?.join()
             stopListeningInternal()
             pedController?.releasePed()
         }
