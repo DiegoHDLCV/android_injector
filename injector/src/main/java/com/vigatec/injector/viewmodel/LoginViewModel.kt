@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
@@ -20,6 +21,8 @@ class LoginViewModel @Inject constructor(
     var loginError by mutableStateOf<String?>(null)
     var loginSuccess by mutableStateOf(false)
     var isLoading by mutableStateOf(false)
+    var loggedInUser by mutableStateOf<User?>(null)
+        private set
 
     fun onUsernameChange(newUsername: String) {
         username = newUsername
@@ -33,11 +36,12 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             isLoading = true
             loginError = null
-            val success = userRepository.login(username, password)
-            if (success) {
+            val user = userRepository.login(username, password)
+            if (user != null) {
+                loggedInUser = user
                 loginSuccess = true
             } else {
-                loginError = "Credenciales inválidas"
+                loginError = "Credenciales inválidas o usuario inactivo"
             }
             isLoading = false
         }

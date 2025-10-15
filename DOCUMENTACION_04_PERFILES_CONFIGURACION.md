@@ -149,22 +149,19 @@ KSN:               (no aplica)
 **Activación**:
 - Toggle "Usar Cifrado KEK"
 - Al activar:
-  - Aparece selector de KEK
-  - Muestra KEKs disponibles (isKEK = true)
-  - Indica estado (ACTIVE/EXPORTED/INACTIVE)
+  - Sistema muestra automáticamente la KEK activa actual
+  - No hay selector manual (solo una KEK activa a la vez)
 
-**Selección de KEK**:
-- Lista filtrada: solo llaves con `isKEK = true`
-- Información mostrada:
-  - KCV de la KEK
-  - Estado actual
-  - Nombre personalizado (si tiene)
-  - Fecha de creación
+**Información de KEK Mostrada**:
+- KCV de la KEK activa
+- Estado actual (ACTIVE/EXPORTED)
+- Nombre personalizado (si tiene)
+- Algoritmo (debe ser AES-256)
 
 **Recomendaciones**:
-- Preferir KEK en estado ACTIVE (no exportada)
-- KEK EXPORTED puede reutilizarse para mismo SubPOS
-- KEK INACTIVE no debe usarse
+- Asegurar que existe una KEK activa antes de crear perfiles
+- Si no hay KEK activa, ir a "Llaves Inyectadas" para seleccionar una
+- Solo llaves AES-256 pueden ser KEK
 
 ### 2.2 Edición de Perfiles
 
@@ -183,8 +180,8 @@ KSN:               (no aplica)
 
 3. **Modificación de KEK**:
    - Activar/desactivar uso de KEK
-   - Cambiar KEK seleccionada
-   - Warning si cambia KEK ya exportada
+   - El sistema usa automáticamente la KEK activa actual
+   - Warning si no hay KEK activa disponible
 
 **Validaciones**:
 - No permitir slots duplicados

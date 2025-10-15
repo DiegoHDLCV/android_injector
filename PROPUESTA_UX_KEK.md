@@ -1,14 +1,14 @@
-# Propuesta de Mejora UX/UI - Sistema KEK
+# Propuesta de Mejora UX/UI - Sistema KEK (IMPLEMENTADA)
 
-## Problema Actual
-- KEK Manager es una pantalla separada difícil de entender
-- No está claro cuándo y cómo usar la KEK
-- Falta integración con el flujo de trabajo natural
-- Usuario tiene que ir a múltiples pantallas para configurar KEK
+## Problema Original
+- KEK Manager era una pantalla separada difícil de entender
+- No estaba claro cuándo y cómo usar la KEK
+- Faltaba integración con el flujo de trabajo natural
+- Usuario tenía que ir a múltiples pantallas para configurar KEK
 
-## Solución Propuesta
+## Solución Implementada
 
-### 1. **Ceremonia de Llaves - Agregar Opción KEK**
+### 1. **Ceremonia de Llaves - Simplificada**
 
 **Pantalla**: `CeremonyScreen` - Paso de Finalización
 
@@ -21,13 +21,13 @@
 │  KCV: CBB14C                                            │
 │                                                          │
 │  ┌────────────────────────────────────────────────┐    │
-│  │ Tipo de llave:                                  │    │
+│  │ Información de la Llave                         │    │
 │  │                                                  │    │
-│  │ ⚪ Llave Operacional (Normal)                   │    │
-│  │ ⚪ Llave de Cifrado KEK                         │    │
+│  │ Nombre: [KEK Master Octubre 2025]              │    │
 │  │                                                  │    │
-│  │ ℹ️  Las llaves KEK se usan para cifrar         │    │
-│  │    todas las demás llaves antes de enviarlas.  │    │
+│  │ ℹ️  Todas las llaves se crean como              │    │
+│  │    operacionales. Puedes configurar cualquier  │    │
+│  │    llave como KEK desde el almacén de llaves.  │    │
 │  └────────────────────────────────────────────────┘    │
 │                                                          │
 │  Nombre de la llave (opcional):                         │
@@ -41,13 +41,64 @@
 ```
 
 **Cambios**:
-- Radio buttons para elegir: Operacional / KEK
-- Campo de nombre opcional
-- Guardar con tipo correspondiente en BD
+- Eliminados radio buttons de selección de tipo KEK
+- Solo campo de nombre personalizado
+- Todas las llaves se crean como operacionales
+- KEK se selecciona posteriormente desde el almacén
 
 ---
 
-### 2. **Pantalla de Perfiles - Selector de KEK**
+### 2. **Almacén de Llaves - Con Filtros y Gestión KEK**
+
+**Pantalla**: `InjectedKeysScreen` - Pantalla Principal
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Llaves Inyectadas                            [🔄] [🗑️] │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌────────────────────────────────────────────────┐    │
+│  │ 🔍 [Buscar por KCV o nombre...]               │    │
+│  └────────────────────────────────────────────────┘    │
+│                                                          │
+│  Algoritmo: [AES-256 ▼] Estado: [Todos ▼] Tipo: [Todas▼]│
+│                                                          │
+│  ┌────────────────────────────────────────────────┐    │
+│  │ MASTER_KEY                              🔵 KEK │    │
+│  │ AES-256                                 🔒      │    │
+│  │                                          ACTIVA │    │
+│  │ 📍 Slot: #10                                     │    │
+│  │ 🔑 KCV: ABC123                                   │    │
+│  │ 📅 Fecha: 14/10/25 10:30                        │    │
+│  │ 💼 Nombre: KEK Principal Master                  │    │
+│  │                                                  │    │
+│  │ [❌ Quitar como KEK]                  [🗑️]      │    │
+│  └────────────────────────────────────────────────┘    │
+│                                                          │
+│  ┌────────────────────────────────────────────────┐    │
+│  │ PIN_KEY                               🟢 SUCCESSFUL│    │
+│  │ AES-256                                             │    │
+│  │                                                     │    │
+│  │ 📍 Slot: #15                                       │    │
+│  │ 🔑 KCV: DEF456                                     │    │
+│  │ 📅 Fecha: 14/10/25 11:15                          │    │
+│  │ 💼 Nombre: PIN Key Tienda Centro                   │    │
+│  │                                                     │    │
+│  │ [🔒 Usar como KEK]                        [🗑️]      │    │
+│  └────────────────────────────────────────────────┘    │
+│                                                          │
+```
+
+**Funcionalidades**:
+- **Filtros Avanzados**: Algoritmo, Estado, Tipo KEK
+- **Búsqueda**: Por KCV, nombre o tipo de llave
+- **Botón KEK**: Solo visible en llaves AES-256
+- **Indicadores Visuales**: Badge "KEK ACTIVA" e icono de candado
+- **Gestión Automática**: Solo una KEK activa a la vez
+
+---
+
+### 3. **Pantalla de Perfiles - KEK Automática**
 
 **Pantalla**: `ProfilesScreen` - Creación/Edición de Perfil
 
@@ -73,14 +124,14 @@
 │  [ ✓ ] Usar cifrado KEK                                │
 │        (Cifra todas las llaves antes de enviarlas)      │
 │                                                          │
-│  Seleccionar KEK a usar:                                │
+│  KEK Activa Actual:                                     │
 │  ┌────────────────────────────────────────────────┐    │
-│  │ 🔑 KEK Principal Master (KCV: CBB14C)   [●]   │    │
-│  │    └─ Estado: ACTIVA | Creada: 10/10/2025     │    │
-│  │                                                 │    │
-│  │ 🔑 KEK Backup (KCV: A3F28D)             [ ]   │    │
-│  │    └─ Estado: EXPORTADA | Creada: 09/10/2025  │    │
+│  │ 🔑 KEK Principal Master (KCV: CBB14C)          │    │
+│  │    └─ Estado: ACTIVA | AES-256                 │    │
 │  └────────────────────────────────────────────────┘    │
+│                                                          │
+│  ℹ️  Solo puede haber una KEK activa a la vez.        │
+│     Para cambiar la KEK, ve al almacén de llaves.       │
 │                                                          │
 │  ⚠️  La KEK se exportará automáticamente al SubPOS     │
 │     la primera vez que inyectes este perfil.           │

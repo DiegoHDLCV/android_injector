@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
@@ -54,10 +55,13 @@ val bottomBarDestinations = listOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScaffold(username: String) {
+fun MainScaffold(
+    username: String,
+    onNavigateToConfig: () -> Unit = {}
+) {
     val navController = rememberNavController()
     Scaffold(
-        //topBar = { MainTopAppBar() },
+        topBar = { MainTopAppBar(onNavigateToConfig = onNavigateToConfig) },
         bottomBar = { AppBottomBar(navController = navController) }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
@@ -68,13 +72,21 @@ fun MainScaffold(username: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainTopAppBar() {
+fun MainTopAppBar(onNavigateToConfig: () -> Unit = {}) {
     var showMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     TopAppBar(
         title = { Text("Injector") },
         actions = {
+            // Botón de configuración
+            IconButton(onClick = onNavigateToConfig) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Configuración"
+                )
+            }
+
             IconButton(onClick = { showMenu = !showMenu }) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,

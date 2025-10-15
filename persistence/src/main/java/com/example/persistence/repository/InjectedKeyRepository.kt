@@ -217,4 +217,66 @@ class InjectedKeyRepository @Inject constructor(
         }
     }
 
+    /**
+     * Establece una llave específica como KEK activa.
+     * Primero limpia cualquier KEK anterior y luego marca la nueva llave como KEK.
+     */
+    suspend fun setKeyAsKEK(kcv: String) {
+        try {
+            Log.i(TAG, "=== ESTABLECIENDO LLAVE COMO KEK ===")
+            Log.i(TAG, "KCV de la nueva KEK: $kcv")
+            
+            // Primero limpiar cualquier KEK anterior
+            injectedKeyDao.clearAllKEKFlags()
+            Log.d(TAG, "KEK anterior desmarcada")
+            
+            // Establecer la nueva KEK
+            injectedKeyDao.setKeyAsKEK(kcv)
+            Log.i(TAG, "✓ Nueva KEK establecida: KCV=$kcv")
+            Log.i(TAG, "================================================")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al establecer KEK: KCV=$kcv", e)
+            throw e
+        }
+    }
+
+    /**
+     * Quita el flag KEK de una llave específica.
+     * La llave vuelve a ser operacional manteniendo su estado original.
+     */
+    suspend fun removeKeyAsKEK(kcv: String) {
+        try {
+            Log.i(TAG, "=== QUITANDO FLAG KEK ===")
+            Log.i(TAG, "KCV de la llave: $kcv")
+            
+            injectedKeyDao.removeKeyAsKEK(kcv)
+            Log.i(TAG, "✓ Flag KEK removido: KCV=$kcv")
+            Log.i(TAG, "================================================")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al quitar flag KEK: KCV=$kcv", e)
+            throw e
+        }
+    }
+
+    /**
+     * Obtiene la llave que está actualmente marcada como KEK activa.
+     * Solo puede haber una KEK activa a la vez.
+     */
+    suspend fun getCurrentKEK(): InjectedKeyEntity? {
+        return try {
+            val kek = injectedKeyDao.getCurrentKEK()
+            if (kek != null) {
+                Log.d(TAG, "KEK actual encontrada: KCV=${kek.kcv}, Estado=${kek.status}")
+            } else {
+                Log.d(TAG, "No hay KEK activa actualmente")
+            }
+            kek
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al obtener KEK actual", e)
+            null
+        }
+    }
+
 }

@@ -88,4 +88,32 @@ interface InjectedKeyDao {
     @Query("UPDATE injected_keys SET status = :newStatus WHERE id = :keyId")
     suspend fun updateKeyStatusById(keyId: Long, newStatus: String)
 
+    /**
+     * Limpia el flag isKEK de todas las llaves (establece todas como operacionales).
+     * Útil antes de establecer una nueva KEK.
+     */
+    @Query("UPDATE injected_keys SET isKEK = 0 WHERE isKEK = 1")
+    suspend fun clearAllKEKFlags()
+
+    /**
+     * Establece una llave específica como KEK activa.
+     * Marca la llave como KEK y establece su estado como ACTIVE.
+     */
+    @Query("UPDATE injected_keys SET isKEK = 1, status = 'ACTIVE' WHERE kcv = :kcv")
+    suspend fun setKeyAsKEK(kcv: String)
+
+    /**
+     * Quita el flag KEK de una llave específica.
+     * La llave vuelve a ser operacional manteniendo su estado original.
+     */
+    @Query("UPDATE injected_keys SET isKEK = 0 WHERE kcv = :kcv")
+    suspend fun removeKeyAsKEK(kcv: String)
+
+    /**
+     * Obtiene la llave que está actualmente marcada como KEK activa.
+     * Solo puede haber una KEK activa a la vez.
+     */
+    @Query("SELECT * FROM injected_keys WHERE isKEK = 1 LIMIT 1")
+    suspend fun getCurrentKEK(): InjectedKeyEntity?
+
 }

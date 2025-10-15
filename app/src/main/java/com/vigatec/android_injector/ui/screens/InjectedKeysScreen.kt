@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,10 +50,16 @@ fun InjectedKeysScreen(
     navController: NavController,
     viewModel: InjectedKeysViewModel = hiltViewModel()
 ) {
-    val keys by viewModel.keys.collectAsState()
+    val keys by viewModel.filteredKeys.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val showDeleteModal by viewModel.showDeleteModal.collectAsState()
     val selectedKeyForDeletion by viewModel.selectedKeyForDeletion.collectAsState()
+    
+    // Estados de filtros
+    val filterAlgorithm by viewModel.filterAlgorithm.collectAsState()
+    val filterStatus by viewModel.filterStatus.collectAsState()
+    val filterKEKType by viewModel.filterKEKType.collectAsState()
+    val searchText by viewModel.searchText.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.snackbarMessage.collectLatest { message ->
@@ -111,19 +119,36 @@ fun InjectedKeysScreen(
             } else if (keys.isEmpty()) {
                 EmptyKeysScreen()
             } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(
-                        items = keys,
-                        key = { it.id }
-                    ) { key ->
-                        KeyInfoCard(
-                            key = key,
-                            onDeleteClick = { viewModel.onDeleteKey(key) }
-                        )
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Barra de filtros
+                    FiltersBar(
+                        filterAlgorithm = filterAlgorithm,
+                        filterStatus = filterStatus,
+                        filterKEKType = filterKEKType,
+                        searchText = searchText,
+                        onFilterAlgorithmChange = { viewModel.updateFilterAlgorithm(it) },
+                        onFilterStatusChange = { viewModel.updateFilterStatus(it) },
+                        onFilterKEKTypeChange = { viewModel.updateFilterKEKType(it) },
+                        onSearchTextChange = { viewModel.updateSearchText(it) }
+                    )
+                    
+                    // Lista de llaves
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(
+                            items = keys,
+                            key = { it.id }
+                        ) { key ->
+                            KeyInfoCard(
+                                key = key,
+                                onDeleteClick = { viewModel.onDeleteKey(key) },
+                                onSetAsKEKClick = { viewModel.setAsKEK(key) },
+                                onRemoveAsKEKClick = { viewModel.removeAsKEK(key) }
+                            )
+                        }
                     }
                 }
             }
@@ -307,7 +332,13 @@ fun EmptyKeysScreen() {
 }
 
 @Composable
-fun KeyInfoCard(modifier: Modifier = Modifier, key: InjectedKeyEntity, onDeleteClick: () -> Unit) {
+fun KeyInfoCard(
+    modifier: Modifier = Modifier, 
+    key: InjectedKeyEntity, 
+    onDeleteClick: () -> Unit,
+    onSetAsKEKClick: () -> Unit,
+    onRemoveAsKEKClick: () -> Unit
+) {
     // --- INICIO DE CAMBIOS: Lógica de estado visual ---
     val statusColor = when (key.status) {
         "SUCCESSFUL" -> Color(0xFF388E3C)
@@ -344,23 +375,40 @@ fun KeyInfoCard(modifier: Modifier = Modifier, key: InjectedKeyEntity, onDeleteC
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(
-                        text = key.keyType,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = key.keyAlgorithm,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = key.keyType,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        if (key.isKEK) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            KEKBadge()
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = key.keyAlgorithm,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                        if (key.isKEK) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "KEK",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 }
                 
                 StatusChip(
-                    text = key.status,
-                    color = statusColor,
+                    text = if (key.isKEK) "KEK ACTIVA" else key.status,
+                    color = if (key.isKEK) Color(0xFF2196F3) else statusColor,
                     isDeleting = key.status == "DELETING"
                 )
             }
@@ -391,8 +439,60 @@ fun KeyInfoCard(modifier: Modifier = Modifier, key: InjectedKeyEntity, onDeleteC
                 )
             }
 
-            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                // --- CAMBIO: Deshabilitar el botón de borrado ---
+            // Mostrar nombre personalizado si existe
+            if (key.customName.isNotEmpty()) {
+                KeyDetailRow(
+                    icon = Icons.Default.Label,
+                    label = "Nombre",
+                    value = key.customName,
+                    isEnabled = isEnabled
+                )
+            }
+
+            // Botones de acción
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Botón de KEK (solo para AES-256)
+                if (key.keyAlgorithm.contains("AES", ignoreCase = true) && key.keyData.length == 64) {
+                    if (key.isKEK) {
+                        Button(
+                            onClick = onRemoveAsKEKClick,
+                            enabled = isEnabled,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LockOpen,
+                                contentDescription = "Quitar como KEK",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Quitar como KEK")
+                        }
+                    } else {
+                        Button(
+                            onClick = onSetAsKEKClick,
+                            enabled = isEnabled,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Usar como KEK",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Usar como KEK")
+                        }
+                    }
+                }
+                
+                // Botón de eliminar
                 IconButton(onClick = onDeleteClick, enabled = isEnabled) {
                     Icon(
                         Icons.Default.DeleteOutline,
@@ -500,4 +600,149 @@ fun ConfirmationDialog(
             }
         }
     )
+}
+
+@Composable
+fun KEKBadge() {
+    Box(
+        modifier = Modifier
+            .background(
+                Color(0xFF2196F3),
+                shape = RoundedCornerShape(4.dp)
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "KEK",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+fun FiltersBar(
+    filterAlgorithm: String,
+    filterStatus: String,
+    filterKEKType: String,
+    searchText: String,
+    onFilterAlgorithmChange: (String) -> Unit,
+    onFilterStatusChange: (String) -> Unit,
+    onFilterKEKTypeChange: (String) -> Unit,
+    onSearchTextChange: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Campo de búsqueda
+            OutlinedTextField(
+                value = searchText,
+                onValueChange = onSearchTextChange,
+                label = { Text("Buscar por KCV o nombre...") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = "Buscar"
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            // Filtros
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Filtro por algoritmo
+                FilterDropdown(
+                    label = "Algoritmo",
+                    options = listOf("Todos", "3DES", "AES-128", "AES-192", "AES-256"),
+                    selectedOption = filterAlgorithm,
+                    onOptionSelected = onFilterAlgorithmChange,
+                    modifier = Modifier.weight(1f)
+                )
+
+                // Filtro por estado
+                FilterDropdown(
+                    label = "Estado",
+                    options = listOf("Todos", "SUCCESSFUL", "GENERATED", "ACTIVE", "EXPORTED", "INACTIVE"),
+                    selectedOption = filterStatus,
+                    onOptionSelected = onFilterStatusChange,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Filtro por tipo KEK
+            FilterDropdown(
+                label = "Tipo",
+                options = listOf("Todas", "Solo KEK", "Solo Operacionales"),
+                selectedOption = filterKEKType,
+                onOptionSelected = onFilterKEKTypeChange,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+fun FilterDropdown(
+    label: String,
+    options: List<String>,
+    selectedOption: String,
+    onOptionSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column(modifier = modifier) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+        )
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { expanded = !expanded }
+        ) {
+            OutlinedTextField(
+                value = selectedOption,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .menuAnchor()
+            )
+
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            onOptionSelected(option)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
 }

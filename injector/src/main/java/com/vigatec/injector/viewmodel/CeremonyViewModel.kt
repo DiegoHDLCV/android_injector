@@ -26,7 +26,6 @@ data class CeremonyState(
     val isCeremonyFinished: Boolean = false,
 
     // Nuevos campos para configuración de llave
-    val isKEK: Boolean = false,        // Si la llave es KEK
     val customName: String = ""        // Nombre personalizado
 )
 
@@ -55,14 +54,6 @@ class CeremonyViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showComponent = !_uiState.value.showComponent)
     }
 
-    fun onToggleIsKEK(isKEK: Boolean) {
-        _uiState.value = _uiState.value.copy(isKEK = isKEK)
-        if (isKEK) {
-            addToLog("Llave marcada como KEK (Key Encryption Key)")
-        } else {
-            addToLog("Llave marcada como operacional")
-        }
-    }
 
     fun onCustomNameChange(name: String) {
         _uiState.value = _uiState.value.copy(customName = name)
@@ -193,15 +184,15 @@ class CeremonyViewModel @Inject constructor(
                 addToLog("=== REGISTRANDO LLAVE COMPLETA EN BASE DE DATOS ===")
                 addToLog("  - Slot: NO ASIGNADO (se define en perfil)")
 
-                // Determinar tipo de llave según configuración
-                val keyType = if (_uiState.value.isKEK) "KEK" else "CEREMONY_KEY"
-                val keyStatus = if (_uiState.value.isKEK) "ACTIVE" else "GENERATED"
+                // Todas las llaves se crean como operacionales
+                val keyType = "CEREMONY_KEY"
+                val keyStatus = "GENERATED"
 
-                addToLog("  - Tipo de Llave: $keyType ${if (_uiState.value.isKEK) "(Key Encryption Key)" else "(Operacional)"}")
+                addToLog("  - Tipo de Llave: $keyType (Operacional)")
                 addToLog("  - Algoritmo: NO ASIGNADO (se define en perfil)")
                 addToLog("  - KCV: $finalKcv")
                 addToLog("  - Estado: $keyStatus")
-                addToLog("  - Es KEK: ${if (_uiState.value.isKEK) "SÍ" else "NO"}")
+                addToLog("  - Es KEK: NO (puede configurarse desde el almacén de llaves)")
                 addToLog("  - Nombre: ${_uiState.value.customName.ifEmpty { "(Sin nombre)" }}")
                 addToLog("  - Datos de llave (longitud): ${finalKeyBytes.size} bytes")
                 addToLog("  - Datos de llave (hex): $finalKeyHex")
@@ -211,12 +202,12 @@ class CeremonyViewModel @Inject constructor(
                 // Estos parámetros se definirán cuando se use la llave en un perfil
                 injectedKeyRepository.recordKeyInjectionWithData(
                     keySlot = -1, // -1 indica que no hay slot asignado (se asigna en perfil)
-                    keyType = keyType, // KEK o CEREMONY_KEY según configuración
+                    keyType = keyType, // Siempre CEREMONY_KEY (operacional)
                     keyAlgorithm = "UNASSIGNED", // No se asigna algoritmo específico
                     kcv = finalKcv,
                     keyData = finalKeyHex, // ¡GUARDANDO LA LLAVE COMPLETA!
                     status = keyStatus,
-                    isKEK = _uiState.value.isKEK, // Marcar si es KEK
+                    isKEK = false, // Siempre false - se puede cambiar desde el almacén
                     customName = _uiState.value.customName // Nombre personalizado
                 )
                 addToLog("✓ Llave COMPLETA guardada exitosamente en base de datos")

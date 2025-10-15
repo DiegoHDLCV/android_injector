@@ -5,18 +5,26 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.vigatec.injector.ui.screens.LoginScreen
 import com.vigatec.injector.ui.screens.SplashScreen
 import com.vigatec.injector.viewmodel.SplashViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.injector.ui.events.UiEvent
 import com.vigatec.injector.ui.screens.MainScaffold
+import com.vigatec.injector.ui.screens.ConfigScreen
+import com.vigatec.injector.ui.screens.LogsScreen
+import com.vigatec.injector.ui.screens.UserManagementScreen
+import com.vigatec.injector.viewmodel.LoginViewModel
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    var currentUsername by remember { mutableStateOf("") }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Splash.route
@@ -39,21 +47,60 @@ fun AppNavigation() {
                 }
             }
         }
+
         composable(Screen.Login.route) {
-            LoginScreen(onLoginSuccess = { username ->
-                navController.navigate(Screen.Main.route) {
-                    popUpTo(Screen.Login.route) {
-                        inclusive = true
+            val loginViewModel: LoginViewModel = hiltViewModel()
+            LoginScreen(
+                loginViewModel = loginViewModel,
+                onLoginSuccess = { username ->
+                    currentUsername = username
+                    navController.navigate(Screen.Main.route) {
+                        popUpTo(Screen.Login.route) {
+                            inclusive = true
+                        }
                     }
                 }
-            })
+            )
         }
+
         composable(Screen.Main.route) {
-            // Aquí recuperamos el username, aunque en este nuevo diseño
-            // podríamos optar por obtenerlo de un ViewModel compartido o de una sesión.
-            // Por ahora, lo pasamos como argumento, pero no lo usamos en MainScaffold.
-            // Lo ideal sería obtenerlo de una fuente de datos única (ej. SessionViewModel).
-            MainScaffold(username = "admin") // Pasamos un valor por ahora.
+            MainScaffold(
+                username = currentUsername,
+                onNavigateToConfig = {
+                    navController.navigate(Screen.Config.route)
+                }
+            )
+        }
+
+        composable(Screen.Config.route) {
+            ConfigScreen(
+                currentUsername = currentUsername,
+                onNavigateToLogs = {
+                    navController.navigate(Screen.Logs.route)
+                },
+                onNavigateToUserManagement = {
+                    navController.navigate(Screen.UserManagement.route)
+                },
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.Logs.route) {
+            LogsScreen(
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.UserManagement.route) {
+            UserManagementScreen(
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
         }
     }
 } 

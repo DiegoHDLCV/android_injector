@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.persistence.dao.InjectionLogDao
 import com.vigatec.injector.data.local.database.AppDatabase
 import com.vigatec.injector.data.local.entity.User
 import dagger.Module
@@ -31,11 +32,20 @@ object AppModule {
             context,
             AppDatabase::class.java,
             "injector_database"
-        ).addCallback(object : RoomDatabase.Callback() {
+        )
+        .fallbackToDestructiveMigration() // Para versión 2
+        .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 CoroutineScope(Dispatchers.IO).launch {
-                    userDaoProvider.get().insertUser(User(username = "admin", pass = "admin"))
+                    userDaoProvider.get().insertUser(
+                        User(
+                            username = "admin",
+                            pass = "admin",
+                            role = "ADMIN",
+                            fullName = "Administrador"
+                        )
+                    )
                 }
             }
         }).build()
@@ -45,5 +55,11 @@ object AppModule {
     @Singleton
     fun provideUserDao(appDatabase: AppDatabase): com.vigatec.injector.data.local.dao.UserDao {
         return appDatabase.userDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideInjectionLogDao(appDatabase: AppDatabase): InjectionLogDao {
+        return appDatabase.injectionLogDao()
     }
 } 

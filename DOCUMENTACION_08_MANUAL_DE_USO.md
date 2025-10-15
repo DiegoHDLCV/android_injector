@@ -277,21 +277,35 @@ Generar llaves criptográficas de forma segura mediante el método de división 
 
 ### 2.4 Gestión de KEK
 
-#### Generar KEK
+#### Crear Llave para KEK
 
 **Proceso**:
 1. Ir a "Ceremonia de Llaves"
 2. Seleccionar tipo: **AES-256** (recomendado para KEK)
 3. Número de custodios: **3 o más** (mayor seguridad)
 4. Ingresar componentes de cada custodio
-5. **Importante**: Marcar checkbox "Esta es una KEK"
-6. Asignar nombre descriptivo: "KEK Master Octubre 2025"
-7. Finalizar ceremonia
+5. Asignar nombre descriptivo: "KEK Master Octubre 2025" (opcional)
+6. Finalizar ceremonia
 
 **Resultado**:
-- KEK almacenada con flag `isKEK = true`
-- Estado inicial: **ACTIVE**
-- Disponible en dropdown de perfiles
+- Llave creada como **operacional** (isKEK = false)
+- Estado inicial: **GENERATED**
+- Disponible en almacén de llaves
+
+#### Seleccionar KEK desde Almacén
+
+**Proceso**:
+1. Ir a "Llaves Inyectadas" (Almacén de Llaves)
+2. Usar filtros para encontrar llaves AES-256
+3. Localizar la llave deseada
+4. Presionar botón **"Usar como KEK"**
+5. Confirmar en el diálogo que aparece
+
+**Resultado**:
+- Llave seleccionada marcada como KEK activa
+- Estado cambia a **ACTIVE**
+- Cualquier KEK anterior se desmarca automáticamente
+- Badge visual "KEK ACTIVA" aparece en la tarjeta
 
 #### Exportar KEK a SubPOS
 
@@ -323,31 +337,56 @@ Generar llaves criptográficas de forma segura mediante el método de división 
 **Configuración**:
 1. Crear/Editar perfil
 2. Activar toggle "Usar Cifrado KEK"
-3. Seleccionar KEK del dropdown
+3. El sistema muestra automáticamente la KEK activa actual
 4. Guardar perfil
 
 **Comportamiento**:
 - Primera inyección: Exporta KEK + inyecta llaves cifradas
 - Inyecciones posteriores: Solo inyecta llaves cifradas
+- Solo puede haber una KEK activa a la vez
 
 #### Rotación de KEK
 
 **Cada 3-6 Meses** (recomendado):
 
-1. **Generar Nueva KEK**:
+1. **Crear Nueva Llave**:
    - Ceremonia nueva
    - AES-256
-   - Marcar como KEK
    - Nombre: "KEK Master Q1 2026"
 
-2. **Sistema Automáticamente**:
-   - Marca KEK anterior como **INACTIVE**
-   - Nueva KEK queda como **ACTIVE**
+2. **Seleccionar Nueva KEK**:
+   - Ir a "Llaves Inyectadas"
+   - Encontrar la nueva llave AES-256
+   - Presionar "Usar como KEK"
 
-3. **Actualizar Perfiles**:
+3. **Sistema Automáticamente**:
+   - Desmarca KEK anterior (vuelve a ser operacional)
+   - Nueva llave queda como **KEK ACTIVA**
+
+4. **Actualizar Perfiles**:
    - Editar perfiles que usan KEK antigua
    - Seleccionar nueva KEK
    - Guardar cambios
+
+#### Filtros del Almacén de Llaves
+
+**Funcionalidad**:
+La pantalla "Llaves Inyectadas" incluye filtros avanzados para facilitar la gestión:
+
+**Campo de Búsqueda**:
+- Buscar por KCV (ej: "ABC123")
+- Buscar por nombre personalizado
+- Buscar por tipo de llave
+
+**Filtros por Categoría**:
+- **Algoritmo**: Todos, 3DES, AES-128, AES-192, AES-256
+- **Estado**: Todos, SUCCESSFUL, GENERATED, ACTIVE, EXPORTED, INACTIVE
+- **Tipo**: Todas, Solo KEK, Solo Operacionales
+
+**Ejemplos de Uso**:
+- Filtrar por "AES-256" + "Solo Operacionales" para encontrar llaves candidatas a KEK
+- Filtrar por "Solo KEK" para ver únicamente la KEK activa
+- Buscar "Master" para encontrar llaves con nombres específicos
 
 4. **Re-inyectar Terminales** (gradual):
    - Inyectar con perfiles actualizados

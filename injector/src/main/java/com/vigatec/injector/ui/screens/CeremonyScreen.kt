@@ -250,7 +250,7 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Card para configuración de tipo de llave
+        // Card para nombre personalizado
         Card(
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(
@@ -260,105 +260,11 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = "Configuración de la Llave",
+                    text = "Información de la Llave",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Selector de tipo de llave
-                Text(
-                    text = "Tipo de llave:",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Opción: Llave Operacional
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    RadioButton(
-                        selected = !state.isKEK,
-                        onClick = { viewModel.onToggleIsKEK(false) }
-                    )
-                    Column {
-                        Text(
-                            text = "Llave Operacional (Normal)",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "Para uso en perfiles de inyección (PIN, MAC, etc.)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Opción: KEK
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    RadioButton(
-                        selected = state.isKEK,
-                        onClick = { viewModel.onToggleIsKEK(true) }
-                    )
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Llave de Cifrado KEK",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "KEK",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Text(
-                            text = "Para cifrar otras llaves antes de enviarlas al SubPOS",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                }
-
-                // Información adicional si es KEK
-                if (state.isKEK) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Card(
-                        shape = RoundedCornerShape(8.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Info",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Las llaves KEK se usan para cifrar todas las demás llaves antes de enviarlas. La KEK se exporta una sola vez al SubPOS.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -367,7 +273,7 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
                     value = state.customName,
                     onValueChange = { viewModel.onCustomNameChange(it) },
                     label = { Text("Nombre de la llave (opcional)") },
-                    placeholder = { Text(if (state.isKEK) "Ej: KEK Principal Master" else "Ej: PIN Key Principal") },
+                    placeholder = { Text("Ej: PIN Key Principal, MAC Key Tienda") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -375,7 +281,7 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "El nombre te ayudará a identificar la llave más fácilmente",
+                    text = "El nombre te ayudará a identificar la llave más fácilmente. Todas las llaves se crean como operacionales y pueden ser configuradas como KEK desde el almacén de llaves.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )

@@ -37,6 +37,22 @@ class InjectedKeysViewModel @Inject constructor(
     private val _snackbarMessage = MutableSharedFlow<String>()
     val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
 
+    // Estados para filtros
+    private val _filterAlgorithm = MutableStateFlow("Todos")
+    val filterAlgorithm: StateFlow<String> = _filterAlgorithm.asStateFlow()
+
+    private val _filterStatus = MutableStateFlow("Todos")
+    val filterStatus: StateFlow<String> = _filterStatus.asStateFlow()
+
+    private val _filterKEKType = MutableStateFlow("Todas")
+    val filterKEKType: StateFlow<String> = _filterKEKType.asStateFlow()
+
+    private val _searchText = MutableStateFlow("")
+    val searchText: StateFlow<String> = _searchText.asStateFlow()
+
+    private val _filteredKeys = MutableStateFlow<List<InjectedKeyEntity>>(emptyList())
+    val filteredKeys: StateFlow<List<InjectedKeyEntity>> = _filteredKeys.asStateFlow()
+
     init {
         loadKeys()
     }
@@ -48,6 +64,7 @@ class InjectedKeysViewModel @Inject constructor(
                 injectedKeyRepository.getAllInjectedKeys()
                     .collect { keys ->
                         _keys.value = keys
+                        applyFilters() // Aplicar filtros cuando se cargan las llaves
                         _loading.value = false
                     }
             } catch (e: Exception) {
@@ -219,6 +236,119 @@ class InjectedKeysViewModel @Inject constructor(
             } else {
                 KeyType.WORKING_PIN_KEY
             }
+        }
+    }
+
+    // === FUNCIONES DE FILTROS ===
+
+    fun updateFilterAlgorithm(algorithm: String) {
+        _filterAlgorithm.value = algorithm
+        applyFilters()
+    }
+
+    fun updateFilterStatus(status: String) {
+        _filterStatus.value = status
+        applyFilters()
+    }
+
+    fun updateFilterKEKType(kekType: String) {
+        _filterKEKType.value = kekType
+        applyFilters()
+    }
+
+    fun updateSearchText(text: String) {
+        _searchText.value = text
+        applyFilters()
+    }
+
+    private fun applyFilters() {
+        val allKeys = _keys.value
+        var filtered = allKeys
+
+        // Filtro por algoritmo
+        if (_filterAlgorithm.value != "Todos") {
+            filtered = filtered.filter { key ->
+                when (_filterAlgorithm.value) {
+                    "3DES" -> key.keyAlgorithm.contains("3DES", ignoreCase = true)
+                    "AES-128" -> key.keyAlgorithm.contains("AES") && key.keyData.length == 32 // 16 bytes = 32 hex chars
+                    "AES-192" -> key.keyAlgorithm.contains("AES") && key.keyData.length == 48 // 24 bytes = 48 hex chars
+                    "AES-256" -> key.keyAlgorithm.contains("AES") && key.keyData.length == 64 // 32 bytes = 64 hex chars
+                    else -> true
+                }
+            }
+        }
+
+        // Filtro por estado
+        if (_filterStatus.value != "Todos") {
+            filtered = filtered.filter { it.status == _filterStatus.value }
+        }
+
+        // Filtro por tipo KEK
+        when (_filterKEKType.value) {
+            "Solo KEK" -> filtered = filtered.filter { it.isKEK }
+            "Solo Operacionales" -> filtered = filtered.filter { !it.isKEK }
+            "Todas" -> { /* No filtrar */ }
+        }
+
+        // Filtro por búsqueda de texto
+        if (_searchText.value.isNotEmpty()) {
+            val searchLower = _searchText.value.lowercase()
+            filtered = filtered.filter { key ->
+                key.kcv.lowercase().contains(searchLower) ||
+                key.customName.lowercase().contains(searchLower) ||
+                key.keyType.lowercase().contains(searchLower)
+            }
+        }
+
+        _filteredKeys.value = filtered
+    }
+
+    // === FUNCIONES DE GESTIÓN DE KEK ===
+
+    fun setAsKEK(key: InjectedKeyEntity) {
+        viewModelScope.launch {
+            try {
+                // Validar que sea AES-256
+                if (!key.keyAlgorithm.contains("AES", ignoreCase = true) || key.keyData.length != 64) {
+                    _snackbarMessage.emit("Solo las llaves AES-256 pueden ser KEK")
+                    return@launch
+                }
+
+                Log.i(TAG, "Estableciendo llave como KEK: KCV=${key.kcv}")
+                injectedKeyRepository.setKeyAsKEK(key.kcv)
+                _snackbarMessage.emit("Llave ${key.kcv} establecida como KEK activa")
+                
+                // Recargar para reflejar cambios
+                loadKeys()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al establecer KEK", e)
+                _snackbarMessage.emit("Error al establecer KEK: ${e.message}")
+            }
+        }
+    }
+
+    fun removeAsKEK(key: InjectedKeyEntity) {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Quitando flag KEK: KCV=${key.kcv}")
+                injectedKeyRepository.removeKeyAsKEK(key.kcv)
+                _snackbarMessage.emit("Llave ${key.kcv} ya no es KEK activa")
+                
+                // Recargar para reflejar cambios
+                loadKeys()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al quitar flag KEK", e)
+                _snackbarMessage.emit("Error al quitar flag KEK: ${e.message}")
+            }
+        }
+    }
+
+    suspend fun getCurrentKEK(): InjectedKeyEntity? {
+        return try {
+            injectedKeyRepository.getCurrentKEK()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al obtener KEK actual", e)
+            null
         }
     }
 }
