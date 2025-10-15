@@ -20,6 +20,7 @@ fun ConfigScreen(
     viewModel: ConfigViewModel = hiltViewModel(),
     onNavigateToLogs: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
+    onNavigateToTmsConfig: () -> Unit = {},
     onBack: () -> Unit,
     onLogout: () -> Unit = {}
 ) {
@@ -57,6 +58,14 @@ fun ConfigScreen(
                     role = user.role
                 )
             }
+
+            // Sección de TMS
+            ConfigOptionCard(
+                title = "Terminal Management System (TMS)",
+                description = "Configurar conexión y parámetros del sistema de gestión de terminales",
+                icon = Icons.Default.Cloud,
+                onClick = onNavigateToTmsConfig
+            )
 
             // Sección de Logs
             ConfigOptionCard(

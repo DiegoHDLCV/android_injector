@@ -7,6 +7,7 @@ sealed class Screen(val route: String) {
     object Config : Screen("config")
     object Logs : Screen("logs")
     object UserManagement : Screen("user_management")
+    object TmsConfig : Screen("tms_config")
 }
 
 sealed class MainScreen(val route: String) {

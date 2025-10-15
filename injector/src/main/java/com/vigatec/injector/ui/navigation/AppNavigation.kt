@@ -18,6 +18,7 @@ import com.vigatec.injector.ui.screens.MainScaffold
 import com.vigatec.injector.ui.screens.ConfigScreen
 import com.vigatec.injector.ui.screens.LogsScreen
 import com.vigatec.injector.ui.screens.UserManagementScreen
+import com.vigatec.injector.ui.screens.TmsConfigScreen
 import com.vigatec.injector.viewmodel.LoginViewModel
 
 @Composable
@@ -81,6 +82,9 @@ fun AppNavigation() {
                 onNavigateToUserManagement = {
                     navController.navigate(Screen.UserManagement.route)
                 },
+                onNavigateToTmsConfig = {
+                    navController.navigate(Screen.TmsConfig.route)
+                },
                 onBack = {
                     navController.popBackStack()
                 },
@@ -107,6 +111,14 @@ fun AppNavigation() {
 
         composable(Screen.UserManagement.route) {
             UserManagementScreen(
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.TmsConfig.route) {
+            TmsConfigScreen(
                 onBack = {
                     navController.popBackStack()
                 }
