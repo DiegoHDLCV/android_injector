@@ -67,75 +67,127 @@ class AisinoComController(private val comport: Int = 0) : IComController { // `c
         parity: EnumCommConfParity,
         dataBits: EnumCommConfDataBits
     ): Int {
+        Log.d(TAG, "╔══════════════════════════════════════════════════════════════")
+        Log.d(TAG, "║ AISINO COM INIT - Puerto $comport")
+        Log.d(TAG, "╠══════════════════════════════════════════════════════════════")
         if (isOpen) {
-            Log.w(TAG, "Port $comport is already open. Close before re-initializing.")
-            // Considerar si devolver error o simplemente permitir reconfiguración de parámetros almacenados
+            Log.w(TAG, "║ ⚠️  ADVERTENCIA: Puerto $comport ya está abierto")
+            Log.w(TAG, "║     Se debe cerrar antes de reinicializar")
         }
         this.storedBaudRate = mapBaudRate(baudRate)
         this.storedDataBits = mapDataBits(dataBits)
         this.storedParity = mapParity(parity)
-        // stopBits se asume 1 por defecto para Rs232Api, si es configurable se agregaría
 
-        Log.i(TAG, "AisinoComController for port $comport initialized with Baud: $storedBaudRate, DataBits: $storedDataBits, Parity: $storedParity. Configuration will be applied on open().")
-        // La Rs232Api no tiene un método init separado de open/setBaud.
-        // La inicialización global del SDK de Aisino (SystemApi.SystemInit_Api) se asume hecha.
+        Log.i(TAG, "║ ✓ Parámetros configurados:")
+        Log.i(TAG, "║   • Baud Rate: $storedBaudRate bps")
+        Log.i(TAG, "║   • Data Bits: $storedDataBits")
+        Log.i(TAG, "║   • Parity: $storedParity")
+        Log.i(TAG, "║   • Stop Bits: $storedStopBits (fijo)")
+        Log.i(TAG, "║ ℹ️  Configuración será aplicada en open()")
+        Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
         return SUCCESS
     }
 
     override fun open(): Int {
+        Log.d(TAG, "╔══════════════════════════════════════════════════════════════")
+        Log.d(TAG, "║ AISINO COM OPEN - Puerto $comport")
+        Log.d(TAG, "╠══════════════════════════════════════════════════════════════")
+
         if (isOpen) {
-            Log.w(TAG, "Port $comport is already open.")
-            return SUCCESS // O ERROR_ALREADY_OPEN si se prefiere ser estricto
+            Log.w(TAG, "║ ⚠️  Puerto $comport ya está abierto, retornando SUCCESS")
+            Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
+            return SUCCESS
         }
+
         try {
-            Log.d(TAG, "Attempting to open port $comport...")
-            var result = Rs232Api.PortOpen_Api(comport) //
+            Log.i(TAG, "║ 🔌 PASO 1/4: Intentando abrir puerto $comport...")
+            Log.i(TAG, "║     Llamando a Rs232Api.PortOpen_Api($comport)")
+
+            var result = Rs232Api.PortOpen_Api(comport)
+
             if (result != AISINO_SUCCESS) {
-                Log.e(TAG, "Failed to open port $comport. Aisino Error Code: $result")
+                Log.e(TAG, "║ ✗ FALLO al abrir puerto $comport")
+                Log.e(TAG, "║   Código de error Aisino: $result")
+                Log.e(TAG, "║   Posibles causas:")
+                Log.e(TAG, "║   • Cable USB no conectado")
+                Log.e(TAG, "║   • Puerto en uso por otra aplicación")
+                Log.e(TAG, "║   • Permisos insuficientes")
+                Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
                 return ERROR_OPEN_FAILED
             }
-            Log.i(TAG, "Port $comport opened successfully.")
+            Log.i(TAG, "║ ✓ Puerto $comport abierto exitosamente")
 
-            // Resetear el puerto después de abrirlo puede ser una buena práctica
+            Log.i(TAG, "║ 🔄 PASO 2/4: Reseteando puerto $comport...")
+            Log.i(TAG, "║     Llamando a Rs232Api.PortReset_Api($comport)")
             Rs232Api.PortReset_Api(comport)
-            Log.d(TAG, "Port $comport reset.")
+            Log.i(TAG, "║ ✓ Puerto $comport reseteado")
 
-            Log.d(TAG, "Setting baud rate for port $comport: Baud=$storedBaudRate, DataBits=$storedDataBits, Parity=$storedParity, StopBits=$storedStopBits")
-            result = Rs232Api.PortSetBaud_Api(comport, storedBaudRate, storedDataBits, storedParity, storedStopBits) //
+            Log.i(TAG, "║ ⚙️  PASO 3/4: Configurando parámetros de comunicación...")
+            Log.i(TAG, "║     Baud: $storedBaudRate, Data: $storedDataBits, Parity: $storedParity, Stop: $storedStopBits")
+            Log.i(TAG, "║     Llamando a Rs232Api.PortSetBaud_Api(...)")
+
+            result = Rs232Api.PortSetBaud_Api(comport, storedBaudRate, storedDataBits, storedParity, storedStopBits)
+
             if (result != AISINO_SUCCESS) {
-                Log.e(TAG, "Failed to set baud rate for port $comport. Aisino Error Code: $result")
-                Rs232Api.PortClose_Api(comport) // Intentar cerrar si falló la configuración
+                Log.e(TAG, "║ ✗ FALLO al configurar baud rate del puerto $comport")
+                Log.e(TAG, "║   Código de error Aisino: $result")
+                Log.e(TAG, "║ 🔒 Cerrando puerto debido al error...")
+                Rs232Api.PortClose_Api(comport)
+                Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
                 return ERROR_SET_BAUD_FAILED
             }
-            Log.i(TAG, "Baud rate set successfully for port $comport.")
+            Log.i(TAG, "║ ✓ Parámetros configurados correctamente")
 
+            Log.i(TAG, "║ ✅ PASO 4/4: Puerto $comport LISTO PARA COMUNICACIÓN")
             isOpen = true
+            Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
             return SUCCESS
+
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during port $comport open or configuration.", e)
+            Log.e(TAG, "║ ❌ EXCEPCIÓN durante apertura del puerto $comport", e)
+            Log.e(TAG, "║    Mensaje: ${e.message}")
+            Log.e(TAG, "║    Stack: ${e.stackTraceToString().take(200)}")
             isOpen = false
+            Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
             return ERROR_GENERAL_EXCEPTION
         }
     }
 
     override fun close(): Int {
+        Log.d(TAG, "╔══════════════════════════════════════════════════════════════")
+        Log.d(TAG, "║ AISINO COM CLOSE - Puerto $comport")
+        Log.d(TAG, "╠══════════════════════════════════════════════════════════════")
+
         if (!isOpen) {
-            Log.w(TAG, "Port $comport is not open or already closed.")
+            Log.w(TAG, "║ ⚠️  Puerto $comport no está abierto o ya fue cerrado")
+            Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
             return SUCCESS
         }
+
         try {
-            Log.d(TAG, "Closing port $comport...")
-            val result = Rs232Api.PortClose_Api(comport) //
-            isOpen = false // Marcar como cerrado independientemente del resultado de la API
+            Log.i(TAG, "║ 🔒 Cerrando puerto $comport...")
+            Log.i(TAG, "║    Llamando a Rs232Api.PortClose_Api($comport)")
+
+            val result = Rs232Api.PortClose_Api(comport)
+            isOpen = false
+
             if (result != AISINO_SUCCESS) {
-                Log.e(TAG, "Failed to close port $comport. Aisino Error Code: $result")
+                Log.e(TAG, "║ ✗ ADVERTENCIA: Error al cerrar puerto $comport")
+                Log.e(TAG, "║   Código de error Aisino: $result")
+                Log.e(TAG, "║   Puerto marcado como cerrado de todas formas")
+                Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
                 return ERROR_CLOSE_FAILED
             }
-            Log.i(TAG, "Port $comport closed successfully.")
+
+            Log.i(TAG, "║ ✓ Puerto $comport cerrado exitosamente")
+            Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
             return SUCCESS
+
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during port $comport close.", e)
+            Log.e(TAG, "║ ❌ EXCEPCIÓN durante cierre del puerto $comport", e)
+            Log.e(TAG, "║    Mensaje: ${e.message}")
             isOpen = false
+            Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
             return ERROR_GENERAL_EXCEPTION
         }
     }
@@ -170,26 +222,46 @@ class AisinoComController(private val comport: Int = 0) : IComController { // `c
 
     override fun readData(expectedLen: Int, buffer: ByteArray, timeout: Int): Int {
         if (!isOpen) {
-            Log.e(TAG, "Port $comport not open for reading.")
+            Log.e(TAG, "║ ✗ ERROR: Puerto $comport no está abierto para lectura")
             return ERROR_NOT_OPEN
         }
         if (buffer.isEmpty() || expectedLen <= 0) {
-            Log.w(TAG, "Read buffer for port $comport is empty or expectedLen is invalid.")
+            Log.w(TAG, "║ ⚠️  Buffer vacío o expectedLen inválido para puerto $comport")
             return 0
         }
 
         try {
-            Log.d(TAG, "Attempting to read $expectedLen bytes from port $comport with timeout $timeout ms.")
-            // Rs232Api.PortRecv_Api devuelve -1 para error/timeout, o la longitud de los datos recibidos.
-            val bytesRead = Rs232Api.PortRecv_Api(comport, buffer, expectedLen, timeout) //
-            if (bytesRead < 0) { // -1 indica error o timeout
-                Log.w(TAG, "Read from port $comport failed or timed out. Aisino Code: $bytesRead")
+            // Log detallado solo cada cierto número de lecturas para evitar spam
+            if (Math.random() < 0.05) { // 5% de las veces
+                Log.d(TAG, "║ 📖 Intentando leer $expectedLen bytes del puerto $comport (timeout: $timeout ms)")
+            }
+
+            val bytesRead = Rs232Api.PortRecv_Api(comport, buffer, expectedLen, timeout)
+
+            if (bytesRead < 0) {
+                // Solo loguear timeouts ocasionalmente para evitar spam
+                if (Math.random() < 0.01) { // 1% de las veces
+                    Log.v(TAG, "║ ⏱️  Timeout en lectura del puerto $comport (normal si no hay datos)")
+                }
                 return ERROR_READ_TIMEOUT_OR_FAILURE
             }
-            Log.d(TAG, "Read $bytesRead bytes from port $comport.")
+
+            if (bytesRead > 0) {
+                val hexData = buffer.take(bytesRead).joinToString("") { "%02X".format(it) }
+                Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
+                Log.i(TAG, "║ 📥 DATOS RECIBIDOS - Puerto $comport")
+                Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
+                Log.i(TAG, "║ Bytes leídos: $bytesRead")
+                Log.i(TAG, "║ Datos HEX: $hexData")
+                Log.i(TAG, "║ Datos ASCII: ${String(buffer, 0, bytesRead, Charsets.ISO_8859_1).replace("[^\\x20-\\x7E]".toRegex(), ".")}")
+                Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
+            }
+
             return bytesRead
+
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during read from port $comport.", e)
+            Log.e(TAG, "║ ❌ EXCEPCIÓN durante lectura del puerto $comport", e)
+            Log.e(TAG, "║    Mensaje: ${e.message}")
             return ERROR_GENERAL_EXCEPTION
         }
     }

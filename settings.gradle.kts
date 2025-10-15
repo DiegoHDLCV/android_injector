@@ -18,6 +18,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
         // Aquí se pueden incluir repositorios locales (flatDir) si es necesario:
         flatDir {
             dirs("project_local_aars") // Apunta a la carpeta que creaste
@@ -36,3 +37,6 @@ include(":manufacturer")
 include(":config")
 include(":communication")
 include(":format")
+
+include(":injector")
+include(":dev_injector")

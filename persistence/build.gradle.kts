@@ -45,6 +45,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler) // Correcto: compilador de Room con KSP
+    implementation(libs.gson)
 
     implementation(libs.hilt.android) // Correcto: Hilt runtime
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")

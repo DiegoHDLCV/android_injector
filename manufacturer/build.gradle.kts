@@ -12,6 +12,10 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
+        ndk {
+            abiFilters.clear() // Limpia cualquier filtro anterior
+            abiFilters += "armeabi-v7a"
+        }
     }
 
     buildTypes {

@@ -3,8 +3,8 @@ package com.example.persistence.repository
 import com.example.persistence.dao.KeyDao
 import com.example.persistence.entities.KeyEntity
 import com.vigatec.utils.enums.Role
-import jakarta.inject.Inject
-import jakarta.inject.Singleton
+import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 
 @Singleton

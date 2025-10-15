@@ -21,7 +21,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.vigatec.android_injector.ui.Navigator
 import com.vigatec.android_injector.ui.events.UiEvent
-import com.vigatec.android_injector.viewmodel.MainViewModel
 import com.vigatec.android_injector.viewmodel.SplashViewModel
 import kotlinx.coroutines.delay
 

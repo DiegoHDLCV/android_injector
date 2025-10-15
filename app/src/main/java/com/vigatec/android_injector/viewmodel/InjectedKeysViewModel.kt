@@ -6,7 +6,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.manufacturer.KeySDKManager
-import com.example.manufacturer.base.models.KeyType as GenericKeyType
+import com.example.manufacturer.base.models.KeyType
 import com.example.persistence.entities.InjectedKeyEntity
 import com.example.persistence.repository.InjectedKeyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,16 +22,116 @@ class InjectedKeysViewModel @Inject constructor(
 
     private val TAG = "InjectedKeysViewModel"
 
-    private val _snackbarMessage = MutableSharedFlow<String>()
-    val snackbarMessage = _snackbarMessage.asSharedFlow()
+    private val _loading = MutableStateFlow(true)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
-    val injectedKeys: StateFlow<List<InjectedKeyEntity>> =
-        injectedKeyRepository.getAllInjectedKeys()
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
+    private val _keys = MutableStateFlow<List<InjectedKeyEntity>>(emptyList())
+    val keys: StateFlow<List<InjectedKeyEntity>> = _keys.asStateFlow()
+
+    private val _showDeleteModal = MutableStateFlow(false)
+    val showDeleteModal: StateFlow<Boolean> = _showDeleteModal.asStateFlow()
+
+    private val _selectedKeyForDeletion = MutableStateFlow<InjectedKeyEntity?>(null)
+    val selectedKeyForDeletion: StateFlow<InjectedKeyEntity?> = _selectedKeyForDeletion.asStateFlow()
+
+    private val _snackbarMessage = MutableSharedFlow<String>()
+    val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
+
+    // Estados para filtros
+    private val _filterAlgorithm = MutableStateFlow("Todos")
+    val filterAlgorithm: StateFlow<String> = _filterAlgorithm.asStateFlow()
+
+    private val _filterStatus = MutableStateFlow("Todos")
+    val filterStatus: StateFlow<String> = _filterStatus.asStateFlow()
+
+    private val _filterKEKType = MutableStateFlow("Todas")
+    val filterKEKType: StateFlow<String> = _filterKEKType.asStateFlow()
+
+    private val _searchText = MutableStateFlow("")
+    val searchText: StateFlow<String> = _searchText.asStateFlow()
+
+    private val _filteredKeys = MutableStateFlow<List<InjectedKeyEntity>>(emptyList())
+    val filteredKeys: StateFlow<List<InjectedKeyEntity>> = _filteredKeys.asStateFlow()
+
+    init {
+        loadKeys()
+    }
+
+    private fun loadKeys() {
+        viewModelScope.launch {
+            _loading.value = true
+            try {
+                injectedKeyRepository.getAllInjectedKeys()
+                    .collect { keys ->
+                        _keys.value = keys
+                        applyFilters() // Aplicar filtros cuando se cargan las llaves
+                        _loading.value = false
+                    }
+            } catch (e: Exception) {
+                _snackbarMessage.emit("Error al cargar las llaves: ${e.message}")
+                _loading.value = false
+            }
+        }
+    }
+
+    fun refreshKeys() {
+        loadKeys()
+    }
+
+    fun onDeleteKey(key: InjectedKeyEntity) {
+        _selectedKeyForDeletion.value = key
+        _showDeleteModal.value = true
+    }
+
+    fun confirmDeleteKey() {
+        viewModelScope.launch {
+            try {
+                val key = _selectedKeyForDeletion.value
+                if (key != null) {
+                    // Marcar como eliminando
+                    val updatedKey = key.copy(status = "DELETING")
+                    injectedKeyRepository.insertOrUpdate(updatedKey)
+                    
+                    // Simular el proceso de eliminación
+                    kotlinx.coroutines.delay(1000)
+                    
+                    // Eliminar de la base de datos
+                    injectedKeyRepository.deleteKey(key.id)
+                    _snackbarMessage.emit("Llave eliminada exitosamente")
+                }
+            } catch (e: Exception) {
+                _snackbarMessage.emit("Error al eliminar la llave: ${e.message}")
+            } finally {
+                dismissDeleteModal()
+            }
+        }
+    }
+
+    fun dismissDeleteModal() {
+        _showDeleteModal.value = false
+        _selectedKeyForDeletion.value = null
+    }
+
+    fun clearAllKeys() {
+        viewModelScope.launch {
+            try {
+                val currentKeys = _keys.value
+                currentKeys.forEach { key ->
+                    val updatedKey = key.copy(status = "DELETING")
+                    injectedKeyRepository.insertOrUpdate(updatedKey)
+                }
+                
+                // Simular el proceso de eliminación
+                kotlinx.coroutines.delay(1500)
+                
+                // Eliminar todas las llaves
+                injectedKeyRepository.deleteAllKeys()
+                _snackbarMessage.emit("Todas las llaves han sido eliminadas")
+            } catch (e: Exception) {
+                _snackbarMessage.emit("Error al eliminar las llaves: ${e.message}")
+            }
+        }
+    }
 
     fun deleteKey(key: InjectedKeyEntity) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -80,7 +180,7 @@ class InjectedKeysViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             Log.i(TAG, "deleteAllKeys: Proceso de borrado por estados iniciado.")
 
-            if (injectedKeys.value.isEmpty()) {
+            if (keys.value.isEmpty()) {
                 Log.i(TAG, "deleteAllKeys: No hay llaves para borrar.")
                 _snackbarMessage.emit("No hay llaves para borrar.")
                 return@launch
@@ -127,15 +227,128 @@ class InjectedKeysViewModel @Inject constructor(
         }
     }
 
-    private fun mapStringToGenericKeyType(keyTypeString: String): GenericKeyType {
+    private fun mapStringToGenericKeyType(keyTypeString: String): KeyType {
         return try {
-            GenericKeyType.valueOf(keyTypeString)
+            KeyType.valueOf(keyTypeString)
         } catch (e: IllegalArgumentException) {
             if (keyTypeString.contains("MASTER") || keyTypeString.contains("TRANSPORT")) {
-                GenericKeyType.MASTER_KEY
+                KeyType.MASTER_KEY
             } else {
-                GenericKeyType.WORKING_PIN_KEY
+                KeyType.WORKING_PIN_KEY
             }
+        }
+    }
+
+    // === FUNCIONES DE FILTROS ===
+
+    fun updateFilterAlgorithm(algorithm: String) {
+        _filterAlgorithm.value = algorithm
+        applyFilters()
+    }
+
+    fun updateFilterStatus(status: String) {
+        _filterStatus.value = status
+        applyFilters()
+    }
+
+    fun updateFilterKEKType(kekType: String) {
+        _filterKEKType.value = kekType
+        applyFilters()
+    }
+
+    fun updateSearchText(text: String) {
+        _searchText.value = text
+        applyFilters()
+    }
+
+    private fun applyFilters() {
+        val allKeys = _keys.value
+        var filtered = allKeys
+
+        // Filtro por algoritmo
+        if (_filterAlgorithm.value != "Todos") {
+            filtered = filtered.filter { key ->
+                when (_filterAlgorithm.value) {
+                    "3DES" -> key.keyAlgorithm.contains("3DES", ignoreCase = true)
+                    "AES-128" -> key.keyAlgorithm.contains("AES") && key.keyData.length == 32 // 16 bytes = 32 hex chars
+                    "AES-192" -> key.keyAlgorithm.contains("AES") && key.keyData.length == 48 // 24 bytes = 48 hex chars
+                    "AES-256" -> key.keyAlgorithm.contains("AES") && key.keyData.length == 64 // 32 bytes = 64 hex chars
+                    else -> true
+                }
+            }
+        }
+
+        // Filtro por estado
+        if (_filterStatus.value != "Todos") {
+            filtered = filtered.filter { it.status == _filterStatus.value }
+        }
+
+        // Filtro por tipo KEK
+        when (_filterKEKType.value) {
+            "Solo KEK" -> filtered = filtered.filter { it.isKEK }
+            "Solo Operacionales" -> filtered = filtered.filter { !it.isKEK }
+            "Todas" -> { /* No filtrar */ }
+        }
+
+        // Filtro por búsqueda de texto
+        if (_searchText.value.isNotEmpty()) {
+            val searchLower = _searchText.value.lowercase()
+            filtered = filtered.filter { key ->
+                key.kcv.lowercase().contains(searchLower) ||
+                key.customName.lowercase().contains(searchLower) ||
+                key.keyType.lowercase().contains(searchLower)
+            }
+        }
+
+        _filteredKeys.value = filtered
+    }
+
+    // === FUNCIONES DE GESTIÓN DE KEK ===
+
+    fun setAsKEK(key: InjectedKeyEntity) {
+        viewModelScope.launch {
+            try {
+                // Validar que sea AES-256
+                if (!key.keyAlgorithm.contains("AES", ignoreCase = true) || key.keyData.length != 64) {
+                    _snackbarMessage.emit("Solo las llaves AES-256 pueden ser KEK")
+                    return@launch
+                }
+
+                Log.i(TAG, "Estableciendo llave como KEK: KCV=${key.kcv}")
+                injectedKeyRepository.setKeyAsKEK(key.kcv)
+                _snackbarMessage.emit("Llave ${key.kcv} establecida como KEK activa")
+                
+                // Recargar para reflejar cambios
+                loadKeys()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al establecer KEK", e)
+                _snackbarMessage.emit("Error al establecer KEK: ${e.message}")
+            }
+        }
+    }
+
+    fun removeAsKEK(key: InjectedKeyEntity) {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "Quitando flag KEK: KCV=${key.kcv}")
+                injectedKeyRepository.removeKeyAsKEK(key.kcv)
+                _snackbarMessage.emit("Llave ${key.kcv} ya no es KEK activa")
+                
+                // Recargar para reflejar cambios
+                loadKeys()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al quitar flag KEK", e)
+                _snackbarMessage.emit("Error al quitar flag KEK: ${e.message}")
+            }
+        }
+    }
+
+    suspend fun getCurrentKEK(): InjectedKeyEntity? {
+        return try {
+            injectedKeyRepository.getCurrentKEK()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al obtener KEK actual", e)
+            null
         }
     }
 }

@@ -5,6 +5,7 @@ import android.util.Log
 import com.example.communication.base.IComController
 import com.example.communication.base.controllers.manager.ICommunicationManager
 import com.example.communication.libraries.aisino.AisinoCommunicationManager
+import com.example.communication.libraries.newpos.NewposCommunicationManager
 import com.example.communication.libraries.urovo.UrovoCommunicationManager
 import com.example.config.EnumManufacturer
 import com.example.config.SystemConfig
@@ -15,10 +16,9 @@ object CommunicationSDKManager : ICommunicationManager {
     private val manager: ICommunicationManager by lazy {
         Log.d("CommSDKManager", "Seleccionando manager para: ${SystemConfig.managerSelected}")
         when (SystemConfig.managerSelected) {
-            //EnumManufacturer.NEWPOS -> NewposCommunicationManager
-            //EnumManufacturer.AISINO -> AisinoCommunicationManager // Implementar
             EnumManufacturer.AISINO -> AisinoCommunicationManager // Implementar
             EnumManufacturer.UROVO -> UrovoCommunicationManager // Implementar
+            EnumManufacturer.NEWPOS -> NewposCommunicationManager // Implementar
             // ... otros fabricantes
             else -> {
                 Log.w(
@@ -44,12 +44,20 @@ object CommunicationSDKManager : ICommunicationManager {
 
     override fun getComController(): IComController? {
         // --- CORREGIDO --- Se cambió "getApnController" a "getComController" en el log
-        Log.d("CommSDKManager", "Delegando getComController a ${SystemConfig.managerSelected}")
+        //Log.d("CommSDKManager", "Delegando getComController a ${SystemConfig.managerSelected}")
         return try {
             manager.getComController()
         } catch (e: Exception) {
             // --- CORREGIDO --- Se cambió "getApnController" a "getComController" en el log
             Log.e("CommSDKManager", "Error en getComController", e); null
+        }
+    }
+
+    fun rescanIfSupported() {
+        when (manager) {
+            is AisinoCommunicationManager -> (manager as AisinoCommunicationManager).safeRescanIfInitialized()
+            // Otros managers podrían implementar lógica futura
+            else -> ""//Log.d("CommSDKManager", "rescanIfSupported: no soportado para ${SystemConfig.managerSelected}")
         }
     }
 

@@ -24,16 +24,138 @@ class InjectedKeyRepository @Inject constructor(
         keyType: String,
         keyAlgorithm: String,
         kcv: String,
-        status: String
+        status: String = "SUCCESSFUL"
     ) {
-        val newRecord = InjectedKeyEntity(
-            keySlot = keySlot,
-            keyType = keyType,
-            keyAlgorithm = keyAlgorithm,
-            kcv = kcv,
-            status = status
-        )
-        injectedKeyDao.insertOrUpdate(newRecord)
+        try {
+            val injectedKey = InjectedKeyEntity(
+                keySlot = keySlot,
+                keyType = keyType,
+                keyAlgorithm = keyAlgorithm,
+                kcv = kcv,
+                status = status,
+                injectionTimestamp = System.currentTimeMillis(),
+            )
+            injectedKeyDao.insertOrUpdate(injectedKey)
+            Log.d(TAG, "Key injection recorded: Slot $keySlot, Type $keyType, Status $status")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error recording key injection", e)
+            throw e
+        }
+    }
+
+    /**
+     * NUEVO MÉTODO: Registra la inyección de una llave con sus datos completos.
+     * Este método es crucial para la ceremonia de llaves donde necesitamos guardar
+     * la llave real, no solo el KCV.
+     */
+    suspend fun recordKeyInjectionWithData(
+        keySlot: Int,
+        keyType: String,
+        keyAlgorithm: String,
+        kcv: String,
+        keyData: String,
+        status: String = "SUCCESSFUL",
+        isKEK: Boolean = false,
+        customName: String = ""
+    ) {
+        try {
+            Log.i(TAG, "=== REGISTRANDO INYECCIÓN DE LLAVE CON DATOS COMPLETOS ===")
+            Log.i(TAG, "Slot: $keySlot")
+            Log.i(TAG, "Tipo: $keyType")
+            Log.i(TAG, "Algoritmo: $keyAlgorithm")
+            Log.i(TAG, "KCV: $kcv")
+            Log.i(TAG, "Datos de llave (longitud): ${keyData.length / 2} bytes")
+            Log.i(TAG, "Datos de llave (primeros 32 bytes): ${keyData.take(64)}")
+            Log.i(TAG, "Estado: $status")
+            Log.i(TAG, "Es KEK: $isKEK")
+            Log.i(TAG, "Nombre personalizado: ${if (customName.isEmpty()) "(Sin nombre)" else customName}")
+
+            val injectedKey = InjectedKeyEntity(
+                keySlot = keySlot,
+                keyType = keyType,
+                keyAlgorithm = keyAlgorithm,
+                kcv = kcv,
+                keyData = keyData,
+                status = status,
+                injectionTimestamp = System.currentTimeMillis(),
+                isKEK = isKEK,
+                customName = customName
+            )
+            
+            if (keyType == "CEREMONY_KEY") {
+                Log.i(TAG, "Llave de ceremonia detectada - usando insertIfNotExists para evitar sobrescritura")
+                val insertedId = injectedKeyDao.insertIfNotExists(injectedKey)
+                if (insertedId > 0) {
+                    Log.i(TAG, "✓ Llave de ceremonia registrada exitosamente con ID: $insertedId")
+                } else {
+                    Log.w(TAG, "⚠️ Llave de ceremonia con KCV $kcv ya existe - no se sobrescribió")
+                }
+            } else {
+                Log.i(TAG, "Llave regular detectada - usando insertOrUpdate para permitir actualizaciones")
+                injectedKeyDao.insertOrUpdate(injectedKey)
+                Log.i(TAG, "✓ Llave registrada/actualizada exitosamente en base de datos")
+                Log.i(TAG, "✓ Datos de la llave guardados: ${keyData.length / 2} bytes")
+                Log.i(TAG, "✓ KCV: $kcv")
+            }
+            Log.i(TAG, "================================================")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ Error al registrar inyección de llave con datos", e)
+            Log.e(TAG, "Detalles del error:")
+            Log.e(TAG, "  - Slot: $keySlot")
+            Log.e(TAG, "  - Tipo: $keyType")
+            Log.e(TAG, "  - KCV: $kcv")
+            Log.e(TAG, "  - Longitud de datos: ${keyData.length / 2} bytes")
+            throw e
+        }
+    }
+
+    suspend fun insertOrUpdate(key: InjectedKeyEntity) {
+        try {
+            injectedKeyDao.insertOrUpdate(key)
+            Log.d(TAG, "Key inserted/updated: ${key.id}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error inserting/updating key", e)
+            throw e
+        }
+    }
+
+    suspend fun getInjectionCountToday(startOfDay: Long): Int {
+        return try {
+            injectedKeyDao.getInjectionCountToday(startOfDay)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting injection count for today", e)
+            0
+        }
+    }
+
+    suspend fun getSuccessfulInjectionCount(): Int {
+        return try {
+            injectedKeyDao.getSuccessfulInjectionCount()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting successful injection count", e)
+            0
+        }
+    }
+
+    suspend fun deleteKey(keyId: Long) {
+        try {
+            injectedKeyDao.deleteKey(keyId)
+            Log.d(TAG, "Key deleted: $keyId")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting key", e)
+            throw e
+        }
+    }
+
+    suspend fun deleteAllKeys() {
+        try {
+            injectedKeyDao.deleteAllKeys()
+            Log.d(TAG, "All keys deleted")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting all keys", e)
+            throw e
+        }
     }
 
     suspend fun getKeyBySlotAndType(slot: Int, type: String): InjectedKeyEntity? {
@@ -49,19 +171,13 @@ class InjectedKeyRepository @Inject constructor(
      * @param key La entidad de la llave a eliminar.
      */
     suspend fun deleteKey(key: InjectedKeyEntity) {
-        injectedKeyDao.delete(key)
-    }
-
-    /**
-     * Borra todas las llaves de la base de datos.
-     * Es una operación destructiva que limpia toda la tabla.
-     */
-    suspend fun deleteAllKeys() {
-        // --- LOG AÑADIDO ---
-        Log.i(TAG, "deleteAllKeys: Solicitud recibida para borrar todos los registros del DAO.")
-        injectedKeyDao.deleteAll()
-        // --- LOG AÑADIDO ---
-        Log.d(TAG, "deleteAllKeys: Llamada a injectedKeyDao.deleteAll() completada.")
+        try {
+            injectedKeyDao.deleteKey(key.id)
+            Log.d(TAG, "Key deleted by entity: ${key.id}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error deleting key by entity", e)
+            throw e
+        }
     }
 
     /**
@@ -74,4 +190,93 @@ class InjectedKeyRepository @Inject constructor(
     suspend fun updateKeyStatus(key: InjectedKeyEntity, newStatus: String) {
         injectedKeyDao.updateKeyStatusById(key.id, newStatus)
     }
+
+    /**
+     * Busca una llave específica por su KCV (Key Check Value).
+     */
+    suspend fun getKeyByKcv(kcv: String): InjectedKeyEntity? {
+        return injectedKeyDao.getKeyByKcv(kcv)
+    }
+
+    /**
+     * Actualiza el estado de una llave por su KCV.
+     * Útil para marcar KEKs como EXPORTED o INACTIVE.
+     */
+    suspend fun updateKeyStatus(kcv: String, newStatus: String) {
+        try {
+            val key = injectedKeyDao.getKeyByKcv(kcv)
+            if (key != null) {
+                injectedKeyDao.updateKeyStatusById(key.id, newStatus)
+                Log.d(TAG, "Estado de llave actualizado: KCV=$kcv, nuevo estado=$newStatus")
+            } else {
+                Log.w(TAG, "No se encontró llave con KCV=$kcv para actualizar estado")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al actualizar estado de llave por KCV", e)
+            throw e
+        }
+    }
+
+    /**
+     * Establece una llave específica como KEK activa.
+     * Primero limpia cualquier KEK anterior y luego marca la nueva llave como KEK.
+     */
+    suspend fun setKeyAsKEK(kcv: String) {
+        try {
+            Log.i(TAG, "=== ESTABLECIENDO LLAVE COMO KEK ===")
+            Log.i(TAG, "KCV de la nueva KEK: $kcv")
+            
+            // Primero limpiar cualquier KEK anterior
+            injectedKeyDao.clearAllKEKFlags()
+            Log.d(TAG, "KEK anterior desmarcada")
+            
+            // Establecer la nueva KEK
+            injectedKeyDao.setKeyAsKEK(kcv)
+            Log.i(TAG, "✓ Nueva KEK establecida: KCV=$kcv")
+            Log.i(TAG, "================================================")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al establecer KEK: KCV=$kcv", e)
+            throw e
+        }
+    }
+
+    /**
+     * Quita el flag KEK de una llave específica.
+     * La llave vuelve a ser operacional manteniendo su estado original.
+     */
+    suspend fun removeKeyAsKEK(kcv: String) {
+        try {
+            Log.i(TAG, "=== QUITANDO FLAG KEK ===")
+            Log.i(TAG, "KCV de la llave: $kcv")
+            
+            injectedKeyDao.removeKeyAsKEK(kcv)
+            Log.i(TAG, "✓ Flag KEK removido: KCV=$kcv")
+            Log.i(TAG, "================================================")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al quitar flag KEK: KCV=$kcv", e)
+            throw e
+        }
+    }
+
+    /**
+     * Obtiene la llave que está actualmente marcada como KEK activa.
+     * Solo puede haber una KEK activa a la vez.
+     */
+    suspend fun getCurrentKEK(): InjectedKeyEntity? {
+        return try {
+            val kek = injectedKeyDao.getCurrentKEK()
+            if (kek != null) {
+                Log.d(TAG, "KEK actual encontrada: KCV=${kek.kcv}, Estado=${kek.status}")
+            } else {
+                Log.d(TAG, "No hay KEK activa actualmente")
+            }
+            kek
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al obtener KEK actual", e)
+            null
+        }
+    }
+
 }

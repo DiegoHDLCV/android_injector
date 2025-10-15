@@ -1,10 +1,21 @@
 package com.example.communication.libraries.aisino
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
+import com.example.communication.base.EnumCommConfBaudRate
 import com.example.communication.base.IComController
 import com.example.communication.base.controllers.manager.ICommunicationManager
 import com.example.communication.libraries.aisino.wrapper.AisinoComController
+import com.vanstone.appsdk.client.ISdkStatue
+import com.vanstone.appsdk.client.SdkApi
+import com.vanstone.trans.api.SystemApi
+import com.vanstone.utils.CommonConvert
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 object AisinoCommunicationManager : ICommunicationManager {
 
@@ -19,38 +30,155 @@ object AisinoCommunicationManager : ICommunicationManager {
     // en la descripción de ese método indica que "port != 0 && port != 1" es un error, sugiriendo que 0 y 1 son puertos válidos. [cite: 551]
     private const val DEFAULT_AISINO_COMPORT = 0
 
+    // Variables para el puerto y baudios seleccionados por el auto-scan
+    private var selectedPort: Int = DEFAULT_AISINO_COMPORT
+    private var selectedBaud: Int = 9600
+
+    @Volatile private var scanning = false
+    @Volatile private var isInitializing = false
+    private val initLock = Any()
+
     override suspend fun initialize(application: Application) {
         if (isInitialized) {
             Log.i(TAG, "AisinoCommunicationManager ya está inicializado.")
             return
         }
-        Log.i(TAG, "Inicializando AisinoCommunicationManager...")
-        this.applicationContext = application
+        synchronized(initLock) {
+            if (isInitialized) return
+            if (isInitializing) {
+                Log.w(TAG, "initialize() llamado mientras ya se inicializa; esperando resultado")
+                // espera activa breve (infrecuente) – evitar complicación de suspensión
+                var spins = 0
+                while (isInitializing && !isInitialized && spins < 100) {
+                    try { Thread.sleep(20) } catch (_: InterruptedException) {}
+                    spins++
+                }
+                return
+            }
+            isInitializing = true
+        }
+        try {
+            Log.i(TAG, "Inicializando AisinoCommunicationManager...")
+            this.applicationContext = application
+            Log.d(TAG, "Inicializando SDK de Vanstone para comunicación...")
+            initializeVanstoneSDK(application)
+            Log.i(TAG, "SDK de Vanstone inicializado correctamente")
+            // Auto-scan de puertos/baudios
+            autoScanPortsAndBauds()
+            isInitialized = true
+            Log.i(TAG, "AisinoCommunicationManager inicializado correctamente.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al inicializar SDK de Vanstone", e)
+            throw e
+        } finally {
+            isInitializing = false
+        }
+    }
 
-        // La inicialización del SDK global de Vanstone (SystemApi.SystemInit_Api)
-        // se asume que ya fue manejada externamente (ej. en AisinoKeyManager o Application.onCreate)
-        // ya que es un prerrequisito para que SdkApi.getInstance() funcione.
-        // Si SdkApi.getInstance().getRs232Handler() es null, las llamadas fallarán.
-        // Aquí solo marcamos este manager como inicializado.
-        isInitialized = true
-        Log.i(TAG, "AisinoCommunicationManager inicializado. Se asume que el SDK de Vanstone está listo.")
+    // Safe re-scan para uso externo cuando no llegan datos
+    fun safeRescanIfInitialized() {
+        if (!isInitialized || isInitializing) return
+        Log.i(TAG, "safeRescanIfInitialized: iniciando re-scan de puertos/baudios")
+        comControllerInstance?.close()
+        comControllerInstance = null
+        autoScanPortsAndBauds()
+    }
+
+    private fun autoScanPortsAndBauds() {
+        if (scanning) {
+            Log.w(TAG, "AutoScan: ya en progreso, se omite")
+            return
+        }
+        scanning = true
+        try {
+            val ports = com.example.config.SystemConfig.aisinoCandidatePorts
+            val bauds = com.example.config.SystemConfig.aisinoCandidateBauds
+            Log.i(TAG, "AutoScan: probando puertos $ports con baudios $bauds")
+            for (p in ports) {
+                for (b in bauds) {
+                    try {
+                        // Crear controlador temporal
+                        val temp = AisinoComController(comport = p)
+                        // Config init
+                        temp.init(
+                            when (b) {
+                                115200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_115200
+                                57600 -> com.example.communication.base.EnumCommConfBaudRate.BPS_57600
+                                38400 -> com.example.communication.base.EnumCommConfBaudRate.BPS_38400
+                                19200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_19200
+                                9600 -> com.example.communication.base.EnumCommConfBaudRate.BPS_9600
+                                4800 -> com.example.communication.base.EnumCommConfBaudRate.BPS_4800
+                                2400 -> com.example.communication.base.EnumCommConfBaudRate.BPS_2400
+                                else -> com.example.communication.base.EnumCommConfBaudRate.BPS_9600
+                            },
+                            com.example.communication.base.EnumCommConfParity.NOPAR,
+                            com.example.communication.base.EnumCommConfDataBits.DB_8
+                        )
+                        val openRes = temp.open()
+                        if (openRes != 0) {
+                            Log.w(TAG, "AutoScan: open fallo para puerto $p baud $b (code=$openRes)")
+                            continue
+                        }
+                        // Intento de lectura rápida
+                        val buf = ByteArray(16)
+                        val read = temp.readData(16, buf, 200)
+                        val hex = buf.take(if (read>0) read else 0).joinToString(" ") { "%02X".format(it) }
+                        Log.d(TAG, "AutoScan: puerto $p baud $b read=$read data=$hex")
+                        // Criterio de selección: éxito de open; si recibe >0 bytes mejor
+                        if (read > 0) {
+                            Log.i(TAG, "AutoScan: seleccionando puerto $p baud $b (datos recibidos)")
+                            selectedPort = p
+                            selectedBaud = b
+                            temp.close()
+                            return
+                        } else if (selectedPort == DEFAULT_AISINO_COMPORT) {
+                            // Fallback temporal si aún no elegimos puerto que lea algo
+                            selectedPort = p
+                            selectedBaud = b
+                        }
+                        temp.close()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "AutoScan: excepción puerto $p baud $b", e)
+                    }
+                }
+            }
+            Log.i(TAG, "AutoScan: puerto elegido $selectedPort baud $selectedBaud")
+        } finally {
+            scanning = false
+        }
+    }
+
+    fun forceRescan() {
+        Log.i(TAG, "Solicitando re-scan manual de puertos Aisino")
+        comControllerInstance?.close()
+        comControllerInstance = null
+        autoScanPortsAndBauds()
     }
 
     @Synchronized
     override fun getComController(): IComController? {
         if (!isInitialized) {
             Log.e(TAG, "AisinoCommunicationManager no ha sido inicializado. Llama a initialize() primero.")
-            // Considerar lanzar una excepción si se requiere inicialización estricta
-            // throw IllegalStateException("AisinoCommunicationManager no ha sido inicializado.")
             return null
         }
-
         if (comControllerInstance == null) {
-            Log.d(TAG, "Creando nueva instancia de AisinoComController para el puerto $DEFAULT_AISINO_COMPORT...")
+            Log.d(TAG, "Creando nueva instancia de AisinoComController para el puerto $selectedPort...")
             try {
-                // Aquí puedes pasar el número de puerto específico si es diferente
-                comControllerInstance = AisinoComController(comport = DEFAULT_AISINO_COMPORT)
-                Log.i(TAG, "Instancia de AisinoComController creada.")
+                comControllerInstance = AisinoComController(comport = selectedPort)
+                // Aplicar init con baud seleccionado
+                val baudEnum = when (selectedBaud) {
+                    115200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_115200
+                    57600 -> com.example.communication.base.EnumCommConfBaudRate.BPS_57600
+                    38400 -> com.example.communication.base.EnumCommConfBaudRate.BPS_38400
+                    19200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_19200
+                    9600 -> com.example.communication.base.EnumCommConfBaudRate.BPS_9600
+                    4800 -> com.example.communication.base.EnumCommConfBaudRate.BPS_4800
+                    2400 -> com.example.communication.base.EnumCommConfBaudRate.BPS_2400
+                    1200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_1200
+                    else -> com.example.communication.base.EnumCommConfBaudRate.BPS_9600
+                }
+                comControllerInstance!!.init(baudEnum, com.example.communication.base.EnumCommConfParity.NOPAR, com.example.communication.base.EnumCommConfDataBits.DB_8)
+                Log.i(TAG, "Instancia de AisinoComController creada para puerto $selectedPort baud $selectedBaud.")
             } catch (e: Exception) {
                 Log.e(TAG, "Error al crear AisinoComController", e)
                 comControllerInstance = null
@@ -70,6 +198,102 @@ object AisinoCommunicationManager : ICommunicationManager {
             applicationContext = null
             isInitialized = false
             Log.i(TAG, "AisinoCommunicationManager liberado.")
+        }
+    }
+
+    // Variable para evitar inicializar el SDK múltiples veces
+    @Volatile
+    private var isVanstoneSDKInitialized = false
+
+    private suspend fun initializeVanstoneSDK(application: Application) = withContext(Dispatchers.IO) {
+        if (isVanstoneSDKInitialized) {
+            Log.d(TAG, "SDK de Vanstone ya está inicializado, omitiendo.")
+            return@withContext
+        }
+
+        val context: Context = application.applicationContext
+
+        suspendCancellableCoroutine { continuation ->
+            try {
+                val curAppDir = context.filesDir.absolutePath
+                val pathBytes = CommonConvert.StringToBytes("$curAppDir/\u0000")
+                if (pathBytes == null) {
+                    val ex = IllegalStateException("Error convirtiendo directorio a bytes para SystemInit_Api.")
+                    Log.e(TAG, "Error: pathBytes es null", ex)
+                    if (continuation.isActive) continuation.resumeWithException(ex)
+                    return@suspendCancellableCoroutine
+                }
+
+                Log.d(TAG, "Llamando SystemApi.SystemInit_Api...")
+                SystemApi.SystemInit_Api(0, pathBytes, context, object : ISdkStatue {
+                    override fun sdkInitSuccessed() {
+                        Log.i(TAG, "SystemApi.SystemInit_Api: Éxito. Inicializando SdkApi...")
+                        if (!continuation.isActive) return
+
+                        // Paso 2: Inicializar SdkApi
+                        SdkApi.getInstance().init(context, object : ISdkStatue {
+                            override fun sdkInitSuccessed() {
+                                Log.i(TAG, "SdkApi.getInstance().init(): Éxito. Inicialización del SDK completa.")
+                                isVanstoneSDKInitialized = true
+                                if (continuation.isActive) {
+                                    continuation.resume(Unit)
+                                }
+                            }
+
+                            override fun sdkInitFailed() {
+                                val ex = IllegalStateException("Falló la inicialización del SDK (SdkApi).")
+                                Log.e(TAG, "Error: Falló la inicialización de SdkApi.", ex)
+                                if (continuation.isActive) {
+                                    continuation.resumeWithException(ex)
+                                }
+                            }
+                        })
+                    }
+
+                    override fun sdkInitFailed() {
+                        val ex = IllegalStateException("Falló la inicialización del SDK (SystemApi).")
+                        Log.e(TAG, "Error: Falló la inicialización de SystemApi.", ex)
+                        if (continuation.isActive) {
+                            continuation.resumeWithException(ex)
+                        }
+                    }
+                })
+            } catch (e: Throwable) {
+                Log.e(TAG, "Excepción durante la configuración de initializeVanstoneSDK", e)
+                if (continuation.isActive) {
+                    continuation.resumeWithException(e)
+                }
+            }
+        }
+    }
+
+    // Objeto Dummy interno para manejar casos no soportados (ya existe en el archivo original)
+    private object DummyCommunicationManager : ICommunicationManager {
+        override suspend fun initialize(application: Application) {
+            Log.w("DummyCommManager", "Initialize llamado, pero no hace nada.")
+        }
+
+        override fun getComController(): IComController? {
+            Log.w("DummyCommManager", "getComController llamado, devolviendo null.")
+            return null
+        }
+
+        override fun release() {
+            Log.w("DummyCommManager", "Release llamado, pero no hace nada.")
+        }
+    }
+
+    fun getSelectedBaudEnum(): EnumCommConfBaudRate {
+        return when (selectedBaud) {
+            115200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_115200
+            57600 -> com.example.communication.base.EnumCommConfBaudRate.BPS_57600
+            38400 -> com.example.communication.base.EnumCommConfBaudRate.BPS_38400
+            19200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_19200
+            9600 -> com.example.communication.base.EnumCommConfBaudRate.BPS_9600
+            4800 -> com.example.communication.base.EnumCommConfBaudRate.BPS_4800
+            2400 -> com.example.communication.base.EnumCommConfBaudRate.BPS_2400
+            1200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_1200
+            else -> com.example.communication.base.EnumCommConfBaudRate.BPS_9600
         }
     }
 }

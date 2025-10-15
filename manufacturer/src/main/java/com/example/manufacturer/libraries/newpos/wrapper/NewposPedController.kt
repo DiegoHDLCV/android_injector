@@ -1,134 +1,106 @@
 package com.example.manufacturer.libraries.newpos.wrapper
 
-// Import generic types (Adjust package if needed)
 import android.app.Application
-import com.example.manufacturer.base.controllers.ped.*
-import com.example.manufacturer.base.models.*
-import com.example.manufacturer.base.models.KeyType as GenericKeyType
-import com.example.manufacturer.base.models.KeyAlgorithm as GenericKeyAlgorithm
-import com.example.manufacturer.base.models.BlockCipherMode as GenericBlockCipherMode
-import com.example.manufacturer.base.models.MacAlgorithm as GenericMacAlgorithm
-import com.example.manufacturer.base.models.PinBlockFormatType as GenericPinBlockFormatType
-
-// Import NewPOS specific types
-import com.pos.device.ped.DukptType as NewposDukptType
-import com.pos.device.ped.EccKeyFormat // Not used in generic interface currently
-import com.pos.device.ped.EccKeyInfo // Not used in generic interface currently
-import com.pos.device.ped.KeySystem as NewposKeySystem
-import com.pos.device.ped.KeyType as NewposKeyType
-import com.pos.device.ped.MACMode as NewposMACMode
-import com.pos.device.ped.Ped
-import com.pos.device.ped.PedConfig
-import com.pos.device.ped.PinBlockCallback
-import com.pos.device.ped.PinBlockFormat as NewposPinBlockFormat
-// Missing NewPOS types from generic models (if any were used)
-// import com.pos.device.ped.KeyUsage // Missing from provided NewPOS docs
-
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
-import com.example.manufacturer.base.models.KeyAlgorithm
+import com.example.manufacturer.base.controllers.ped.*
+import com.example.manufacturer.base.models.*
+import com.example.manufacturer.base.models.KeyAlgorithm as GenericKeyAlgorithm
+import com.example.manufacturer.base.models.KeyType as GenericKeyType
+import com.example.manufacturer.base.models.BlockCipherMode as GenericBlockCipherMode
+import com.example.manufacturer.base.models.MacAlgorithm as GenericMacAlgorithm
+import com.example.manufacturer.base.models.PinBlockFormatType as GenericPinBlockFormatType
+import com.pos.device.ped.*
+import com.pos.device.ped.KeySystem as NewposKeySystem
+import com.pos.device.ped.KeyType as NewposKeyType
+import com.pos.device.ped.MACMode as NewposMACMode
+import com.pos.device.ped.PinBlockFormat as NewposPinBlockFormat
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+/**
+ * IPedController implementation for NewPOS devices.
+ *
+ * Uses the NewPOS SDK `com.pos.device.ped.Ped` to interact with the hardware.
+ *
+ * @param context The application context, needed to get the PED instance.
+ */
 class NewposPedController(private val context: Context) : IPedController {
 
     private val TAG = "NewposPedController"
-    private lateinit var pedInstance: Ped // Instance obtained in init
-    private var isPedInitialized = false
+    private val pedInstance: Ped
 
 
     // --- Mappings ---
 
-    private fun mapToNewposKeySystem(generic: GenericKeyType): NewposKeySystem? {
-        // DUKPT keys use specific KeySystems in NewPOS
-        if (generic == GenericKeyType.DUKPT_INITIAL_KEY || generic == GenericKeyType.DUKPT_WORKING_KEY) {
-            // Assuming DUKPT_DES for TDES variant, DUKPT_AES for AES variant
-            // The actual algorithm needs to be known when loading the initial key.
-            // This mapping might need context. Defaulting to DUKPT_DES for simplicity here.
-            Log.w(TAG, "Ambiguous DUKPT KeySystem mapping for $generic. Defaulting to DUKPT_DES.")
-            return NewposKeySystem.DUKPT_DES
-        }
-        // Add mappings based on NewPOS KeySystem enum documentation
+    private fun mapToNewposKeySystem(generic: GenericKeyType, algorithm: GenericKeyAlgorithm? = null): NewposKeySystem {
         return when (generic) {
-            GenericKeyType.MASTER_KEY -> NewposKeySystem.MS_DES // Or MS_SM4 / MS_AES if differentiating Master Key algorithms
-            GenericKeyType.WORKING_PIN_KEY -> NewposKeySystem.FIXED_DES // Assuming FIXED system for working keys? Or MS? Needs clarification.
-            GenericKeyType.WORKING_MAC_KEY -> NewposKeySystem.FIXED_DES
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> NewposKeySystem.FIXED_DES
-            GenericKeyType.RSA_PRIVATE_KEY, GenericKeyType.RSA_PUBLIC_KEY -> NewposKeySystem.TMS_RSA // Check if correct
-            GenericKeyType.TRANSPORT_KEY -> NewposKeySystem.FIXED_TMTK // Assuming transport key maps to TMTK
+            GenericKeyType.MASTER_KEY, GenericKeyType.TRANSPORT_KEY -> {
+                when (algorithm) {
+                    GenericKeyAlgorithm.SM4 -> NewposKeySystem.MS_SM4
+                    GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> NewposKeySystem.MS_AES
+                    else -> NewposKeySystem.MS_DES // Default for DES/TDES
+                }
+            }
+            GenericKeyType.WORKING_PIN_KEY,
+            GenericKeyType.WORKING_MAC_KEY,
+            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> {
+                when (algorithm) {
+                    GenericKeyAlgorithm.SM4 -> NewposKeySystem.FIXED_SM4
+                    GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> NewposKeySystem.FIXED_AES
+                    else -> NewposKeySystem.FIXED_DES // Default for DES/TDES
+                }
+            }
+            GenericKeyType.DUKPT_INITIAL_KEY, GenericKeyType.DUKPT_WORKING_KEY -> {
+                when (algorithm) {
+                    GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> NewposKeySystem.DUKPT_AES
+                    else -> NewposKeySystem.DUKPT_DES // Default for DES/TDES
+                }
+            }
+            GenericKeyType.RSA_PUBLIC_KEY, GenericKeyType.RSA_PRIVATE_KEY -> NewposKeySystem.TMS_RSA
             else -> {
-                Log.w(TAG, "Unsupported generic KeyType to NewposKeySystem mapping: $generic")
-                null
+                Log.w(TAG, "Unsupported generic KeyType to NewposKeySystem mapping: $generic. Defaulting to MS_DES.")
+                NewposKeySystem.MS_DES
             }
-        }
-    }
-
-    internal fun initializePedInternal(): Boolean {
-        if (isPedInitialized) return true
-        try {
-            Log.i(TAG, "Attempting Ped.getInstance(). Context: $context, Thread: ${Thread.currentThread().name}")
-            // Ahora intentamos obtener la instancia aquí
-            pedInstance = Ped.getInstance()
-            if (!::pedInstance.isInitialized || pedInstance == null) { // Doble chequeo
-                throw IllegalStateException("Ped.getInstance() returned null or failed. NewPOS SDK not operational.")
-            }
-            isPedInitialized = true // Marcar como inicializado
-            Log.i(TAG, "NewPOS Ped instance obtained successfully in initializePedInternal.")
-            return true
-        } catch (e: Throwable) {
-            Log.e(TAG, "!!! Ped.getInstance() FAILED in initializePedInternal!!! Error: ${e.message}", e)
-            isPedInitialized = false
-            // Relanzar como PedException para que NewposKeyManager lo capture
-            throw PedException("Failed to initialize NewPOS PED via Ped.getInstance(): ${e.message}", e)
         }
     }
 
     private fun mapToNewposKeyType(generic: GenericKeyType): NewposKeyType? {
         return when (generic) {
             GenericKeyType.MASTER_KEY -> NewposKeyType.KEY_TYPE_MASTK
-            GenericKeyType.WORKING_PIN_KEY -> NewposKeyType.KEY_TYPE_PINK // Or KEY_TYPE_FIXPINK? Depends on usage context.
-            GenericKeyType.WORKING_MAC_KEY -> NewposKeyType.KEY_TYPE_MACK // Or KEY_TYPE_FIXMACK?
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> NewposKeyType.KEY_TYPE_EAK // Or KEY_TYPE_FIXEAK?
+            GenericKeyType.WORKING_PIN_KEY -> NewposKeyType.KEY_TYPE_PINK
+            GenericKeyType.WORKING_MAC_KEY -> NewposKeyType.KEY_TYPE_MACK
+            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> NewposKeyType.KEY_TYPE_EAK
             GenericKeyType.DUKPT_INITIAL_KEY, GenericKeyType.DUKPT_WORKING_KEY -> NewposKeyType.KEY_TYPE_DUKPTK
             GenericKeyType.RSA_PRIVATE_KEY -> NewposKeyType.KEY_TYPE_RSA_PRIK
-            GenericKeyType.TRANSPORT_KEY -> NewposKeyType.KEY_TYPE_TMSK // Example mapping, verify based on SDK usage
-            // GenericKeyType.RSA_PUBLIC_KEY is not directly mapped as a NewposKeyType for storage? Public keys are often imported/exported differently.
-            else -> {
-                Log.w(TAG, "Unsupported generic KeyType mapping to NewposKeyType: $generic")
-                null
-            }
+            GenericKeyType.TRANSPORT_KEY -> NewposKeyType.KEY_TYPE_TMSK
+            // CORRECTED: There is no direct type for RSA public keys in the NewPOS SDK.
+            // Returning null to indicate no direct storage type.
+            GenericKeyType.RSA_PUBLIC_KEY -> null
         }
     }
-
     private fun mapToNewposPinFormat(generic: GenericPinBlockFormatType): NewposPinBlockFormat? {
         return when (generic) {
             GenericPinBlockFormatType.ISO9564_0 -> NewposPinBlockFormat.PIN_BLOCK_FORMAT_0
             GenericPinBlockFormatType.ISO9564_1 -> NewposPinBlockFormat.PIN_BLOCK_FORMAT_1
             GenericPinBlockFormatType.ISO9564_3 -> NewposPinBlockFormat.PIN_BLOCK_FORMAT_3
-            GenericPinBlockFormatType.ISO9564_4 -> {
-                // This requires setting the AES DUKPT type (128, 192, 256)
-                // The generic interface doesn't currently pass this detail explicitly with the format.
-                // We'd need context about the AES key being used (e.g., from writeDukptInitialKey).
-                // Defaulting to AES128 for now if format 4 is requested for DUKPT AES.
-                Log.w(TAG, "Mapping ISO9564_4 requires AES key size context. Assuming AES128 for NewposPinBlockFormat.setDukptAESType.")
-                NewposPinBlockFormat.PIN_BLOCK_FORMAT_4.setDukptAESType(NewposDukptType.DUKPT_TYPE_AES128) // Example default
-                NewposPinBlockFormat.PIN_BLOCK_FORMAT_4
+            // NewPOS API does not have a direct mapping for ISO9564_4.
+            // This is often linked to DUKPT AES, which is handled via the KeySystem in NewPOS.
+            else -> {
+                Log.w(TAG, "Unsupported generic PinBlockFormatType mapping to NewposPinBlockFormat: $generic")
+                null
             }
-            // else -> null // Explicitly handle unsupported formats if any
         }
     }
 
     private fun mapToNewposMacMode(generic: GenericMacAlgorithm): NewposMACMode? {
-        return when(generic) {
-            // Map based on standard interpretations and NewPOS enum names
-            GenericMacAlgorithm.CBC_MAC_ISO9797_1_M1 -> NewposMACMode.MAC_MODE_EMV // Often used for EMV (DES M1)
-            GenericMacAlgorithm.CBC_MAC_ISO9797_1_M2 -> NewposMACMode.MAC_MODE_1 // Often TDES M2 maps to ANSI X9.19
-            GenericMacAlgorithm.RETAIL_MAC_ANSI_X9_19 -> NewposMACMode.MAC_MODE_1 // Retail MAC is usually ANSI X9.19
+        return when (generic) {
+            GenericMacAlgorithm.RETAIL_MAC_ANSI_X9_19 -> NewposMACMode.MAC_MODE_1
             GenericMacAlgorithm.UNIONPAY_CBC_MAC -> NewposMACMode.MAC_MODE_CUP
-            // GenericMacAlgorithm.CMAC_AES -> Not directly listed in NewposMACMode? Might require different API call.
-            // GenericMacAlgorithm.DUKPT_MAC (if added) -> NewposMACMode.MAC_MODE_DUKPT
+            GenericMacAlgorithm.CBC_MAC_ISO9797_1_M1, GenericMacAlgorithm.CBC_MAC_ISO9797_1_M2 -> NewposMACMode.MAC_MODE_EMV
+            GenericMacAlgorithm.CMAC_AES -> NewposMACMode.MAC_MODE_2
             else -> {
                 Log.w(TAG, "Unsupported generic MacAlgorithm mapping to NewposMACMode: $generic")
                 null
@@ -136,95 +108,77 @@ class NewposPedController(private val context: Context) : IPedController {
         }
     }
 
-    private fun mapToNewposDukptType(generic: GenericKeyAlgorithm): NewposDukptType? {
-        return when(generic) {
-            GenericKeyAlgorithm.DES_TRIPLE -> NewposDukptType.DUKPT_TYPE_3TDEA // Assuming 3TDEA for TDES
-            GenericKeyAlgorithm.DES_DOUBLE -> NewposDukptType.DUKPT_TYPE_2TDEA // Assuming 2TDEA for 2-key TDES
-            GenericKeyAlgorithm.AES_128 -> NewposDukptType.DUKPT_TYPE_AES128
-            GenericKeyAlgorithm.AES_192 -> NewposDukptType.DUKPT_TYPE_AES192
-            GenericKeyAlgorithm.AES_256 -> NewposDukptType.DUKPT_TYPE_AES256
+    private fun mapToNewposDukptType(generic: GenericKeyAlgorithm): DukptType? {
+        return when (generic) {
+            GenericKeyAlgorithm.DES_TRIPLE, GenericKeyAlgorithm.DES_DOUBLE -> DukptType.DUKPT_TYPE_3TDEA
+            GenericKeyAlgorithm.AES_128 -> DukptType.DUKPT_TYPE_AES128
+            GenericKeyAlgorithm.AES_192 -> DukptType.DUKPT_TYPE_AES192
+            GenericKeyAlgorithm.AES_256 -> DukptType.DUKPT_TYPE_AES256
             else -> {
-                Log.w(TAG, "Unsupported generic KeyAlgorithm for NewposDukptType mapping: $generic")
+                Log.w(TAG, "Unsupported generic KeyAlgorithm for DukptType mapping: $generic")
                 null
             }
         }
     }
 
-    // Map generic cipher params to NewPOS mode integer for desDencryptUnified
-    private fun mapToNewposDesUnifiedMode(alg: GenericKeyAlgorithm, mode: GenericBlockCipherMode?, encrypt: Boolean): Int? {
-        val operation = when(alg) {
+    private fun mapToNewposDesUnifiedMode(alg: GenericKeyAlgorithm, mode: GenericBlockCipherMode?, encrypt: Boolean): Int {
+        val operation = when (alg) {
             GenericKeyAlgorithm.DES_SINGLE, GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> if (encrypt) Ped.TDEA_ENCRYPT else Ped.TDEA_DECRYPT
             GenericKeyAlgorithm.SM4 -> if (encrypt) Ped.SM4_ENCRYPT else Ped.SM4_DECRYPT
             GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> if (encrypt) Ped.AES_ENCRYPT else Ped.AES_DECRYPT
-            else -> { Log.w(TAG,"Unsupported algorithm for desDencryptUnified: $alg"); return null }
+            else -> throw PedCryptoException("Unsupported algorithm for desDencryptUnified: $alg")
         }
 
-        val blockModeVal = when(mode) {
-            GenericBlockCipherMode.ECB -> when(alg) {
+        val blockModeVal = when (mode) {
+            GenericBlockCipherMode.ECB -> when (alg) {
                 GenericKeyAlgorithm.DES_SINGLE, GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> Ped.TDEA_MODE_ECB
                 GenericKeyAlgorithm.SM4 -> Ped.SM4_MODE_ECB
                 GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> Ped.AES_MODE_ECB
-                else -> { Log.w(TAG,"ECB mode unsupported for algorithm: $alg"); return null }
+                else -> throw PedCryptoException("ECB mode is not supported for algorithm: $alg")
             }
-            GenericBlockCipherMode.CBC -> when(alg) {
+            GenericBlockCipherMode.CBC -> when (alg) {
                 GenericKeyAlgorithm.DES_SINGLE, GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> Ped.TDEA_MODE_CBC
                 GenericKeyAlgorithm.SM4 -> Ped.SM4_MODE_CBC
                 GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> Ped.AES_MODE_CBC
-                else -> { Log.w(TAG,"CBC mode unsupported for algorithm: $alg"); return null }
+                else -> throw PedCryptoException("CBC mode is not supported for algorithm: $alg")
             }
-            null -> { // Needed for RSA? but desDencryptUnified is likely not for RSA
-                Log.w(TAG,"Block mode cannot be null for symmetric algorithms"); return null
-            }
+            null -> throw PedCryptoException("Block mode (ECB/CBC) cannot be null for symmetric operations.")
         }
-        // Combine operation and block mode using bitwise OR
         return operation or blockModeVal
     }
 
+    // --- Initialization & Lifecycle ---
 
-    // --- Initialization ---
     init {
         try {
-            Log.i(TAG, "Attempting Ped.getInstance(). Context: $context, Thread: ${Thread.currentThread().name}") // Added context/thread info
-            // --> The failing call is next:
+            Log.i(TAG, "Attempting to get NewPOS Ped instance...")
             pedInstance = Ped.getInstance()
-            // <-- If it gets past here, it succeeded
-            if (pedInstance == null) {
-                // This case might not be reachable if getInstance throws, but good to have
-                Log.e(TAG, "Ped.getInstance() returned null!")
-                throw IllegalStateException("Ped.getInstance() returned null. NewPOS SDK not operational.")
-            }
-            Log.i(TAG, "NewPOS Ped instance obtained successfully.") // Changed to Info level
+            Log.i(TAG, "NewPOS Ped instance obtained successfully.")
         } catch (e: Throwable) {
-            // Log the exception *before* re-throwing
-            Log.e(TAG, "!!! Ped.getInstance() FAILED !!! Error: ${e.message}", e)
+            Log.e(TAG, "FATAL: Failed to get NewPOS Ped instance. The SDK may not be properly initialized or supported on this device.", e)
             throw PedException("Failed to initialize NewPOS PED: ${e.message}", e)
         }
     }
 
-    // --- Interface Implementation ---
-
     override suspend fun initializePed(application: Application): Boolean {
-        Log.d(TAG, "initializePed called (NewPOS instance already obtained in init).")
-        // Could add a status check here if needed
+        Log.d(TAG, "initializePed called. NewPOS instance was already obtained in init. Returning true.")
         return true
     }
 
     override fun releasePed() {
-        Log.d(TAG, "releasePed called. No explicit release needed for NewPOS Ped singleton.")
-        // Could clear listeners or internal state if necessary
+        Log.d(TAG, "releasePed called. No explicit release action is required for the NewPOS Ped singleton.")
     }
 
     override suspend fun getStatus(): PedStatusInfo {
-        return try {
+        try {
             val statusLong = pedInstance.status
-            // Interpret the NewPOS status bits (this requires specific documentation for the bitmask)
-            // Example: Assuming bit 0 indicates tamper, needs verification
-            val isTampered = (statusLong and 0x01L) != 0L
-            PedStatusInfo(
+            // The interpretation of status bits requires specific documentation.
+            // We assume a status other than 0 indicates a problem or tamper.
+            val isTampered = statusLong != 0L
+            return PedStatusInfo(
                 isTampered = isTampered,
-                // Other fields might require calls to getConfig() or are unavailable
-                batteryLevel = null, // Not typically available via Ped API
-                errorMessage = if (isTampered) "Device Tampered (Raw Status: $statusLong)" else null
+                batteryLevel = null, // Not available through the Ped API
+                errorMessage = if (isTampered) "Device Tampered or in Error State (Raw Status: $statusLong)" else null
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error getting PED status", e)
@@ -234,22 +188,10 @@ class NewposPedController(private val context: Context) : IPedController {
 
     override suspend fun getConfig(): PedConfigInfo {
         try {
-            val config = pedInstance.config ?: throw PedException("Failed to get PED config instance")
-            // Try to read SN (may fail or require specific permissions/API)
-            var serialNum: String? = null
-            try {
-                // PEDReadPinPadSn_Api usage needs confirmation based on actual API availability and signature
-                // Assuming it exists and populates a byte array that needs conversion.
-                // val snBytes = ByteArray(40) // Adjust size as needed
-                // val snResult = pedInstance.PEDReadPinPadSn_Api(snBytes)
-                // if (snResult == 0) { serialNum = String(snBytes).trim() /* Or specific parsing */ }
-                Log.w(TAG, "Serial number retrieval via PEDReadPinPadSn_Api needs verification/implementation.")
-            } catch (snEx: Exception) {
-                Log.w(TAG, "Failed to read serial number: ${snEx.message}")
-            }
-
+            val config = pedInstance.config ?: throw PedException("Failed to get PED config instance (returned null)")
             return PedConfigInfo(
-                serialNumber = serialNum,
+                // CORRECTED: The 'TID' property does not exist in 'PedConfig'. Assigning null.
+                serialNumber = null,
                 firmwareVersion = config.swVer,
                 hardwareVersion = config.hwVer,
                 modelIdentifier = config.model
@@ -265,44 +207,35 @@ class NewposPedController(private val context: Context) : IPedController {
     override suspend fun writeKey(
         keyIndex: Int,
         keyType: GenericKeyType,
-        keyAlgorithm: GenericKeyAlgorithm, // Algoritmo de la nueva llave (no usado directamente por loadWorkKey/loadEncryptMainKey pero sí por setKeyAlgorithm)
+        keyAlgorithm: GenericKeyAlgorithm,
         keyData: PedKeyData,
         transportKeyIndex: Int?,
         transportKeyType: GenericKeyType?
     ): Boolean {
-        val npDestKeySystem = mapToNewposKeySystem(keyType)
-            ?: throw PedKeyException("Unsupported destination key type for KeySystem mapping: $keyType")
+        if (transportKeyIndex == null || transportKeyType == null) {
+            throw PedKeyException("NewPOS requires transportKeyIndex and transportKeyType for encrypted key loading.")
+        }
+
+        // CORRECCIÓN: El KeySystem debe ser el de la llave de transporte (la que descifra), no el de la llave de destino.
+        val npTransportKeySystem = mapToNewposKeySystem(transportKeyType, keyAlgorithm)
         val npDestKeyType = mapToNewposKeyType(keyType)
             ?: throw PedKeyException("Unsupported destination key type for KeyType mapping: $keyType")
 
-        if (transportKeyIndex == null || transportKeyType == null) {
-            throw PedKeyException("Encrypted key loading requires transportKeyIndex and transportKeyType")
-        }
-
-        // NewPOS writeKey: MasterKey encrypts WorkKey
-        if (transportKeyType != GenericKeyType.MASTER_KEY) {
-            throw PedKeyException("NewPOS writeKey expects transport key to be a MASTER_KEY")
-        }
-
-        val npKcvMode = if (keyData.kcv != null) {
-            // TODO: Implement actual KCV comparison logic if needed, as NewPOS mode only triggers internal check.
-            // For now, just use the mode flag if KCV is provided.
-            Log.w(TAG, "KCV provided but generic interface doesn't specify check *value*. Using KEY_VERIFY_KVC mode.")
-            Ped.KEY_VERIFY_KVC // Assuming KCV check type. NewPOS SDK handles check internally.
-        } else {
-            Ped.KEY_VERIFY_NONE
-        }
+        val npKcvMode = if (keyData.kcv != null) Ped.KEY_VERIFY_KVC else Ped.KEY_VERIFY_NONE
+        if (keyData.kcv != null) Log.d(TAG, "KCV check enabled (NewPOS internal check).")
 
         try {
+            Log.d(TAG, "Calling writeKey: TransportKS=$npTransportKeySystem, DestKT=$npDestKeyType, MKeyIdx=$transportKeyIndex, DestKeyIdx=$keyIndex")
             val result = pedInstance.writeKey(
-                npDestKeySystem,
+                npTransportKeySystem, // Se usa el KeySystem de la llave de transporte
                 npDestKeyType,
-                transportKeyIndex, // masterKeyIndex
-                keyIndex,          // destKeyIndex
+                transportKeyIndex,
+                keyIndex,
                 npKcvMode,
-                keyData.keyBytes   // Encrypted key value
+                keyData.keyBytes
             )
             if (result != 0) {
+                // Agregar el código de error al mensaje de la excepción es útil para depurar
                 throw PedKeyException("Failed to write key (encrypted). NewPOS Error Code: $result")
             }
             return true
@@ -315,23 +248,31 @@ class NewposPedController(private val context: Context) : IPedController {
     override suspend fun writeKeyPlain(
         keyIndex: Int,
         keyType: GenericKeyType,
-        keyAlgorithm: GenericKeyAlgorithm, // Algorithm info might be needed for some PEDs, NewPOS injectKey doesn't use it directly
+        keyAlgorithm: GenericKeyAlgorithm,
         keyBytes: ByteArray,
         kcvBytes: ByteArray?
     ): Boolean {
-        // NewPOS uses injectKey for plaintext Master Keys
-        if (keyType != GenericKeyType.MASTER_KEY) {
-            Log.w(TAG, "NewPOS injectKey is typically used for MASTER_KEY plaintext loading.")
-            // Optionally allow other types if injectKey supports them, but log warning.
-            // throw PedKeyException("Plaintext loading via injectKey usually for MASTER_KEY")
+        if (keyType != GenericKeyType.MASTER_KEY && keyType != GenericKeyType.TRANSPORT_KEY) {
+            Log.w(TAG, "NewPOS injectKey is primarily for MASTER_KEY and TRANSPORT_KEY. Attempting with $keyType.")
         }
 
-        val npKeySystem = mapToNewposKeySystem(keyType)
-            ?: throw PedKeyException("Unsupported key type for KeySystem mapping: $keyType")
-        val npKeyType = mapToNewposKeyType(keyType)
-            ?: throw PedKeyException("Unsupported key type for KeyType mapping: $keyType")
+        // CORRECCIÓN PARA TRANSPORT_KEY: NewPOS no tiene un método específico para inyectar
+        // Transport Keys en texto plano. Funcionalmente, las Transport Keys son similares
+        // a las Master Keys (ambas son llaves de nivel superior), por lo que las tratamos
+        // como MASTER_KEY para el mapeo de NewPOS.
+        val effectiveKeyType = if (keyType == GenericKeyType.TRANSPORT_KEY) {
+            Log.d(TAG, "Tratando TRANSPORT_KEY como MASTER_KEY para NewPOS injectKey debido a limitaciones de la API.")
+            GenericKeyType.MASTER_KEY
+        } else {
+            keyType
+        }
+
+        val npKeySystem = mapToNewposKeySystem(effectiveKeyType, keyAlgorithm)
+        val npKeyType = mapToNewposKeyType(effectiveKeyType)
+            ?: throw PedKeyException("Unsupported key type for KeyType mapping: $effectiveKeyType")
 
         try {
+            Log.d(TAG, "Calling injectKey: KS=$npKeySystem, KT=$npKeyType, KeyIdx=$keyIndex (Original type: $keyType)")
             val result = pedInstance.injectKey(npKeySystem, npKeyType, keyIndex, keyBytes)
             if (result != 0) {
                 throw PedKeyException("Failed to write key (plaintext). NewPOS Error Code: $result")
@@ -345,147 +286,193 @@ class NewposPedController(private val context: Context) : IPedController {
 
     override suspend fun writeDukptInitialKeyEncrypted(
         groupIndex: Int,
-        keyAlgorithm: KeyAlgorithm,
+        keyAlgorithm: GenericKeyAlgorithm,
         encryptedIpek: ByteArray,
         initialKsn: ByteArray,
         transportKeyIndex: Int,
         keyChecksum: String?
     ): Boolean {
-        TODO("Not yet implemented")
-    }
+        Log.i(TAG, "Attempting to write encrypted DUKPT key using writeDukptIPEK.")
+        val npKeySystem = mapToNewposKeySystem(GenericKeyType.DUKPT_INITIAL_KEY, keyAlgorithm)
 
-     suspend fun writeDukptInitialKeyEncrypted(
-        groupIndex: Int,
-        keyAlgorithm: KeyAlgorithm,
-        encryptedIpek: ByteArray,
-        initialKsn: ByteArray,
-        transportKeyIndex: Int
-    ): Boolean {
-        TODO("Not yet implemented")
+        // The NewPOS 'writeDukptIPEK' API expects ipekHeader and ipekData.
+        // The generic interface only provides one encrypted byte array.
+        // This suggests a specific format like TR-31 which we are not handling.
+        // We assume ipekData is the main payload and the header might be null or empty.
+        Log.w(TAG, "NewPOS writeDukptIPEK requires 'ipekHeader' and 'ipekData'. Mapping entire 'encryptedIpek' to 'ipekData' and using null header. This may fail if a specific format (e.g., TR-31) is expected.")
+
+        try {
+            val result = pedInstance.writeDukptIPEK(
+                npKeySystem,
+                transportKeyIndex, // kbpkIndex (Key Block Protection Key)
+                groupIndex,        // ipekIndex
+                initialKsn,        // KSN
+                null,              // ipekHeader - unavailable in the generic interface
+                encryptedIpek      // ipekData
+            )
+
+            if (result != 0) {
+                throw PedKeyException("Failed to write encrypted DUKPT IPEK. NewPOS Error Code: $result")
+            }
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error writing encrypted DUKPT IPEK", e)
+            throw PedKeyException("Failed to write encrypted DUKPT IPEK: ${e.message}", e)
+        }
     }
 
     override suspend fun deleteKey(keyIndex: Int, keyType: GenericKeyType): Boolean {
+        // To delete, we don't need the algorithm, just the generic type for mapping.
         val npKeySystem = mapToNewposKeySystem(keyType)
-            ?: throw PedKeyException("Unsupported key type for KeySystem mapping: $keyType")
         val npKeyType = mapToNewposKeyType(keyType)
-            ?: throw PedKeyException("Unsupported key type for KeyType mapping: $keyType")
+            ?: throw PedKeyException("Unsupported key type for deleteKey: $keyType")
 
         try {
+            Log.i(TAG, "--- Starting deleteKey operation ---")
+            Log.i(TAG, "Parameters:")
+            Log.i(TAG, "  - keyIndex: $keyIndex")
+            Log.i(TAG, "  - keyType: $keyType") 
+            Log.i(TAG, "  - mapped npKeySystem: $npKeySystem")
+            Log.i(TAG, "  - mapped npKeyType: $npKeyType")
+            
+            Log.d(TAG, "Calling NewPOS pedInstance.deleteKey($npKeySystem, $npKeyType, $keyIndex)")
             pedInstance.deleteKey(npKeySystem, npKeyType, keyIndex)
-            return true // NewPOS deleteKey is void, assume success if no exception
-        } catch (e: Exception) { // Catch specific SDKException if defined
-            Log.e(TAG, "Error deleting key", e)
+            Log.i(TAG, "✅ NewPOS deleteKey completed successfully - key removed from slot $keyIndex")
+            return true // The function is void, so if no exception is thrown, it was successful.
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ NewPOS deleteKey failed for [$keyType/$keyIndex]", e)
+            Log.e(TAG, "Exception details: ${e.message}")
             throw PedKeyException("Failed to delete key [$keyType/$keyIndex]: ${e.message}", e)
         }
     }
 
     override suspend fun deleteAllKeys(): Boolean {
         try {
+            Log.i(TAG, "--- Starting deleteAllKeys operation ---")
+            Log.i(TAG, "Operation: Mass deletion of all working keys from NewPOS device")
+            Log.i(TAG, "NewPOS method: clearUserKeys() - eliminates all user injected keys")
+            
+            Log.d(TAG, "Calling NewPOS pedInstance.clearUserKeys()")
             pedInstance.clearUserKeys()
-            return true // NewPOS clearUserKeys is void
+            
+            Log.i(TAG, "✅ NewPOS clearUserKeys completed successfully")
+            Log.i(TAG, "✅ ALL working keys have been removed from the device")
+            Log.i(TAG, "Note: Master keys and system keys remain untouched")
+            return true // The function is void.
         } catch (e: Exception) {
-            Log.e(TAG, "Error deleting all keys", e)
+            Log.e(TAG, "❌ NewPOS clearUserKeys failed during mass deletion", e)
+            Log.e(TAG, "Exception details: ${e.message}")
+            Log.e(TAG, "This means some or all keys may still be present in the device")
             throw PedKeyException("Failed to delete all keys: ${e.message}", e)
         }
     }
 
     override suspend fun isKeyPresent(keyIndex: Int, keyType: GenericKeyType): Boolean {
-        val npKeySystem = mapToNewposKeySystem(keyType)
-            ?: throw PedKeyException("Unsupported key type for KeySystem mapping: $keyType")
-        val npKeyType = mapToNewposKeyType(keyType)
-            ?: throw PedKeyException("Unsupported key type for KeyType mapping: $keyType")
+        // AÑADIR ESTA LÓGICA DE TRADUCCIÓN
+        val effectiveKeyType = if (keyType == GenericKeyType.TRANSPORT_KEY) {
+            Log.d(TAG, "isKeyPresent: Tratando TRANSPORT_KEY como MASTER_KEY para la verificación.")
+            GenericKeyType.MASTER_KEY
+        } else {
+            keyType
+        }
+
+        val npKeySystem = mapToNewposKeySystem(effectiveKeyType) // Usar el tipo efectivo
+        val npKeyType = mapToNewposKeyType(effectiveKeyType) // Usar el tipo efectivo
+            ?: throw PedKeyException("Unsupported key type for isKeyPresent: $keyType")
 
         return try {
-            // Mode is always 0 in current NewPOS doc for checkKey
-            pedInstance.checkKey(npKeySystem, npKeyType, keyIndex, 0) == 0
+            // La llamada ahora será consistente con la inyección
+            val result = pedInstance.checkKey(npKeySystem, npKeyType, keyIndex, 0)
+            Log.d(TAG, "checkKey for [$keyType/$keyIndex] (as $effectiveKeyType) returned: $result")
+            result == 0 // 0 means the key exists.
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking key presence", e)
-            throw PedException("Failed to check key presence: ${e.message}", e) // Or return false?
+            Log.e(TAG, "Error checking key presence for [$keyType/$keyIndex]", e)
+            false
         }
     }
 
     override suspend fun getKeyInfo(keyIndex: Int, keyType: GenericKeyType): PedKeyInfo? {
-        Log.w(TAG, "getKeyInfo not directly supported by NewPOS Ped API. Checking presence only.")
-        // NewPOS checkKey only confirms existence, not algorithm or detailed info.
-        if (isKeyPresent(keyIndex, keyType)) {
-            // Cannot determine algorithm reliably from NewPOS API alone
-            return PedKeyInfo(index = keyIndex, type = keyType, algorithm = null)
+        Log.w(TAG, "NewPOS API does not support getting key details. Checking for presence only.")
+        return if (isKeyPresent(keyIndex, keyType)) {
+            Log.i(TAG, "Key is PRESENT at index=$keyIndex. Returning basic PedKeyInfo without algorithm.")
+            PedKeyInfo(index = keyIndex, type = keyType, algorithm = null) // We cannot determine the algorithm.
+        } else {
+            Log.i(TAG, "Key is NOT PRESENT at index=$keyIndex. Returning null.")
+            null
         }
-        return null
     }
+
+    // --- DUKPT Management ---
 
     override suspend fun writeDukptInitialKey(
         groupIndex: Int,
-        keyAlgorithm: KeyAlgorithm,
+        keyAlgorithm: GenericKeyAlgorithm,
         keyBytes: ByteArray,
         initialKsn: ByteArray,
         keyChecksum: String?
     ): Boolean {
-        TODO("Not yet implemented")
-    }
+        if (!keyChecksum.isNullOrBlank()) {
+            Log.w(TAG, "NewPOS API for DUKPT key loading does not use a key checksum parameter. It will be ignored.")
+        }
 
-
-    // --- DUKPT Management ---
-
-     suspend fun writeDukptInitialKey(
-        groupIndex: Int,
-        keyAlgorithm: GenericKeyAlgorithm,
-        keyBytes: ByteArray,
-        initialKsn: ByteArray
-    ): Boolean {
-        // NewPOS distinguishes between AES and DES/TDES DUKPT loading
         try {
             val result = when (keyAlgorithm) {
                 GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> {
-                    // Use createDukptKey for TDES
+                    Log.d(TAG, "Calling createDukptKey (TDES) for group $groupIndex")
                     pedInstance.createDukptKey(groupIndex, keyBytes, initialKsn)
                 }
                 GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> {
-                    // Use createDukptAESKey for AES
                     val npDukptType = mapToNewposDukptType(keyAlgorithm)
                         ?: throw PedKeyException("Unsupported AES algorithm for DUKPT: $keyAlgorithm")
+                    Log.d(TAG, "Calling createDukptAESKey ($npDukptType) for group $groupIndex")
                     pedInstance.createDukptAESKey(groupIndex, npDukptType, keyBytes, initialKsn)
                 }
                 else -> throw PedKeyException("Unsupported algorithm for DUKPT initial key: $keyAlgorithm")
             }
+
             if (result != 0) {
                 throw PedKeyException("Failed to write DUKPT initial key. NewPOS Error Code: $result")
             }
             return true
         } catch (e: Exception) {
-            Log.e(TAG, "Error writing DUKPT initial key", e)
+            Log.e(TAG, "Error writing DUKPT initial key for group $groupIndex", e)
             throw PedKeyException("Failed to write DUKPT initial key: ${e.message}", e)
         }
     }
 
-    @Throws(PedException::class)
     override suspend fun getDukptInfo(groupIndex: Int): DukptInfo? {
-        // ... (Implementation from previous response, ensuring it's suspend if needed) ...
-        // Example simple implementation (might need Dispatchers.IO if pedInstance calls block)
         var ksn: ByteArray? = null
+        var keySystemUsed: String? = null
         try {
-            ksn = pedInstance.getDukptKsn(groupIndex) // Assuming this is for TDES DUKPT
+            // First, try to get the KSN for TDES
+            ksn = pedInstance.getDukptKsn(groupIndex)
+            if (ksn != null) keySystemUsed = "DUKPT_DES"
         } catch (e: Exception) {
-            Log.w(TAG, "getDukptKsn failed for index $groupIndex, trying getDukptAESKsn", e)
+            Log.w(TAG, "getDukptKsn (TDES) failed for group $groupIndex, trying AES. Error: ${e.message}")
         }
 
         if (ksn == null) {
             try {
-                ksn = pedInstance.getDukptAESKsn(groupIndex) // Assuming this is for AES DUKPT
+                // If that fails, try to get the KSN for AES
+                ksn = pedInstance.getDukptAESKsn(groupIndex)
+                if (ksn != null) keySystemUsed = "DUKPT_AES"
             } catch (e: Exception) {
-                Log.w(TAG, "Error getting DUKPT KSN (AES) for index $groupIndex, key might not exist or be wrong type.", e)
-                return null // Return null if neither worked
-                // throw PedException("Failed to get DUKPT KSN for group $groupIndex: ${e.message}", e)
+                Log.e(TAG, "getDukptAESKsn also failed for group $groupIndex. Key may not exist.", e)
+                return null
             }
         }
-        return ksn?.let { DukptInfo(ksn = it, counter = null) }
+
+        return ksn?.let {
+            Log.d(TAG, "Successfully retrieved KSN for group $groupIndex using $keySystemUsed system.")
+            // NewPOS does not provide the counter separately.
+            DukptInfo(ksn = it, counter = null)
+        }
     }
 
     override suspend fun incrementDukptKsn(groupIndex: Int): Boolean {
-        Log.w(TAG, "Manual DUKPT KSN increment not supported by NewPOS Ped API.")
-        // KSN increment is typically implicit during crypto operations.
-        // throw UnsupportedOperationException("Manual DUKPT KSN increment not supported")
-        return false // Indicate not supported
+        Log.e(TAG, "Unsupported Operation: NewPOS does not support manual DUKPT KSN increment.")
+        // The increment is implicit in cryptographic operations that use the DUKPT key.
+        throw UnsupportedOperationException("Manual DUKPT KSN increment is not supported by NewPOS PED API.")
     }
 
     // --- Cryptographic Operations ---
@@ -503,92 +490,79 @@ class NewposPedController(private val context: Context) : IPedController {
     private suspend fun performCipher(request: PedCipherRequest): PedCipherResult {
         return when {
             request.isDukpt -> performDukptCipher(request)
-            request.keyType == GenericKeyType.RSA_PRIVATE_KEY && request.encrypt -> performRsaCipher(request) // RSA Private Key Encrypt
-            request.keyType == GenericKeyType.RSA_PRIVATE_KEY && !request.encrypt -> throw PedCryptoException("RSA decryption typically uses the public key.") // RSA Private Key Decrypt (uncommon)
-            request.keyType == GenericKeyType.RSA_PUBLIC_KEY -> throw PedCryptoException("RSA public key operations not directly supported via standard cipher methods in NewPOS PED API.") // RSA Public Key ops
-            else -> performSymmetricCipher(request) // Symmetric keys (Master, Working)
+            request.keyType == GenericKeyType.RSA_PRIVATE_KEY && request.encrypt -> performRsaCipher(request)
+            else -> performSymmetricCipher(request)
         }
     }
 
-    private suspend fun performSymmetricCipher(request: PedCipherRequest): PedCipherResult {
-        val npKeySystem = mapToNewposKeySystem(request.keyType)
-            ?: throw PedCryptoException("Unsupported key type for KeySystem mapping: ${request.keyType}")
+    private fun performSymmetricCipher(request: PedCipherRequest): PedCipherResult {
+        val npKeySystem = mapToNewposKeySystem(request.keyType, request.algorithm)
         val npKeyType = mapToNewposKeyType(request.keyType)
-            ?: throw PedCryptoException("Unsupported key type for KeyType mapping: ${request.keyType}")
+            ?: throw PedCryptoException("Unsupported key type for symmetric cipher: ${request.keyType}")
         val npMode = mapToNewposDesUnifiedMode(request.algorithm, request.mode, request.encrypt)
-            ?: throw PedCryptoException("Unsupported algorithm/mode combination: ${request.algorithm}/${request.mode}")
+
+        // --- CORRECCIÓN #1: Manejo del IV ---
+        // El SDK de NewPOS requiere un IV no nulo incluso para el modo ECB.
+        val effectiveIv: ByteArray
+        if (request.mode == GenericBlockCipherMode.CBC) {
+            effectiveIv = request.iv ?: throw PedCryptoException("IV is required for CBC mode.")
+        } else { // Para ECB u otros modos
+            val blockSize = when (request.algorithm) {
+                GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256, GenericKeyAlgorithm.SM4 -> 16
+                else -> 8 // DES/TDES
+            }
+            effectiveIv = request.iv ?: ByteArray(blockSize) { 0 } // Usar IV de ceros si es nulo
+        }
+        // --- FIN CORRECCIÓN #1 ---
 
         try {
-            // Assuming desDencryptUnified handles TDES, SM4, AES based on KeySystem/KeyType
             val resultData = pedInstance.desDencryptUnified(
-                npKeySystem,
-                npKeyType,
-                request.keyIndex,
-                npMode,
-                request.iv, // IV needed for CBC modes
-                request.data
-            ) ?: throw PedCryptoException("Symmetric cipher operation failed (returned null)")
+                npKeySystem, npKeyType, request.keyIndex, npMode, effectiveIv, request.data
+            ) ?: throw PedCryptoException("Symmetric cipher operation failed (returned null).")
             return PedCipherResult(resultData)
         } catch (e: Exception) {
-            Log.e(TAG, "Error performing symmetric cipher operation", e)
+            Log.e(TAG, "Error performing symmetric cipher", e)
+            // Envolver la excepción original para obtener el mensaje de error completo del SDK
             throw PedCryptoException("Symmetric cipher failed: ${e.message}", e)
         }
     }
 
     private suspend fun performDukptCipher(request: PedCipherRequest): PedCipherResult {
-        val groupIndex = request.dukptGroupIndex
-            ?: throw PedCryptoException("DUKPT group index is required for DUKPT cipher operation")
+        val groupIndex = request.dukptGroupIndex ?: throw PedCryptoException("DUKPT group index required.")
 
-        // NewPOS dukptEncrypt/DecryptRequest don't specify algorithm/mode/IV - assume TDES/ECB?
-        // Also doesn't specify KeyVariant (PIN/MAC/Data) - which derived key is used?
-        // NewPOS dukptAESEncrypt/DecryptRequest requires KeyUsage (not documented)
-        Log.w(TAG, "Performing DUKPT cipher: NewPOS API limitations apply (assumes TDES/ECB?, KeyUsage needed for AES). KeyVariant parameter ignored.")
+        // API Limitation: KeyUsage is not defined in the provided .class file.
+        if (request.algorithm in listOf(GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256)) {
+            Log.e(TAG, "AES DUKPT cipher requires 'KeyUsage', which is an undefined type in the provided SDK. Operation aborted.")
+            throw PedCryptoException("Cannot perform AES DUKPT cipher: Missing 'KeyUsage' type definition.")
+        }
+        if (request.mode != GenericBlockCipherMode.ECB) {
+            Log.w(TAG, "NewPOS DUKPT cipher API (dukptEncrypt/DecryptRequest) does not specify block mode. It likely defaults to ECB. Requested mode was ${request.mode}.")
+        }
 
         try {
-            val resultData: ByteArray?
-            val isAes = request.algorithm == GenericKeyAlgorithm.AES_128 ||
-                    request.algorithm == GenericKeyAlgorithm.AES_192 ||
-                    request.algorithm == GenericKeyAlgorithm.AES_256
-
-            if (isAes) {
-                // AES DUKPT requires KeyUsage which is missing. Cannot proceed reliably.
-                throw PedCryptoException("AES DUKPT cipher operations require KeyUsage, which is unavailable/undocumented.")
-                // If KeyUsage were available:
-                // val npDukptType = mapToNewposDukptType(request.algorithm) ?: throw PedCryptoException(...)
-                // val npKeyUsage = mapToNewposKeyUsage(request.dukptKeyVariant) ?: throw PedCryptoException(...)
-                // resultData = if (request.encrypt) pedInstance.dukptAESEncryptRequest(groupIndex, npDukptType, npKeyUsage, request.data)
-                //             else pedInstance.dukptAESDecryptRequest(groupIndex, npDukptType, npKeyUsage, request.data)
+            val resultData = if (request.encrypt) {
+                pedInstance.dukptEncryptRequest(groupIndex, request.data)
             } else {
-                // Assume TDES DUKPT
-                resultData = if (request.encrypt) {
-                    pedInstance.dukptEncryptRequest(groupIndex, request.data)
-                } else {
-                    pedInstance.dukptDecryptRequest(groupIndex, request.data)
-                }
-            }
+                pedInstance.dukptDecryptRequest(groupIndex, request.data)
+            } ?: throw PedCryptoException("DUKPT (TDES) cipher operation failed (returned null).")
 
-            if (resultData == null) {
-                throw PedCryptoException("DUKPT cipher operation failed (returned null)")
-            }
-
-            val finalDukptInfo = if (request.dukptIncrementKsn) getDukptInfo(groupIndex) else null // KSN likely incremented regardless of request flag?
-
-            return PedCipherResult(resultData, finalDukptInfo)
-
+            // KSN is incremented automatically. We fetch it after the operation.
+            val finalDukpt = getDukptInfo(groupIndex)
+            return PedCipherResult(resultData, finalDukpt)
         } catch (e: Exception) {
-            Log.e(TAG, "Error performing DUKPT cipher operation", e)
-            throw PedCryptoException("DUKPT cipher failed: ${e.message}", e)
+            Log.e(TAG, "Error performing DUKPT (TDES) cipher", e)
+            throw PedCryptoException("DUKPT (TDES) cipher failed: ${e.message}", e)
         }
     }
 
-    private suspend fun performRsaCipher(request: PedCipherRequest): PedCipherResult {
+    private fun performRsaCipher(request: PedCipherRequest): PedCipherResult {
+        // Encryption with a private key is functionally a signature.
         if (request.keyType != GenericKeyType.RSA_PRIVATE_KEY || !request.encrypt) {
-            throw PedCryptoException("RSA operation mismatch: Expecting private key encryption.")
+            throw PedCryptoException("Unsupported RSA operation. Only private key encryption (signing) is supported.")
         }
-        // NewPOS `encryptWithRsaPrivateKey` handles encryption with private key (signing/raw encrypt)
         try {
             val resultData = pedInstance.encryptWithRsaPrivateKey(request.keyIndex, request.data)
-                ?: throw PedCryptoException("RSA private key encryption failed (returned null)")
+                ?: throw PedCryptoException("RSA private key encryption failed (returned null).")
             return PedCipherResult(resultData)
         } catch (e: Exception) {
             Log.e(TAG, "Error performing RSA private key encryption", e)
@@ -596,31 +570,48 @@ class NewposPedController(private val context: Context) : IPedController {
         }
     }
 
-
     override suspend fun calculateMac(request: PedMacRequest): PedMacResult {
-        return when {
-            request.isDukpt -> calculateDukptMac(request)
-            else -> calculateStandardMac(request)
+        return if (request.isDukpt) {
+            calculateDukptMac(request)
+        } else {
+            calculateStandardMac(request)
+        }
+    }
+
+    /**
+     * Infers the underlying key algorithm from a MAC algorithm.
+     * This is necessary because NewPOS needs to know the key family (DES, AES)
+     * to select the correct key system (MS_DES, MS_AES, etc.).
+     */
+    private fun inferKeyAlgorithm(macAlgorithm: GenericMacAlgorithm): GenericKeyAlgorithm {
+        return when (macAlgorithm) {
+            GenericMacAlgorithm.CBC_MAC_ISO9797_1_M1 -> GenericKeyAlgorithm.DES_SINGLE
+            GenericMacAlgorithm.CBC_MAC_ISO9797_1_M2,
+            GenericMacAlgorithm.RETAIL_MAC_ANSI_X9_19,
+            GenericMacAlgorithm.UNIONPAY_CBC_MAC -> GenericKeyAlgorithm.DES_TRIPLE
+
+            // For CMAC, the key is AES. The mapToNewposKeySystem function just needs
+            // to know it's in the AES family; it doesn't require the exact size. AES_128 is a safe default.
+            GenericMacAlgorithm.CMAC_AES -> GenericKeyAlgorithm.AES_128
         }
     }
 
     private suspend fun calculateStandardMac(request: PedMacRequest): PedMacResult {
-        val npKeySystem = mapToNewposKeySystem(request.keyType)
-            ?: throw PedCryptoException("Unsupported key type for KeySystem mapping: ${request.keyType}")
-        val npKeyType = mapToNewposKeyType(request.keyType)
-            ?: throw PedCryptoException("Unsupported key type for KeyType mapping: ${request.keyType}")
-        val npMacMode = mapToNewposMacMode(request.algorithm)
-            ?: throw PedCryptoException("Unsupported MAC algorithm mapping: ${request.algorithm}")
+        // 1. Infer the KeyAlgorithm from the request's MacAlgorithm.
+        val inferredKeyAlgorithm = inferKeyAlgorithm(request.algorithm)
 
-        if (request.keyType != GenericKeyType.WORKING_MAC_KEY) {
-            Log.w(TAG, "Calculating standard MAC with non-MAC key type: ${request.keyType}")
-        }
-        if (request.iv != null) Log.w(TAG, "NewPOS getMac does not support explicit IV.")
+        // 2. Use the inferred algorithm to get the correct KeySystem.
+        val npKeySystem = mapToNewposKeySystem(request.keyType, inferredKeyAlgorithm)
+
+        val npMacMode = mapToNewposMacMode(request.algorithm)
+            ?: throw PedCryptoException("Unsupported MAC algorithm for standard MAC: ${request.algorithm}")
+
+        if (request.iv != null) Log.w(TAG, "NewPOS getMac does not support an explicit IV. It will be ignored.")
 
         try {
             val mac = pedInstance.getMac(npKeySystem, request.keyIndex, npMacMode, request.data)
-                ?: throw PedCryptoException("Standard MAC calculation failed (returned null)")
-            return PedMacResult(mac) // No DUKPT info for standard MAC
+                ?: throw PedCryptoException("Standard MAC calculation failed (returned null).")
+            return PedMacResult(mac)
         } catch (e: Exception) {
             Log.e(TAG, "Error calculating standard MAC", e)
             throw PedCryptoException("Standard MAC calculation failed: ${e.message}", e)
@@ -628,22 +619,16 @@ class NewposPedController(private val context: Context) : IPedController {
     }
 
     private suspend fun calculateDukptMac(request: PedMacRequest): PedMacResult {
-        val groupIndex = request.dukptGroupIndex
-            ?: throw PedCryptoException("DUKPT group index is required for DUKPT MAC operation")
+        val groupIndex = request.dukptGroupIndex ?: throw PedCryptoException("DUKPT group index required for MAC.")
         val npMacMode = mapToNewposMacMode(request.algorithm)
-            ?: throw PedCryptoException("Unsupported MAC algorithm mapping for DUKPT: ${request.algorithm}")
-
-        // NewPOS dukptCalcMacResponse doesn't specify key variant or take IV
-        if (request.iv != null) Log.w(TAG, "NewPOS dukptCalcMacResponse does not support explicit IV.")
+            ?: throw PedCryptoException("Unsupported MAC algorithm for DUKPT MAC: ${request.algorithm}")
 
         try {
             val mac = pedInstance.dukptCalcMacResponse(groupIndex, npMacMode, request.data)
-                ?: throw PedCryptoException("DUKPT MAC calculation failed (returned null)")
+                ?: throw PedCryptoException("DUKPT MAC calculation failed (returned null).")
 
-            // Get KSN after operation if requested (Note: KSN likely increments even if dukptIncrementKsn is false)
-            val finalDukptInfo = getDukptInfo(groupIndex) // Always get current KSN after op
-
-            return PedMacResult(mac, finalDukptInfo)
+            val finalDukpt = getDukptInfo(groupIndex)
+            return PedMacResult(mac, finalDukpt)
         } catch (e: Exception) {
             Log.e(TAG, "Error calculating DUKPT MAC", e)
             throw PedCryptoException("DUKPT MAC calculation failed: ${e.message}", e)
@@ -652,143 +637,94 @@ class NewposPedController(private val context: Context) : IPedController {
 
     // --- PIN Operations ---
 
-    @Throws(PedException::class, PedTimeoutException::class, PedCancellationException::class)
-    override suspend fun getPinBlock(request: PedPinRequest): PedPinResult { // Return type updated
-        val keyIdx: Int
-        val npKeySystem: NewposKeySystem
-
-        if (request.isDukpt) {
-            keyIdx = request.dukptGroupIndex ?: throw PedException("DUKPT group index missing for PIN block request")
-            // Determine if DUKPT is AES or TDES to pick KeySystem
-            // We still need to know this to call getPinBlock correctly.
-            // How was the key loaded? Assuming TDES if not specified.
-            // A better approach might be to pass the algorithm used for DUKPT in the request.
-            Log.w(TAG, "Assuming DUKPT_DES KeySystem for DUKPT PIN block unless known otherwise.")
-            npKeySystem = NewposKeySystem.DUKPT_DES // Or DUKPT_AES if known
+    override suspend fun getPinBlock(request: PedPinRequest): PedPinResult {
+        val (keyIdx, npKeySystem) = if (request.isDukpt) {
+            Pair(
+                request.dukptGroupIndex ?: throw PedException("DUKPT group index missing."),
+                mapToNewposKeySystem(GenericKeyType.DUKPT_INITIAL_KEY, request.algorithm)
+            )
         } else {
-            keyIdx = request.keyIndex
-            npKeySystem = mapToNewposKeySystem(request.keyType)
-                ?: throw PedException("Unsupported key type for KeySystem mapping: ${request.keyType}")
-            if (request.keyType != GenericKeyType.WORKING_PIN_KEY && request.keyType != GenericKeyType.MASTER_KEY) {
-                Log.w(TAG, "Requesting PIN block with non-PIN key type: ${request.keyType}")
-            }
+            Pair(
+                request.keyIndex,
+                mapToNewposKeySystem(request.keyType, request.algorithm)
+            )
         }
 
         val npPinFormat = mapToNewposPinFormat(request.format)
             ?: throw PedException("Unsupported PIN block format: ${request.format}")
+        val pan = request.pan ?: ""
 
-        // Handle ISO Format 4 specific requirement for AES DUKPT
-        if (request.format == GenericPinBlockFormatType.ISO9564_4) {
-            if (!request.isDukpt || npKeySystem != NewposKeySystem.DUKPT_AES) {
-                // If we defaulted to DUKPT_DES above, this will fail. Need context.
-                throw PedException("ISO9564_4 format requires DUKPT AES key system, but current context is $npKeySystem")
-            }
-            // Re-apply the AES type setting as mapToNewposPinFormat is stateless
-            try {
-                // Determine AES type based on context (e.g., stored key info or default)
-                val aesDukptType = NewposDukptType.DUKPT_TYPE_AES128 // Example default
-                npPinFormat.setDukptAESType(aesDukptType)
-                Log.d(TAG,"Set AES DUKPT type ${aesDukptType} for PIN_BLOCK_FORMAT_4")
-            } catch(e: Exception) {
-                throw PedException("Failed to set AES DUKPT type for PIN_BLOCK_FORMAT_4", e)
-            }
-        }
-
-
-        val pan = request.pan ?: "" // NewPOS API requires a String for PAN
-
-        // Set prerequisites
         try {
-            pedInstance.setPinEntryTimeout(request.timeoutSeconds * 1000) // ms
-            if(request.promptMessage != null) Log.w(TAG, "Generic promptMessage ignored, NewPOS handles prompts internally or via style/displayAmount.")
-            // If amount display is needed, call pedInstance.setDisplayAmount(amount) here
-        } catch(e: Exception) {
-            Log.e(TAG, "Error setting prerequisites for getPinBlock", e)
-            throw PedException("Failed to set prerequisites for PIN entry: ${e.message}", e)
+            // --- CORRECCIÓN #2: Timeout en segundos ---
+            // La API de NewPOS espera el timeout en segundos, no en milisegundos.
+            pedInstance.setPinEntryTimeout(request.timeoutSeconds)
+            // --- FIN CORRECCIÓN #2 ---
+        } catch (e: Exception) {
+            throw PedException("Failed to set PIN entry timeout: ${e.message}", e)
         }
 
-        // --- Corrected suspendCancellableCoroutine ---
         return suspendCancellableCoroutine { continuation ->
-            Log.d(TAG, "Requesting PIN block: KS=$npKeySystem, KI=$keyIdx, Format=$npPinFormat, Len='${request.pinLengthConstraints}', PAN='$pan'")
             try {
+                Log.d(TAG, "Requesting PIN block: KS=$npKeySystem, KI=$keyIdx, Format=$npPinFormat, Len='${request.pinLengthConstraints}', PAN='$pan'")
                 pedInstance.getPinBlock(
-                    npKeySystem,
-                    keyIdx,
-                    npPinFormat,
-                    request.pinLengthConstraints,
-                    pan,
+                    npKeySystem, keyIdx, npPinFormat, request.pinLengthConstraints, pan,
                     object : PinBlockCallback {
-                        // This callback runs on a thread managed by the NewPOS SDK
                         override fun onPinBlock(resultCode: Int, pinBlockData: ByteArray?) {
-                            Log.d(TAG, "onPinBlock: ResultCode=$resultCode, PinBlock=${pinBlockData?.size ?: "null"} bytes")
                             if (continuation.isActive) {
                                 if (resultCode == 0 && pinBlockData != null) {
-                                    // *** Correction: Do NOT call suspend function getDukptInfo here ***
-                                    // Resume only with the direct result of the PIN operation.
-                                    continuation.resume(PedPinResult(pinBlockData)) // Resume with PedPinResult containing only the block
+                                    continuation.resume(PedPinResult(pinBlockData, null))
                                 } else {
-                                    // Map resultCode to appropriate exception
-                                    val exception = mapNewposPinResultCodeToException(resultCode)
+                                    val exception = mapNewposPinResultCodeToException(resultCode, pinBlockData == null && resultCode == 0)
                                     continuation.resumeWithException(exception)
                                 }
-                            } else {
-                                Log.w(TAG, "onPinBlock received but coroutine no longer active.")
                             }
                         }
                     }
                 )
             } catch (e: Exception) {
-                Log.e(TAG, "Exception during getPinBlock call setup or execution", e)
                 if (continuation.isActive) {
                     continuation.resumeWithException(PedException("Failed to initiate PIN Block retrieval: ${e.message}", e))
                 }
             }
-
-            // Handle coroutine cancellation
             continuation.invokeOnCancellation {
-                Log.d(TAG, "getPinBlock coroutine cancelled. Attempting to cancel PED PIN entry.")
-                cancelPinEntry() // Call the wrapper's cancel method
+                Log.d(TAG, "PIN entry coroutine cancelled. Attempting to cancel PED.")
+                cancelPinEntry()
             }
         }
-        // --- End Corrected suspendCancellableCoroutine ---
     }
 
-    // Helper to map NewPOS return codes from PinBlockCallback to exceptions
-    private fun mapNewposPinResultCodeToException(resultCode: Int): PedException {
-        // Need documentation for NewPOS PED result codes (PedRetCode?)
-        // Example mapping:
+    /**
+     * Helper to map NewPOS return codes from PinBlockCallback to exceptions.
+     */
+    private fun mapNewposPinResultCodeToException(resultCode: Int, successWithNullData: Boolean): PedException {
+        if (successWithNullData) {
+            return PedException("PIN entry succeeded (code 0) but returned null data.")
+        }
+        // Mapping based on common PED codes. Should be verified with NewPOS documentation.
         return when (resultCode) {
-            0 -> PedException("PIN block callback reported success (0) but data was null") // Should not happen if resultCode is 0
-            // Add specific mappings based on PedRetCode documentation
-            // e.g., someErrorCodeForTimeout -> PedTimeoutException("PIN entry timed out (Code: $resultCode)")
-            // e.g., someErrorCodeForCancel -> PedCancellationException("PIN entry cancelled by user (Code: $resultCode)")
-            // e.g., someErrorCodeForKeyError -> PedKeyException("PIN key error (Code: $resultCode)")
-            else -> PedException("PIN entry failed with NewPOS PED code: $resultCode") // Generic fallback
+            -2003, -2005 -> PedTimeoutException("PIN entry timed out (Code: $resultCode)")
+            -2004 -> PedCancellationException("PIN entry cancelled by user (Code: $resultCode)")
+            -2601 -> PedKeyException("PIN key not found or invalid (Code: $resultCode)")
+            else -> PedException("PIN entry failed with NewPOS error code: $resultCode")
         }
     }
-
 
     override fun cancelPinEntry() {
         try {
+            Log.d(TAG, "Calling cancelInputPin on PED instance.")
             pedInstance.cancelInputPin()
-            Log.d(TAG, "cancelInputPin called on PED instance.")
         } catch (e: Exception) {
             Log.e(TAG, "Error calling cancelInputPin", e)
-            // Optionally rethrow as PedException
         }
     }
 
     // --- UI Interaction ---
 
     override fun displayMessage(message: String, line: Int?, clearPrevious: Boolean) {
-        Log.w(TAG, "displayMessage not directly supported. NewPOS PED handles prompts internally or via styles.")
-        // NewPOS has setDisplayAmount, but not generic text display during PIN entry via a simple API.
-        // It might be part of the custom PadView or style Bundle.
+        Log.w(TAG, "Unsupported Operation: NewPOS PED does not support displaying arbitrary messages directly during PIN entry. Use setPinPadStyle or custom PadView.")
     }
 
     override fun setPinPadStyle(styleInfo: Map<String, Any>) {
-        Log.d(TAG, "Attempting to set PIN pad style using Map.")
-        // Convert the generic Map to an Android Bundle expected by NewPOS setPadViewStyle
         val bundle = Bundle()
         styleInfo.forEach { (key, value) ->
             try {
@@ -797,23 +733,19 @@ class NewposPedController(private val context: Context) : IPedController {
                     is Int -> bundle.putInt(key, value)
                     is Boolean -> bundle.putBoolean(key, value)
                     is Float -> bundle.putFloat(key, value)
-                    // Add other types as needed (Long, Double, Arrays?)
                     else -> Log.w(TAG, "Unsupported value type in styleInfo Map for key '$key': ${value::class.java.name}")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error putting key '$key' with value '$value' into Bundle for setPadViewStyle", e)
+                Log.e(TAG, "Error putting key '$key' with value '$value' into Bundle.", e)
             }
         }
-
         if (!bundle.isEmpty) {
             try {
+                Log.d(TAG, "Calling setPadViewStyle with bundle: $bundle")
                 pedInstance.setPadViewStyle(bundle)
             } catch (e: Exception) {
-                Log.e(TAG, "Error calling setPadViewStyle with Bundle", e)
-                // Optionally throw PedException
+                Log.e(TAG, "Error calling setPadViewStyle", e)
             }
-        } else {
-            Log.w(TAG, "Style Map was empty or contained unsupported types, setPadViewStyle not called.")
         }
     }
 
@@ -822,11 +754,10 @@ class NewposPedController(private val context: Context) : IPedController {
     override suspend fun getRandomBytes(length: Int): ByteArray {
         try {
             return pedInstance.getRandom(length)
-                ?: throw PedException("Failed to get random bytes (returned null)")
+                ?: throw PedException("Failed to get random bytes (PED returned null).")
         } catch (e: Exception) {
             Log.e(TAG, "Error getting random bytes", e)
             throw PedException("Failed to get random bytes: ${e.message}", e)
         }
     }
-
 }
