@@ -32,7 +32,8 @@ data class ProfileFormData(
     val appType: String = "",
     val keyConfigurations: List<KeyConfiguration> = emptyList(),
     val useKEK: Boolean = false,
-    val selectedKEKKcv: String = ""
+    val selectedKEKKcv: String = "",
+    val currentKEK: InjectedKeyEntity? = null // KEK activa del almacén
 )
 
 @HiltViewModel
@@ -67,20 +68,29 @@ class ProfileViewModel @Inject constructor(
     }
     
     fun onShowCreateModal(profile: ProfileEntity? = null) {
-        val formData = if (profile != null) {
-            ProfileFormData(
-                id = profile.id,
-                name = profile.name,
-                description = profile.description,
-                appType = profile.applicationType,
-                keyConfigurations = profile.keyConfigurations,
-                useKEK = profile.useKEK,
-                selectedKEKKcv = profile.selectedKEKKcv
-            )
-        } else {
-            ProfileFormData()
+        viewModelScope.launch {
+            // Obtener la KEK activa del almacén
+            val currentKEK = injectedKeyRepository.getCurrentKEK()
+            
+            val formData = if (profile != null) {
+                ProfileFormData(
+                    id = profile.id,
+                    name = profile.name,
+                    description = profile.description,
+                    appType = profile.applicationType,
+                    keyConfigurations = profile.keyConfigurations,
+                    useKEK = profile.useKEK,
+                    selectedKEKKcv = currentKEK?.kcv ?: profile.selectedKEKKcv, // Usar la KEK activa si existe
+                    currentKEK = currentKEK
+                )
+            } else {
+                ProfileFormData(
+                    currentKEK = currentKEK,
+                    selectedKEKKcv = currentKEK?.kcv ?: "" // Auto-seleccionar KEK activa si existe
+                )
+            }
+            _state.value = _state.value.copy(showCreateModal = true, selectedProfile = profile, formData = formData)
         }
-        _state.value = _state.value.copy(showCreateModal = true, selectedProfile = profile, formData = formData)
     }
 
     fun onDismissCreateModal() {

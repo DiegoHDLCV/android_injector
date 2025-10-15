@@ -48,6 +48,7 @@ import android.util.Log
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfilesScreen(
+    username: String = "system",
     viewModel: ProfileViewModel = hiltViewModel(),
     keyInjectionViewModel: KeyInjectionViewModel = hiltViewModel()
 ) {
@@ -86,12 +87,13 @@ fun ProfilesScreen(
                     onDelete = { viewModel.onDeleteProfile(it) },
                     onInject = {
                         Log.i("ProfilesScreen", "=== ABRIENDO MODAL DE INYECCIÓN FUTUREX ===")
+                        Log.i("ProfilesScreen", "Usuario: $username")
                         Log.i("ProfilesScreen", "Usuario presionó botón de inyección en perfil: ${it.name}")
                         Log.i("ProfilesScreen", "Configuraciones de llave: ${it.keyConfigurations.size}")
                         it.keyConfigurations.forEachIndexed { index, config ->
                             Log.i("ProfilesScreen", "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
                         }
-                        keyInjectionViewModel.showInjectionModal(it)
+                        keyInjectionViewModel.showInjectionModal(it, username)
                     }
                 )
             }
@@ -955,15 +957,10 @@ fun CreateProfileModal(
                                     )
                                 }
 
-                                // Selector de KEK (solo visible si useKEK está activado)
+                                // Mostrar KEK activa (solo lectura si useKEK está activado)
                                 if (formData.useKEK) {
-                                    // Filtrar solo las KEKs disponibles
-                                    val availableKEKs = remember(availableKeys) {
-                                        availableKeys.filter { it.isKEK && (it.status == "ACTIVE" || it.status == "EXPORTED") }
-                                    }
-
-                                    if (availableKEKs.isEmpty()) {
-                                        // No hay KEKs disponibles
+                                    if (formData.currentKEK == null) {
+                                        // No hay KEK activa
                                         Card(
                                             colors = CardDefaults.cardColors(
                                                 containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
@@ -980,127 +977,96 @@ fun CreateProfileModal(
                                                     contentDescription = null,
                                                     tint = MaterialTheme.colorScheme.error
                                                 )
-                                                Text(
-                                                    text = "No hay KEKs disponibles. Genera una KEK en la ceremonia de llaves primero.",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
-                                            }
-                                        }
-                                    } else {
-                                        // Selector de KEK
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text(
-                                                text = "Seleccionar KEK a usar:",
-                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
-                                            )
-
-                                            // Radio buttons para cada KEK
-                                            availableKEKs.forEach { kek ->
-                                                val isSelected = formData.selectedKEKKcv == kek.kcv
-
-                                                Card(
-                                                    onClick = { onFormDataChange(formData.copy(selectedKEKKcv = kek.kcv)) },
-                                                    colors = CardDefaults.cardColors(
-                                                        containerColor = if (isSelected) {
-                                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                                        } else {
-                                                            MaterialTheme.colorScheme.surface
-                                                        }
-                                                    ),
-                                                    shape = RoundedCornerShape(8.dp),
-                                                    border = if (isSelected) {
-                                                        BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                                                    } else {
-                                                        BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                                                    }
-                                                ) {
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(12.dp),
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                    ) {
-                                                        RadioButton(
-                                                            selected = isSelected,
-                                                            onClick = { onFormDataChange(formData.copy(selectedKEKKcv = kek.kcv)) }
-                                                        )
-                                                        Icon(
-                                                            imageVector = Icons.Default.Lock,
-                                                            contentDescription = null,
-                                                            tint = MaterialTheme.colorScheme.primary
-                                                        )
-                                                        Column(modifier = Modifier.weight(1f)) {
-                                                            Text(
-                                                                text = kek.customName.ifEmpty { "KEK ${kek.kcv.take(6)}" },
-                                                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
-                                                            )
-                                                            Text(
-                                                                text = "KCV: ${kek.kcv}",
-                                                                style = MaterialTheme.typography.bodySmall,
-                                                                fontFamily = FontFamily.Monospace,
-                                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                                            )
-                                                            Row(
-                                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                                                verticalAlignment = Alignment.CenterVertically
-                                                            ) {
-                                                                // Badge de estado
-                                                                Surface(
-                                                                    color = when (kek.status) {
-                                                                        "ACTIVE" -> Color(0xFF4CAF50).copy(alpha = 0.2f)
-                                                                        "EXPORTED" -> Color(0xFF2196F3).copy(alpha = 0.2f)
-                                                                        else -> MaterialTheme.colorScheme.surfaceVariant
-                                                                    },
-                                                                    shape = RoundedCornerShape(4.dp)
-                                                                ) {
-                                                                    Text(
-                                                                        text = kek.status,
-                                                                        style = MaterialTheme.typography.labelSmall,
-                                                                        color = when (kek.status) {
-                                                                            "ACTIVE" -> Color(0xFF4CAF50)
-                                                                            "EXPORTED" -> Color(0xFF2196F3)
-                                                                            else -> MaterialTheme.colorScheme.onSurface
-                                                                        },
-                                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                                                    )
-                                                                }
-                                                                // Fecha de creación
-                                                                Text(
-                                                                    text = "Creada: ${java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date(kek.injectionTimestamp))}",
-                                                                    style = MaterialTheme.typography.labelSmall,
-                                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                                                )
-                                                            }
-                                                        }
-                                                    }
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = "No hay KEK activa en el almacén",
+                                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        text = "Ve al almacén de llaves y selecciona una llave AES-256 como KEK activa.",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                    )
                                                 }
                                             }
                                         }
+                                    } else {
+                                        // Mostrar KEK activa (solo lectura)
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Text(
+                                                text = "KEK activa seleccionada del almacén:",
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
+                                            )
 
-                                        // Warning sobre exportación automática
-                                        Card(
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-                                            ),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                                ),
+                                                shape = RoundedCornerShape(8.dp),
+                                                border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Info,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.tertiary
-                                                )
-                                                Text(
-                                                    text = "La KEK se exportará automáticamente al SubPOS la primera vez que inyectes este perfil.",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                )
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(12.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Lock,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(32.dp)
+                                                    )
+                                                    Column(modifier = Modifier.weight(1f)) {
+                                                        Text(
+                                                            text = formData.currentKEK.customName.ifEmpty { "KEK ${formData.currentKEK.kcv.take(6)}" },
+                                                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                                                        )
+                                                        Text(
+                                                            text = "KCV: ${formData.currentKEK.kcv}",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            fontFamily = FontFamily.Monospace,
+                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                                        )
+                                                        Text(
+                                                            text = "Creada: ${java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date(formData.currentKEK.injectionTimestamp))}",
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                        )
+                                                    }
+                                                    Icon(
+                                                        imageVector = Icons.Default.CheckCircle,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary
+                                                    )
+                                                }
+                                            }
+
+                                            // Info sobre el uso de KEK
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                                                ),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.padding(12.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Info,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.tertiary
+                                                    )
+                                                    Text(
+                                                        text = "Esta KEK se usará para cifrar las llaves antes de enviarlas al SubPOS.",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -1185,12 +1151,11 @@ fun KeyConfigurationItem(
     onUpdate: (Long, String, String) -> Unit,
     onRemove: () -> Unit
 ) {
-    val usageOptions = remember { listOf("PIN", "MAC", "DATA", "KEK") }
-    val keyTypeOptions = remember { listOf("TDES", "AES", "DUKPT_TDES", "DUKPT_AES", "PIN", "MAC", "DATA") }
+    val usageOptions = remember { listOf("PIN", "MAC", "DATA") }
+
 
     // Estados UI
     var usageExpanded by rememberSaveable { mutableStateOf(false) }
-    var keyTypeExpanded by rememberSaveable { mutableStateOf(false) }
     var keyExpanded by rememberSaveable { mutableStateOf(false) }
 
     // Derivados
@@ -1324,40 +1289,6 @@ fun KeyConfigurationItem(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(fieldSpacing)
                     ) {
-                        // Tipo de llave (solo lectura + menú)
-                        ExposedDropdownMenuBox(
-                            expanded = keyTypeExpanded,
-                            onExpandedChange = { keyTypeExpanded = !keyTypeExpanded }
-                        ) {
-                            OutlinedTextField(
-                                value = config.keyType,
-                                onValueChange = {}, // evita escritura
-                                readOnly = true,
-                                label = { Text("Tipo de llave") },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyTypeExpanded)
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor()
-                            )
-
-                            ExposedDropdownMenu(
-                                expanded = keyTypeExpanded,
-                                onDismissRequest = { keyTypeExpanded = false },
-                                modifier = Modifier.heightIn(max = 320.dp)
-                            ) {
-                                keyTypeOptions.forEach { type ->
-                                    DropdownMenuItem(
-                                        text = { Text(type) },
-                                        onClick = {
-                                            onUpdate(config.id, "keyType", type)
-                                            keyTypeExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
                     }
 
                     // Slot (validación suave HEX 2 dígitos)
@@ -1529,37 +1460,6 @@ fun KeyConfigurationItem(
                                     onClick = {
                                         onUpdate(config.id, "usage", usage)
                                         usageExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    ExposedDropdownMenuBox(
-                        expanded = keyTypeExpanded,
-                        onExpandedChange = { keyTypeExpanded = !keyTypeExpanded }
-                    ) {
-                        OutlinedTextField(
-                            value = config.keyType,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Tipo de llave") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyTypeExpanded) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = keyTypeExpanded,
-                            onDismissRequest = { keyTypeExpanded = false },
-                            modifier = Modifier.heightIn(max = 320.dp)
-                        ) {
-                            keyTypeOptions.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type) },
-                                    onClick = {
-                                        onUpdate(config.id, "keyType", type)
-                                        keyTypeExpanded = false
                                     }
                                 )
                             }

@@ -55,6 +55,7 @@ class KeyInjectionViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val injectedKeyRepository: InjectedKeyRepository,
     private val kekManager: com.vigatec.injector.manager.KEKManager,
+    private val injectionLogger: com.vigatec.injector.util.InjectionLogger,
     private val application: android.app.Application
 ) : ViewModel() {
 
@@ -73,6 +74,9 @@ class KeyInjectionViewModel @Inject constructor(
     
     // Instancia del servicio de polling
     private val pollingService = com.example.communication.polling.PollingService()
+    
+    // Username del usuario actual para los logs
+    private var currentUsername: String = "system"
 
     init {
         Log.i(TAG, "=== INICIALIZANDO KEYINJECTIONVIEWMODEL FUTUREX ===")
@@ -137,13 +141,16 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "================================================")
     }
 
-    fun showInjectionModal(profile: ProfileEntity) {
+    fun showInjectionModal(profile: ProfileEntity, username: String = "system") {
         Log.i(TAG, "=== MOSTRANDO MODAL DE INYECCIÓN FUTUREX ===")
         Log.i(TAG, "Perfil seleccionado: ${profile.name}")
+        Log.i(TAG, "Usuario: $username")
         Log.i(TAG, "Configuraciones de llave: ${profile.keyConfigurations.size}")
         profile.keyConfigurations.forEachIndexed { index, config ->
             Log.i(TAG, "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
         }
+        
+        currentUsername = username
         
         _state.value = _state.value.copy(
             showInjectionModal = true,
@@ -153,6 +160,11 @@ class KeyInjectionViewModel @Inject constructor(
         
         Log.i(TAG, "✓ Modal de inyección mostrado")
         Log.i(TAG, "================================================")
+    }
+    
+    fun setCurrentUsername(username: String) {
+        currentUsername = username
+        Log.i(TAG, "Usuario establecido para logs: $username")
     }
 
     fun hideInjectionModal() {
@@ -423,9 +435,9 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "Esperando respuesta del dispositivo...")
         val response = waitForResponse()
         
-        // Procesar respuesta
+        // Procesar respuesta y registrar en logs
         Log.i(TAG, "Procesando respuesta del dispositivo...")
-        processInjectionResponse(response, keyConfig)
+        processInjectionResponse(response, keyConfig, injectionCommand)
         
         Log.i(TAG, "=== INYECCIÓN DE LLAVE FUTUREX COMPLETADA ===")
     }
@@ -755,10 +767,14 @@ class KeyInjectionViewModel @Inject constructor(
         return response
     }
 
-    private fun processInjectionResponse(response: ByteArray, keyConfig: KeyConfiguration) {
+    private fun processInjectionResponse(response: ByteArray, keyConfig: KeyConfiguration, commandSent: ByteArray) {
         Log.i(TAG, "=== PROCESANDO RESPUESTA FUTUREX ===")
         Log.i(TAG, "Configuración de llave: ${keyConfig.usage} (Slot: ${keyConfig.slot})")
         Log.i(TAG, "Respuesta recibida: ${response.size} bytes")
+        
+        val profile = _state.value.currentProfile
+        val commandHex = commandSent.toHexString()
+        val responseHex = response.toHexString()
         
         // Agregar datos al parser
         Log.i(TAG, "Agregando datos al parser Futurex...")
@@ -780,10 +796,33 @@ class KeyInjectionViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         log = _state.value.log + "✓ ${keyConfig.usage}: Inyectada exitosamente\n"
                     )
+                    
+                    // Registrar log de inyección exitosa
+                    injectionLogger.logSuccess(
+                        commandSent = commandHex,
+                        responseReceived = responseHex,
+                        username = currentUsername,
+                        profileName = profile?.name ?: "Desconocido",
+                        keyType = keyConfig.keyType,
+                        keySlot = keyConfig.slot.toIntOrNull() ?: -1,
+                        notes = "Uso: ${keyConfig.usage}, KCV: ${parsedMessage.keyChecksum}"
+                    )
                 } else {
                     val errorCode = FuturexErrorCode.fromCode(parsedMessage.responseCode)
                     val errorMsg = errorCode?.description ?: "Error desconocido"
                     Log.e(TAG, "✗ Error en inyección de ${keyConfig.usage}: $errorMsg (Código: ${parsedMessage.responseCode})")
+                    
+                    // Registrar log de inyección fallida
+                    injectionLogger.logFailure(
+                        commandSent = commandHex,
+                        responseReceived = responseHex,
+                        username = currentUsername,
+                        profileName = profile?.name ?: "Desconocido",
+                        keyType = keyConfig.keyType,
+                        keySlot = keyConfig.slot.toIntOrNull() ?: -1,
+                        notes = "Error: $errorMsg (Código: ${parsedMessage.responseCode})"
+                    )
+                    
                     throw Exception("Error en inyección de ${keyConfig.usage}: $errorMsg")
                 }
             }
@@ -800,6 +839,18 @@ class KeyInjectionViewModel @Inject constructor(
                 } else {
                     Log.w(TAG, "Payload: N/A (mensaje null)")
                 }
+                
+                // Registrar log de error por respuesta inesperada
+                injectionLogger.logInjection(
+                    commandSent = commandHex,
+                    responseReceived = responseHex,
+                    operationStatus = "ERROR",
+                    username = currentUsername,
+                    profileName = profile?.name ?: "Desconocido",
+                    keyType = keyConfig.keyType,
+                    keySlot = keyConfig.slot.toIntOrNull() ?: -1,
+                    notes = "Respuesta inesperada: ${parsedMessage?.javaClass?.simpleName}"
+                )
             }
         }
         

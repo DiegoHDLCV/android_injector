@@ -6,6 +6,9 @@ sealed class Screen(val route: String) {
     object Main : Screen("main")
     object Config : Screen("config")
     object Logs : Screen("logs")
+    object LogDetail : Screen("log_detail/{logId}") {
+        fun createRoute(logId: Long) = "log_detail/$logId"
+    }
     object UserManagement : Screen("user_management")
     object TmsConfig : Screen("tms_config")
 }

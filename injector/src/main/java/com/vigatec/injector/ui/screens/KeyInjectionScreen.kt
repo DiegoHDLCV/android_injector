@@ -124,7 +124,7 @@ fun KeyInjectionModal(
                         InjectionProgressCard(state = state)
                         
                         // Logs de inyección
-                        InjectionLogsCard(state = state)
+                        //InjectionLogsCard(state = state)
                     }
                     
                     // Footer con botones

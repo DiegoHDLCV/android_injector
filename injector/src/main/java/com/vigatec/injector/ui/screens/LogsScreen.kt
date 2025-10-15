@@ -23,12 +23,13 @@ import java.util.*
 @Composable
 fun LogsScreen(
     viewModel: LogsViewModel = hiltViewModel(),
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onLogClick: (Long) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showFilters by remember { mutableStateOf(false) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
-    var selectedLog by remember { mutableStateOf<InjectionLogEntity?>(null) }
+    var selectedLogToDelete by remember { mutableStateOf<InjectionLogEntity?>(null) }
 
     Scaffold(
         topBar = {
@@ -97,9 +98,10 @@ fun LogsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(uiState.filteredLogs) { log ->
-                        LogItem(
+                        CompactLogCard(
                             log = log,
-                            onDelete = { selectedLog = it },
+                            onClick = { onLogClick(log.id) },
+                            onDelete = { selectedLogToDelete = it },
                             formatTimestamp = { viewModel.formatTimestamp(it) }
                         )
                     }
@@ -109,23 +111,23 @@ fun LogsScreen(
     }
 
     // Diálogo de confirmación para eliminar log
-    selectedLog?.let { log ->
+    selectedLogToDelete?.let { log ->
         AlertDialog(
-            onDismissRequest = { selectedLog = null },
+            onDismissRequest = { selectedLogToDelete = null },
             title = { Text("Eliminar Log") },
             text = { Text("¿Estás seguro de que deseas eliminar este log?") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         viewModel.deleteLog(log)
-                        selectedLog = null
+                        selectedLogToDelete = null
                     }
                 ) {
                     Text("Eliminar")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { selectedLog = null }) {
+                TextButton(onClick = { selectedLogToDelete = null }) {
                     Text("Cancelar")
                 }
             }
@@ -283,95 +285,134 @@ fun FilterSection(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LogItem(
+fun CompactLogCard(
     log: InjectionLogEntity,
+    onClick: () -> Unit,
     onDelete: (InjectionLogEntity) -> Unit,
     formatTimestamp: (Long) -> String
 ) {
+    var showDeleteMenu by remember { mutableStateOf(false) }
+    
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Header con estado y acciones
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                StatusChip(status = log.operationStatus)
-                IconButton(onClick = { onDelete(log) }) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "Eliminar",
-                        tint = MaterialTheme.colorScheme.error
+                // Header: Estado + Fecha
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StatusChip(status = log.operationStatus)
+                    Text(
+                        text = formatTimestamp(log.timestamp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                
+                // Usuario y Perfil
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = log.username,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = log.profileName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                // Especificaciones de llaves
+                if (log.keyType.isNotEmpty() || log.keySlot >= 0) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (log.keyType.isNotEmpty()) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                shape = MaterialTheme.shapes.small
+                            ) {
+                                Text(
+                                    text = log.keyType,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                        if (log.keySlot >= 0) {
+                            Text(
+                                text = "Slot: ${log.keySlot}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Información del log
-            LogInfoRow(label = "Usuario", value = log.username)
-            LogInfoRow(label = "Perfil", value = log.profileName)
-            LogInfoRow(label = "Fecha", value = formatTimestamp(log.timestamp))
-
-            if (log.keyType.isNotEmpty()) {
-                LogInfoRow(label = "Tipo de Llave", value = log.keyType)
-            }
-
-            if (log.keySlot >= 0) {
-                LogInfoRow(label = "Slot", value = log.keySlot.toString())
-            }
-
-            Spacer(Modifier.height(8.dp))
-            Divider()
-            Spacer(Modifier.height(8.dp))
-
-            // Comando enviado
-            Text(
-                text = "Comando Enviado:",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = log.commandSent,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(8.dp)
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            // Respuesta recibida
-            Text(
-                text = "Respuesta Recibida:",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = log.responseReceived,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(8.dp)
-            )
-
-            if (log.notes.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = "Notas: ${log.notes}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            
+            // Botón de más opciones
+            Box {
+                IconButton(
+                    onClick = { showDeleteMenu = true },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        Icons.Default.MoreVert,
+                        contentDescription = "Más opciones",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                DropdownMenu(
+                    expanded = showDeleteMenu,
+                    onDismissRequest = { showDeleteMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Eliminar") },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        onClick = {
+                            showDeleteMenu = false
+                            onDelete(log)
+                        }
+                    )
+                }
             }
         }
     }

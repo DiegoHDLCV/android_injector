@@ -1,9 +1,11 @@
 package com.vigatec.injector.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +19,7 @@ import com.vigatec.injector.ui.events.UiEvent
 import com.vigatec.injector.ui.screens.MainScaffold
 import com.vigatec.injector.ui.screens.ConfigScreen
 import com.vigatec.injector.ui.screens.LogsScreen
+import com.vigatec.injector.ui.screens.LogDetailScreen
 import com.vigatec.injector.ui.screens.UserManagementScreen
 import com.vigatec.injector.ui.screens.TmsConfigScreen
 import com.vigatec.injector.viewmodel.LoginViewModel
@@ -103,6 +106,26 @@ fun AppNavigation() {
 
         composable(Screen.Logs.route) {
             LogsScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onLogClick = { logId ->
+                    navController.navigate(Screen.LogDetail.createRoute(logId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.LogDetail.route,
+            arguments = listOf(
+                navArgument("logId") {
+                    type = NavType.LongType
+                }
+            )
+        ) { backStackEntry ->
+            val logId = backStackEntry.arguments?.getLong("logId") ?: 0L
+            LogDetailScreen(
+                logId = logId,
                 onBack = {
                     navController.popBackStack()
                 }

@@ -27,7 +27,7 @@ fun MainNavGraph(navController: NavHostController, username: String) {
             CeremonyScreen()
         }
         composable(MainScreen.Profiles.route) {
-            ProfilesScreen()
+            ProfilesScreen(username = username)
         }
         composable(MainScreen.RawDataListener.route) {
             RawDataListenerScreen()
