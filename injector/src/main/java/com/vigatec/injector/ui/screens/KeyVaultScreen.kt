@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.persistence.entities.InjectedKeyEntity
@@ -35,7 +36,8 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
             KeyVaultTopBar(
                 onRefresh = { viewModel.loadKeys() },
                 onClearAll = { viewModel.onClearAllKeys() },
-                loading = state.loading
+                loading = state.loading,
+                isAdmin = state.isAdmin
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -58,9 +60,11 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
                 ) {
                     items(state.keysWithProfiles) { keyWithProfiles ->
                         KeyCard(
-                            key = keyWithProfiles.key, 
+                            key = keyWithProfiles.key,
                             assignedProfiles = keyWithProfiles.assignedProfiles,
-                            onDelete = { viewModel.onShowDeleteModal(it) }
+                            onDelete = { viewModel.onShowDeleteModal(it) },
+                            onToggleKEK = { viewModel.toggleKeyAsKEK(it) },
+                            isAdmin = state.isAdmin
                         )
                     }
                 }
@@ -82,15 +86,18 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KeyVaultTopBar(onRefresh: () -> Unit, onClearAll: () -> Unit, loading: Boolean) {
+fun KeyVaultTopBar(onRefresh: () -> Unit, onClearAll: () -> Unit, loading: Boolean, isAdmin: Boolean) {
     TopAppBar(
         title = { Text("Almacén de Llaves", fontWeight = FontWeight.Bold) },
         actions = {
             IconButton(onClick = onRefresh, enabled = !loading) {
                 Icon(Icons.Default.Refresh, contentDescription = "Refrescar")
             }
-            IconButton(onClick = onClearAll, enabled = !loading) {
-                Icon(Icons.Default.Delete, contentDescription = "Limpiar Almacén")
+            // Solo admins pueden limpiar el almacén
+            if (isAdmin) {
+                IconButton(onClick = onClearAll, enabled = !loading) {
+                    Icon(Icons.Default.Delete, contentDescription = "Limpiar Almacén")
+                }
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(
@@ -105,10 +112,13 @@ fun KeyVaultTopBar(onRefresh: () -> Unit, onClearAll: () -> Unit, loading: Boole
 fun KeyCard(
     key: InjectedKeyEntity,
     assignedProfiles: List<String> = emptyList(),
-    onDelete: (InjectedKeyEntity) -> Unit
+    onDelete: (InjectedKeyEntity) -> Unit,
+    onToggleKEK: (InjectedKeyEntity) -> Unit,
+    isAdmin: Boolean = false
 ) {
     val isCeremonyKey = key.keyType == "CEREMONY_KEY"
     val isKEK = key.isKEK
+    val detectedAlgorithm = detectKeyAlgorithm(key)
 
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -137,16 +147,31 @@ fun KeyCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         Text(
                             text = key.kcv,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        // Badge de tipo de algoritmo
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Text(
+                                text = detectedAlgorithm,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                         // Badge KEK
                         if (isKEK) {
-                            Spacer(modifier = Modifier.width(8.dp))
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
                                 color = MaterialTheme.colorScheme.tertiary
@@ -176,11 +201,15 @@ fun KeyCard(
             
             // Solo mostrar detalles técnicos para llaves que NO son de ceremonia
             if (!isCeremonyKey) {
-                Text("Slot: ${key.keySlot}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Solo mostrar slot si es positivo (slots reales)
+                if (key.keySlot >= 0) {
+                    Text("Slot: ${key.keySlot}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Text("Tipo: ${key.keyType}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Algoritmo: ${key.keyAlgorithm}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 // Para llaves de ceremonia, mostrar información relevante
+                Text("Origen: Ceremonia", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Longitud: ${key.keyData.length / 2} bytes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 // Mostrar estado si es KEK
@@ -222,12 +251,43 @@ fun KeyCard(
 
             Text("Fecha: ${formatDate(key.injectionTimestamp)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { onDelete(key) },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Eliminar")
+
+            // Botones de acciones (solo para admins)
+            if (isAdmin) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Botón "Marcar como KEK" / "Quitar KEK"
+                    OutlinedButton(
+                        onClick = { onToggleKEK(key) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (isKEK) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
+                            contentColor = if (isKEK) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text(if (isKEK) "Quitar KEK" else "Marcar KEK", style = MaterialTheme.typography.labelMedium)
+                    }
+
+                    // Botón Eliminar
+                    Button(
+                        onClick = { onDelete(key) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Eliminar", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            } else {
+                // Mensaje para usuarios no admin
+                Text(
+                    text = "Solo administradores pueden modificar o eliminar llaves",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
@@ -255,4 +315,31 @@ fun DeleteKeyDialog(key: InjectedKeyEntity, onConfirm: (InjectedKeyEntity) -> Un
 fun formatDate(timestamp: Long): String {
     val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
     return sdf.format(Date(timestamp))
+}
+
+/**
+ * Detecta el tipo de algoritmo basado en la longitud de los datos de la llave
+ * o en el algoritmo almacenado en la entidad
+ */
+fun detectKeyAlgorithm(key: InjectedKeyEntity): String {
+    // Si ya tiene un algoritmo asignado (de ceremonia), usarlo
+    if (key.keyAlgorithm != "UNASSIGNED" && key.keyAlgorithm.isNotEmpty() && key.keyType == "CEREMONY_KEY") {
+        return when (key.keyAlgorithm) {
+            "DES_TRIPLE" -> "3DES"
+            "AES_128" -> "AES-128"
+            "AES_192" -> "AES-192"
+            "AES_256" -> "AES-256"
+            else -> key.keyAlgorithm
+        }
+    }
+
+    // Si no, detectar por longitud de datos
+    val keyLengthBytes = key.keyData.length / 2 // Convertir hex a bytes
+    return when (keyLengthBytes) {
+        8 -> "DES"
+        16 -> "3DES/AES-128" // Ambigüedad - pueden ser 3DES o AES-128
+        24 -> "3DES/AES-192"
+        32 -> "AES-256"
+        else -> "Desconocido (${keyLengthBytes}B)"
+    }
 } 

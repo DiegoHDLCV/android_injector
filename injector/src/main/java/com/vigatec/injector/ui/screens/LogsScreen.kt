@@ -165,6 +165,7 @@ fun LogsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilterSection(
     uiState: com.vigatec.injector.viewmodel.LogsUiState,

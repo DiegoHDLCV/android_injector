@@ -85,6 +85,9 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // DataStore Preferences
+    implementation(libs.androidx.datastore.preferences)
+
     implementation(project(":persistence"))
     implementation(project(":manufacturer"))
 

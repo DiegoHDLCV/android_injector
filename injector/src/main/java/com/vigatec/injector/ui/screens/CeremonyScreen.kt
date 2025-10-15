@@ -17,9 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.injector.viewmodel.CeremonyViewModel
+import com.vigatec.injector.viewmodel.KeyAlgorithmType
 
 @Composable
 fun CeremonyScreen(viewModel: CeremonyViewModel = hiltViewModel()) {
@@ -110,7 +112,32 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
     Column {
         Text("Paso 1: Configuración Inicial", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Número de Custodios:")
+
+        // Selector de tipo de llave
+        Text("Tipo de Llave:", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+        Column(Modifier.selectableGroup()) {
+            KeyAlgorithmType.values().forEach { keyType ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    RadioButton(
+                        selected = state.selectedKeyType == keyType,
+                        onClick = { viewModel.onKeyTypeChange(keyType) }
+                    )
+                    Text(
+                        text = keyType.displayName,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text("Número de Custodios:", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
         Row(Modifier.selectableGroup()) {
             (2..3).forEach { num ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -122,8 +149,8 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
                 }
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { viewModel.startCeremony() }) {
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = { viewModel.startCeremony() }, modifier = Modifier.fillMaxWidth()) {
             Text("Iniciar Ceremonia")
         }
     }
@@ -137,6 +164,21 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
             "Paso 2: Custodio ${state.currentCustodian} de ${state.numCustodians}",
             style = MaterialTheme.typography.titleLarge
         )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Mostrar tipo de llave seleccionado
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+        ) {
+            Text(
+                text = "Tipo de llave: ${state.selectedKeyType.displayName}",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
             value = state.component,
@@ -148,6 +190,16 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
                     Icon(
                         if (state.showComponent) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                         contentDescription = "Toggle visibility"
+                    )
+                }
+            },
+            isError = state.componentError != null,
+            supportingText = {
+                if (state.componentError != null) {
+                    Text(
+                        text = state.componentError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
@@ -171,60 +223,36 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
                 Text("Siguiente Custodio")
             }
         } else {
-            // Último custodio completado
-            if (state.component.isNotBlank()) {
-                Button(
-                    onClick = { viewModel.finalizeCeremony() },
-                    enabled = !state.isLoading
-                ) {
-                    if (state.isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Procesando...")
-                    } else {
-                        Text("Finalizar y Guardar Llave")
-                    }
+            // Último custodio - solo habilitar el botón si ya se verificó el KCV
+            Button(
+                onClick = { viewModel.finalizeCeremony() },
+                enabled = state.partialKCV.isNotBlank() && !state.isLoading
+            ) {
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Procesando...")
+                } else {
+                    Text("Finalizar y Guardar Llave")
                 }
-            } else {
+            }
+
+            if (state.partialKCV.isBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Ingresa el componente del custodio ${state.currentCustodian} para continuar",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    text = "Verifica el componente del último custodio antes de finalizar",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    textAlign = TextAlign.Center
                 )
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        
-        // Botones de debug
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Button(
-                onClick = { 
-                    viewModel.addToLog("Test: Verificando estado actual")
-                    viewModel.addToLog("Componentes: ${viewModel.uiState.value.components.size}")
-                    viewModel.addToLog("Componente actual: ${viewModel.uiState.value.component}")
-                    viewModel.addToLog("Custodio actual: ${viewModel.uiState.value.currentCustodian}")
-                    viewModel.addToLog("Total custodios: ${viewModel.uiState.value.numCustodians}")
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-            ) {
-                Text("Debug Estado")
-            }
-            
-            Button(
-                onClick = { 
-                    viewModel.verifyDatabaseState()
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
-            ) {
-                Text("Verificar BD")
-            }
-        }
+
         
         Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = { viewModel.cancelCeremony() }, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {

@@ -7,6 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.persistence.dao.InjectionLogDao
 import com.vigatec.injector.data.local.database.AppDatabase
 import com.vigatec.injector.data.local.entity.User
+import com.vigatec.injector.data.local.preferences.UserPreferencesManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -61,5 +62,11 @@ object AppModule {
     @Singleton
     fun provideInjectionLogDao(appDatabase: AppDatabase): InjectionLogDao {
         return appDatabase.injectionLogDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserPreferencesManager(@ApplicationContext context: Context): UserPreferencesManager {
+        return UserPreferencesManager(context)
     }
 } 

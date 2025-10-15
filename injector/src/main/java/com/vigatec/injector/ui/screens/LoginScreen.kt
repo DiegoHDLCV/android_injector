@@ -122,6 +122,29 @@ fun LoginScreen(
                         enabled = !loginViewModel.isLoading
                     )
 
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Checkbox "Recordar usuario"
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Checkbox(
+                            checked = loginViewModel.rememberUser,
+                            onCheckedChange = { loginViewModel.onRememberUserChange(it) },
+                            enabled = !loginViewModel.isLoading,
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = MaterialTheme.colorScheme.primary,
+                                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                        Text(
+                            text = "Recordar usuario",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
                     // Error message
                     loginViewModel.loginError?.let {
                         Text(
@@ -133,7 +156,7 @@ fun LoginScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Submit button
                     Button(

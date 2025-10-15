@@ -20,7 +20,8 @@ fun ConfigScreen(
     viewModel: ConfigViewModel = hiltViewModel(),
     onNavigateToLogs: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onLogout: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -77,6 +78,25 @@ fun ConfigScreen(
 
             // Información del sistema
             SystemInfoCard()
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Botón de cerrar sesión
+            Button(
+                onClick = onLogout,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(
+                    Icons.Default.Logout,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Cerrar Sesión")
+            }
         }
     }
 

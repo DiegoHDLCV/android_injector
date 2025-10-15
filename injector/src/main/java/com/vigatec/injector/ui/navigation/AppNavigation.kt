@@ -83,6 +83,16 @@ fun AppNavigation() {
                 },
                 onBack = {
                     navController.popBackStack()
+                },
+                onLogout = {
+                    // Limpiar el username y navegar al login
+                    currentUsername = ""
+                    navController.navigate(Screen.Login.route) {
+                        // Limpiar toda la pila de navegación
+                        popUpTo(Screen.Main.route) {
+                            inclusive = true
+                        }
+                    }
                 }
             )
         }

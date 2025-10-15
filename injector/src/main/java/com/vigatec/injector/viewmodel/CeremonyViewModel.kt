@@ -11,6 +11,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class KeyAlgorithmType(val displayName: String, val bytesRequired: Int) {
+    DES_TRIPLE("3DES (16 bytes)", 16),
+    AES_128("AES-128 (16 bytes)", 16),
+    AES_192("AES-192 (24 bytes)", 24),
+    AES_256("AES-256 (32 bytes)", 32)
+}
+
 data class CeremonyState(
     val currentStep: Int = 1, // 1: Config, 2: Custodios, 3: Finalización
     val numCustodians: Int = 2,
@@ -26,7 +33,9 @@ data class CeremonyState(
     val isCeremonyFinished: Boolean = false,
 
     // Nuevos campos para configuración de llave
-    val customName: String = ""        // Nombre personalizado
+    val customName: String = "",              // Nombre personalizado
+    val selectedKeyType: KeyAlgorithmType = KeyAlgorithmType.DES_TRIPLE,  // Tipo de algoritmo seleccionado
+    val componentError: String? = null        // Error de validación de componente
 )
 
 @HiltViewModel
@@ -59,15 +68,31 @@ class CeremonyViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(customName = name)
     }
 
+    fun onKeyTypeChange(keyType: KeyAlgorithmType) {
+        _uiState.value = _uiState.value.copy(selectedKeyType = keyType)
+    }
+
+    /**
+     * Valida que el componente tenga la longitud correcta según el tipo de llave seleccionado
+     */
+    private fun validateComponentLength(component: String): Boolean {
+        val expectedBytes = _uiState.value.selectedKeyType.bytesRequired
+        val expectedHexLength = expectedBytes * 2 // Cada byte = 2 caracteres hex
+
+        return component.length == expectedHexLength
+    }
+
     fun startCeremony() {
         addToLog("=== INICIANDO CEREMONIA DE LLAVES ===")
         addToLog("Configuración inicial:")
         addToLog("  - Número de custodios: ${_uiState.value.numCustodians}")
+        addToLog("  - Tipo de llave: ${_uiState.value.selectedKeyType.displayName}")
+        addToLog("  - Longitud esperada: ${_uiState.value.selectedKeyType.bytesRequired * 2} caracteres hex")
         addToLog("  - Componente inicial: ${_uiState.value.component}")
         addToLog("  - Estado del repositorio: Inicializado")
         addToLog("  - Base de datos: Conectada")
         addToLog("================================================")
-        
+
         _uiState.value = _uiState.value.copy(
             currentStep = 2,
             isCeremonyInProgress = true,
@@ -77,15 +102,29 @@ class CeremonyViewModel @Inject constructor(
 
     fun addComponent() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, partialKCV = "")
+            _uiState.value = _uiState.value.copy(isLoading = true, partialKCV = "", componentError = null)
             try {
                 val component = _uiState.value.component
+
+                // Validar longitud del componente
+                if (!validateComponentLength(component)) {
+                    val expectedBytes = _uiState.value.selectedKeyType.bytesRequired
+                    val expectedHexLength = expectedBytes * 2
+                    val errorMsg = "Error: El componente debe tener exactamente $expectedHexLength caracteres hex para ${_uiState.value.selectedKeyType.displayName}"
+                    addToLog(errorMsg)
+                    _uiState.value = _uiState.value.copy(
+                        componentError = "Se esperan $expectedHexLength caracteres hex, recibidos: ${component.length}",
+                        isLoading = false
+                    )
+                    return@launch
+                }
+
                 val kcv = KcvCalculator.calculateKcv(component)
-                _uiState.value = _uiState.value.copy(partialKCV = kcv, isLoading = false)
+                _uiState.value = _uiState.value.copy(partialKCV = kcv, isLoading = false, componentError = null)
                 addToLog("Custodio ${_uiState.value.currentCustodian}: Componente verificado. KCV: $kcv")
             } catch (e: Exception) {
                 addToLog("Error al verificar componente: ${e.message}")
-                _uiState.value = _uiState.value.copy(isLoading = false)
+                _uiState.value = _uiState.value.copy(isLoading = false, componentError = e.message)
             }
         }
     }
@@ -188,8 +227,16 @@ class CeremonyViewModel @Inject constructor(
                 val keyType = "CEREMONY_KEY"
                 val keyStatus = "GENERATED"
 
+                // Detectar el algoritmo basado en el tipo seleccionado
+                val detectedAlgorithm = when (_uiState.value.selectedKeyType) {
+                    KeyAlgorithmType.DES_TRIPLE -> "DES_TRIPLE"
+                    KeyAlgorithmType.AES_128 -> "AES_128"
+                    KeyAlgorithmType.AES_192 -> "AES_192"
+                    KeyAlgorithmType.AES_256 -> "AES_256"
+                }
+
                 addToLog("  - Tipo de Llave: $keyType (Operacional)")
-                addToLog("  - Algoritmo: NO ASIGNADO (se define en perfil)")
+                addToLog("  - Algoritmo detectado: $detectedAlgorithm (${_uiState.value.selectedKeyType.displayName})")
                 addToLog("  - KCV: $finalKcv")
                 addToLog("  - Estado: $keyStatus")
                 addToLog("  - Es KEK: NO (puede configurarse desde el almacén de llaves)")
@@ -198,12 +245,12 @@ class CeremonyViewModel @Inject constructor(
                 addToLog("  - Datos de llave (hex): $finalKeyHex")
                 addToLog("  - Datos de llave (primeros 16 bytes): ${finalKeyHex.take(32)}")
 
-                // CRÍTICO: Guardar la llave SOLO con KCV y datos, sin asignar slot/tipo/algoritmo
-                // Estos parámetros se definirán cuando se use la llave en un perfil
+                // CRÍTICO: Guardar la llave con su algoritmo detectado
+                // El slot se asignará cuando se use la llave en un perfil (por ahora -1)
                 injectedKeyRepository.recordKeyInjectionWithData(
-                    keySlot = -1, // -1 indica que no hay slot asignado (se asigna en perfil)
+                    keySlot = -1, // -1 indica que no hay slot asignado (se asignará en el perfil)
                     keyType = keyType, // Siempre CEREMONY_KEY (operacional)
-                    keyAlgorithm = "UNASSIGNED", // No se asigna algoritmo específico
+                    keyAlgorithm = detectedAlgorithm, // Guardar el algoritmo detectado
                     kcv = finalKcv,
                     keyData = finalKeyHex, // ¡GUARDANDO LA LLAVE COMPLETA!
                     status = keyStatus,
