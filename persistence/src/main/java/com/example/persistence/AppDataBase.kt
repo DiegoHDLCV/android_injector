@@ -25,7 +25,7 @@ import com.example.persistence.entities.ProfileEntity
         InjectedKeyEntity::class,
         ProfileEntity::class
     ],
-    version = 10, // Se incrementa la versión para agregar campos isKEK y customName
+    version = 12, // Versión 12: Agrega campo kekType para diferenciar entre KEK_STORAGE y KEK_TRANSPORT (KTK)
     exportSchema = true
 )
 @TypeConverters(Converters::class)

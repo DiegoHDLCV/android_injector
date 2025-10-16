@@ -26,6 +26,7 @@ data class KeyVaultState(
     val selectedKey: InjectedKeyEntity? = null,
     val showDeleteModal: Boolean = false,
     val showViewModal: Boolean = false,
+    val showClearAllConfirmation: Boolean = false,  // Diálogo de confirmación para eliminar todas
     val currentUser: User? = null,  // Usuario actual para permisos
     val isAdmin: Boolean = false     // Flag rápido para verificar si es admin
 )
@@ -88,9 +89,18 @@ class KeyVaultViewModel @Inject constructor(
         }
     }
 
-    fun onClearAllKeys() {
+    fun onShowClearAllConfirmation() {
+        _uiState.value = _uiState.value.copy(showClearAllConfirmation = true)
+    }
+
+    fun onDismissClearAllConfirmation() {
+        _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
+    }
+
+    fun onConfirmClearAllKeys() {
         viewModelScope.launch {
             injectedKeyRepository.deleteAllKeys()
+            _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
             loadKeys() // Recargar
         }
     }
@@ -104,16 +114,17 @@ class KeyVaultViewModel @Inject constructor(
     }
 
     /**
-     * Marca o desmarca una llave como KEK
+     * Marca o desmarca una llave como KTK (Key Transport Key)
+     * La KTK se usa para cifrar llaves antes de transmitirlas al SubPOS
      */
     fun toggleKeyAsKEK(key: InjectedKeyEntity) {
         viewModelScope.launch {
             try {
                 if (key.isKEK) {
-                    // Quitar flag KEK
+                    // Quitar flag KTK
                     injectedKeyRepository.removeKeyAsKEK(key.kcv)
                 } else {
-                    // Establecer como KEK (automáticamente limpia KEKs anteriores)
+                    // Establecer como KTK (automáticamente limpia KTKs anteriores)
                     injectedKeyRepository.setKeyAsKEK(key.kcv)
                 }
                 loadKeys() // Recargar para reflejar cambios

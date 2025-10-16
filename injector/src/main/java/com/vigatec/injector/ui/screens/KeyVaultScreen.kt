@@ -36,7 +36,7 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
         topBar = {
             KeyVaultTopBar(
                 onRefresh = { viewModel.loadKeys() },
-                onClearAll = { viewModel.onClearAllKeys() },
+                onClearAll = { viewModel.onShowClearAllConfirmation() },
                 onGenerateTestKeys = { viewModel.generateTestKeys() },
                 loading = state.loading,
                 isAdmin = state.isAdmin
@@ -82,6 +82,13 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
                 viewModel.onDismissDeleteModal()
             },
             onDismiss = { viewModel.onDismissDeleteModal() }
+        )
+    }
+
+    if (state.showClearAllConfirmation) {
+        ClearAllKeysDialog(
+            onConfirm = { viewModel.onConfirmClearAllKeys() },
+            onDismiss = { viewModel.onDismissClearAllConfirmation() }
         )
     }
 }
@@ -131,14 +138,16 @@ fun KeyCard(
     isAdmin: Boolean = false
 ) {
     val isCeremonyKey = key.keyType == "CEREMONY_KEY"
-    val isKEK = key.isKEK
+    val isKEKStorage = key.isKEKStorage() // KEK creada en ceremonia
+    val isKTK = key.isKEK && !isKEKStorage // KTK marcada desde almacén
     val detectedAlgorithm = detectKeyAlgorithm(key)
 
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {
-                isKEK -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                isKEKStorage -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f)
+                isKTK -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
                 isCeremonyKey -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                 else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
             }
@@ -153,7 +162,8 @@ fun KeyCard(
                     Icons.Default.VpnKey,
                     contentDescription = "Key",
                     tint = when {
-                        isKEK -> MaterialTheme.colorScheme.tertiary
+                        isKEKStorage -> MaterialTheme.colorScheme.tertiary
+                        isKTK -> MaterialTheme.colorScheme.secondary
                         isCeremonyKey -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.onSurface
                     },
@@ -184,8 +194,8 @@ fun KeyCard(
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
-                        // Badge KEK
-                        if (isKEK) {
+                        // Badge KEK Storage
+                        if (isKEKStorage) {
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
                                 color = MaterialTheme.colorScheme.tertiary
@@ -194,6 +204,21 @@ fun KeyCard(
                                     text = "KEK",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onTertiary,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        // Badge KTK
+                        if (isKTK) {
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.secondary
+                            ) {
+                                Text(
+                                    text = "KTK",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondary,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
@@ -226,8 +251,8 @@ fun KeyCard(
                 Text("Origen: Ceremonia", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("Longitud: ${key.keyData.length / 2} bytes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                // Mostrar estado si es KEK
-                if (isKEK) {
+                // Mostrar estado si es KEK Storage o KTK
+                if (isKEKStorage || isKTK) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Estado: ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Surface(
@@ -272,23 +297,25 @@ fun KeyCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Botón "Marcar como KEK" / "Quitar KEK"
-                    OutlinedButton(
-                        onClick = { onToggleKEK(key) },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (isKEK) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
-                            contentColor = if (isKEK) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(if (isKEK) "Quitar KEK" else "Marcar KEK", style = MaterialTheme.typography.labelMedium)
+                    // Botón "Marcar como KTK" / "Quitar KTK" - Solo si NO es KEK Storage
+                    if (!isKEKStorage) {
+                        OutlinedButton(
+                            onClick = { onToggleKEK(key) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (isKTK) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                                contentColor = if (isKTK) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Text(if (isKTK) "Quitar KTK" else "Marcar KTK", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
 
                     // Botón Eliminar
                     Button(
                         onClick = { onDelete(key) },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.weight(1f)
+                        modifier = if (isKEKStorage) Modifier.fillMaxWidth() else Modifier.weight(1f)
                     ) {
                         Text("Eliminar", style = MaterialTheme.typography.labelMedium)
                     }
@@ -316,6 +343,39 @@ fun DeleteKeyDialog(key: InjectedKeyEntity, onConfirm: (InjectedKeyEntity) -> Un
         confirmButton = {
             Button(onClick = { onConfirm(key) }) {
                 Text("Eliminar")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@Composable
+fun ClearAllKeysDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Eliminar Todas las Llaves") },
+        text = { 
+            Text(
+                "⚠️ ADVERTENCIA: Esta acción eliminará TODAS las llaves del almacén.\n\n" +
+                "Esto incluye:\n" +
+                "• Llaves de ceremonia\n" +
+                "• KEK Storage\n" +
+                "• KTK (Key Transport Key)\n" +
+                "• Llaves operacionales\n\n" +
+                "Esta acción NO se puede deshacer.\n\n" +
+                "¿Estás completamente seguro?"
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                Text("Sí, Eliminar Todo")
             }
         },
         dismissButton = {

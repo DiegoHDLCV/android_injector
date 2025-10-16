@@ -33,6 +33,13 @@ interface InjectedKeyDao {
     fun getAllInjectedKeys(): Flow<List<InjectedKeyEntity>>
 
     /**
+     * Obtiene todas las llaves inyectadas de forma síncrona.
+     * Útil para operaciones de migración y backup.
+     */
+    @Query("SELECT * FROM injected_keys ORDER BY injectionTimestamp DESC")
+    suspend fun getAllInjectedKeysSync(): List<InjectedKeyEntity>
+
+    /**
      * Busca una llave específica por su slot y tipo.
      */
     @Query("SELECT * FROM injected_keys WHERE keySlot = :slot AND keyType = :type LIMIT 1")

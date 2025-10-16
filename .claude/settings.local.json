@@ -5,7 +5,11 @@
       "Bash(git init:*)",
       "Bash(git remote add:*)",
       "Bash(git pull:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(./gradlew clean build:*)",
+      "Bash(./gradlew:*)",
+      "Bash(chmod:*)",
+      "Bash(pip3 install:*)"
     ],
     "deny": [],
     "ask": []

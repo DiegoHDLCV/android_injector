@@ -3,6 +3,8 @@ package com.vigatec.injector.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.persistence.repository.InjectedKeyRepository
+import com.example.persistence.entities.KEKType
+import com.vigatec.utils.security.StorageKeyManager
 import com.vigatec.utils.KcvCalculator
 import com.vigatec.utils.KeyStoreManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,7 +36,8 @@ data class CeremonyState(
     // Nuevos campos para configuración de llave
     val customName: String = "",              // Nombre personalizado
     val selectedKeyType: KeyAlgorithmType = KeyAlgorithmType.DES_TRIPLE,  // Tipo de algoritmo seleccionado
-    val componentError: String? = null        // Error de validación de componente
+    val componentError: String? = null,       // Error de validación de componente
+    val selectedKEKType: KEKType = KEKType.NONE  // Tipo de KEK: NONE, KEK_STORAGE, KEK_TRANSPORT
 )
 
 @HiltViewModel
@@ -68,6 +71,14 @@ class CeremonyViewModel @Inject constructor(
 
     fun onKeyTypeChange(keyType: KeyAlgorithmType) {
         _uiState.value = _uiState.value.copy(selectedKeyType = keyType)
+    }
+
+    fun onKEKTypeChange(kekType: KEKType) {
+        _uiState.value = _uiState.value.copy(
+            selectedKEKType = kekType,
+            // Si se marca como KEK Storage, forzar AES-256
+            selectedKeyType = if (kekType == KEKType.KEK_STORAGE) KeyAlgorithmType.AES_256 else _uiState.value.selectedKeyType
+        )
     }
 
     /**
@@ -192,6 +203,28 @@ class CeremonyViewModel @Inject constructor(
                 }
 
 
+                // Si es KEK Storage, inicializarla en Android Keystore
+                if (_uiState.value.selectedKEKType == KEKType.KEK_STORAGE) {
+                    addToLog("=== INICIALIZANDO KEK STORAGE ===")
+                    addToLog("Esta llave se usará para cifrar todas las llaves del almacén")
+
+                    try {
+                        // Validar que sea AES-256
+                        if (_uiState.value.selectedKeyType != KeyAlgorithmType.AES_256) {
+                            throw IllegalStateException("KEK Storage debe ser AES-256")
+                        }
+
+                        // Inicializar KEK Storage en Android Keystore
+                        StorageKeyManager.initializeFromCeremony(finalKeyHex)
+                        addToLog("✓ KEK Storage inicializada en Android Keystore")
+                        addToLog("✓ Protección hardware: Activa")
+                        addToLog("================================================")
+                    } catch (e: Exception) {
+                        addToLog("✗ Error al inicializar KEK Storage: ${e.message}")
+                        throw e
+                    }
+                }
+
                 // CRÍTICO: Guardar la llave con su algoritmo detectado
                 // El slot se asignará cuando se use la llave en un perfil (por ahora -1)
                 injectedKeyRepository.recordKeyInjectionWithData(
@@ -201,7 +234,8 @@ class CeremonyViewModel @Inject constructor(
                     kcv = finalKcv,
                     keyData = finalKeyHex, // ¡GUARDANDO LA LLAVE COMPLETA!
                     status = keyStatus,
-                    isKEK = false, // Siempre false - se puede cambiar desde el almacén
+                    isKEK = _uiState.value.selectedKEKType != KEKType.NONE, // Mantener compatibilidad con isKEK
+                    kekType = _uiState.value.selectedKEKType.name, // Nuevo campo: tipo específico de KEK
                     customName = _uiState.value.customName // Nombre personalizado
                 )
 

@@ -26,20 +26,25 @@ object KcvCalculator {
                     finalKeyBytes = keyBytes
                     Log.d(TAG, "Tipo: DES (8 bytes)")
                 }
-                16 -> { // 2-key 3DES - USAR 16 BYTES DIRECTO
+                16 -> { // 2-key 3DES o AES-128
+                    // Por defecto asumimos 3DES para compatibilidad
                     algorithm = "DESede/ECB/NoPadding"
-                    // CAMBIO: Usar los 16 bytes directamente sin expansión
                     finalKeyBytes = keyBytes
-                    Log.d(TAG, "Tipo: 2-key 3DES (16 bytes directo)")
+                    Log.d(TAG, "Tipo: 2-key 3DES o AES-128 (16 bytes directo)")
                 }
-                24 -> { // 3-key 3DES
+                24 -> { // 3-key 3DES o AES-192
                     algorithm = "DESede/ECB/NoPadding"
                     finalKeyBytes = keyBytes
-                    Log.d(TAG, "Tipo: 3-key 3DES (24 bytes)")
+                    Log.d(TAG, "Tipo: 3-key 3DES o AES-192 (24 bytes)")
+                }
+                32 -> { // AES-256
+                    algorithm = "AES/ECB/NoPadding"
+                    finalKeyBytes = keyBytes
+                    Log.d(TAG, "Tipo: AES-256 (32 bytes)")
                 }
                 else -> {
                     Log.e(TAG, "Longitud de clave inválida: ${keyBytes.size} bytes")
-                    throw IllegalArgumentException("Longitud de llave inválida: ${keyBytes.size}. Debe ser de 8, 16, o 24 bytes.")
+                    throw IllegalArgumentException("Longitud de llave inválida: ${keyBytes.size}. Debe ser de 8, 16, 24 o 32 bytes.")
                 }
             }
 
@@ -50,6 +55,7 @@ object KcvCalculator {
             val algorithmName = when (algorithm.substringBefore('/')) {
                 "DES" -> "DES"
                 "DESede" -> "DESede"
+                "AES" -> "AES"
                 else -> throw IllegalArgumentException("Algoritmo no soportado")
             }
 
@@ -57,8 +63,10 @@ object KcvCalculator {
             val cipher = Cipher.getInstance(algorithm)
             cipher.init(Cipher.ENCRYPT_MODE, keySpec)
 
-            // Datos a encriptar: 8 bytes de ceros (estándar para KCV)
-            val data = ByteArray(8) { 0x00 }
+            // Datos a encriptar: tamaño de bloque según algoritmo
+            // DES/3DES: 8 bytes, AES: 16 bytes
+            val blockSize = if (algorithmName == "AES") 16 else 8
+            val data = ByteArray(blockSize) { 0x00 }
             Log.d(TAG, "Datos entrada: ${data.joinToString(" ") { "%02X".format(it) }}")
 
             val encryptedData = cipher.doFinal(data)
