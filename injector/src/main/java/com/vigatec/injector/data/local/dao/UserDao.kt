@@ -79,4 +79,16 @@ interface UserDao {
      */
     @Query("DELETE FROM users WHERE id = :userId")
     suspend fun deleteUserById(userId: Int)
+    
+    /**
+     * Desactiva todos los usuarios (cierra todas las sesiones).
+     */
+    @Query("UPDATE users SET isActive = 0")
+    suspend fun deactivateAllUsers()
+    
+    /**
+     * Activa solo un usuario específico (establece sesión única).
+     */
+    @Query("UPDATE users SET isActive = CASE WHEN id = :userId THEN 1 ELSE 0 END")
+    suspend fun setActiveUserById(userId: Int)
 } 

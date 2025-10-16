@@ -10,6 +10,7 @@ import com.vigatec.utils.KeyStoreManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -37,16 +38,68 @@ data class CeremonyState(
     val customName: String = "",              // Nombre personalizado
     val selectedKeyType: KeyAlgorithmType = KeyAlgorithmType.DES_TRIPLE,  // Tipo de algoritmo seleccionado
     val componentError: String? = null,       // Error de validación de componente
-    val selectedKEKType: KEKType = KEKType.NONE  // Tipo de KEK: NONE, KEK_STORAGE, KEK_TRANSPORT
+    val selectedKEKType: KEKType = KEKType.NONE,  // Tipo de KEK: NONE, KEK_STORAGE, KEK_TRANSPORT
+    val hasKEKStorage: Boolean = false,       // Si existe KEK Storage (necesaria para llaves operacionales)
+    val isAdmin: Boolean = false              // Si el usuario actual es administrador
 )
 
 @HiltViewModel
 class CeremonyViewModel @Inject constructor(
-    private val injectedKeyRepository: InjectedKeyRepository
+    private val injectedKeyRepository: InjectedKeyRepository,
+    private val userRepository: com.vigatec.injector.repository.UserRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CeremonyState(component = "E59D620E1A6D311F19342054AB01ABF7"))
     val uiState = _uiState.asStateFlow()
+
+    init {
+        // Verificar si existe KEK Storage y cargar usuario actual
+        checkKEKStorageExists()
+        loadCurrentUser()
+    }
+
+    private fun checkKEKStorageExists() {
+        val hasKEK = StorageKeyManager.hasStorageKEK()
+        _uiState.value = _uiState.value.copy(
+            hasKEKStorage = hasKEK
+        )
+    }
+
+    private fun loadCurrentUser() {
+        viewModelScope.launch {
+            try {
+                // Obtener usuario activo
+                val users = userRepository.getAllUsers().first()
+                android.util.Log.d("CeremonyViewModel", "Ceremony - Total usuarios obtenidos: ${users.size}")
+                users.forEachIndexed { index, user ->
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario[$index]: username=${user.username}, role=${user.role}, isActive=${user.isActive}")
+                }
+                
+                // IMPORTANTE: Solo debería haber un usuario activo a la vez
+                // Si hay múltiples, tomar el último (más reciente)
+                val activeUsers = users.filter { it.isActive }
+                if (activeUsers.size > 1) {
+                    android.util.Log.w("CeremonyViewModel", "Ceremony - ⚠️ ADVERTENCIA: Hay ${activeUsers.size} usuarios activos. Solo debería haber uno.")
+                }
+                
+                val currentUser = activeUsers.lastOrNull() // Último usuario activo (más reciente)
+                val isAdmin = currentUser?.role == "ADMIN"
+                
+                android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario actual: username=${currentUser?.username}, role=${currentUser?.role}")
+                android.util.Log.d("CeremonyViewModel", "Ceremony - isAdmin determinado: $isAdmin")
+                
+                _uiState.value = _uiState.value.copy(
+                    isAdmin = isAdmin
+                )
+                
+                android.util.Log.d("CeremonyViewModel", "Ceremony - Estado actualizado: isAdmin=${_uiState.value.isAdmin}")
+            } catch (e: Exception) {
+                // Si hay error, asumir no admin
+                android.util.Log.e("CeremonyViewModel", "Ceremony - Error cargando usuario actual", e)
+                _uiState.value = _uiState.value.copy(isAdmin = false)
+            }
+        }
+    }
 
     fun addToLog(message: String) {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())

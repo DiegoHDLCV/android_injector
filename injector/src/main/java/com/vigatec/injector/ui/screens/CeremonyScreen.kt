@@ -95,6 +95,33 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
     val state by viewModel.uiState.collectAsState()
     Column {
         Text("Paso 1: Configuración Inicial", style = MaterialTheme.typography.titleLarge)
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Indicador de rol del usuario
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = if (state.isAdmin) 
+                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+            else 
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (state.isAdmin) "👤 ADMINISTRADOR" else "👤 USUARIO",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (state.isAdmin) 
+                        MaterialTheme.colorScheme.tertiary
+                    else 
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        
         Spacer(modifier = Modifier.height(16.dp))
 
         // Selector de tipo de llave
@@ -120,12 +147,12 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Selector de tipo de llave: Operacional o KEK
+        // Selector de tipo de llave: Operacional o KEK (según permisos de admin)
         Text("Tipo de Llave:", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
         
         Column(Modifier.selectableGroup()) {
-            // Opción: Llave Operacional (NONE)
+            // Opción: Llave Operacional (siempre visible)
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
@@ -162,10 +189,11 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Opción: KEK Storage
-            Card(
+            // Opción: KEK Storage (solo visible para admin)
+            if (state.isAdmin) {
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (state.selectedKEKType == KEKType.KEK_STORAGE)
@@ -216,6 +244,7 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
                         )
                     }
                 }
+            }
             }
         }
 

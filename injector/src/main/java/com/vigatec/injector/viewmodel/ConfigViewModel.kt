@@ -44,4 +44,18 @@ class ConfigViewModel @Inject constructor(
     fun clearErrorMessage() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
     }
+    
+    /**
+     * Cierra la sesión del usuario actual.
+     */
+    fun logout() {
+        viewModelScope.launch {
+            try {
+                // Desactivar todos los usuarios (cerrar sesión)
+                userRepository.deactivateAllUsers()
+            } catch (e: Exception) {
+                // Silenciosamente fallar - el usuario aún navegará al login
+            }
+        }
+    }
 }

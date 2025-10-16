@@ -45,6 +45,31 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            // Indicador de rol del usuario
+            Surface(
+                shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp),
+                color = if (state.isAdmin) 
+                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                else 
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (state.isAdmin) "👤 ADMINISTRADOR" else "👤 USUARIO",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (state.isAdmin) 
+                            MaterialTheme.colorScheme.tertiary
+                        else 
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
             if (state.loading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -291,27 +316,27 @@ fun KeyCard(
             Text("Fecha: ${formatDate(key.injectionTimestamp)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Botones de acciones (solo para admins)
-            if (isAdmin) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Botón "Marcar como KTK" / "Quitar KTK" - Solo si NO es KEK Storage
-                    if (!isKEKStorage) {
-                        OutlinedButton(
-                            onClick = { onToggleKEK(key) },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = if (isKTK) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                                contentColor = if (isKTK) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Text(if (isKTK) "Quitar KTK" else "Marcar KTK", style = MaterialTheme.typography.labelMedium)
-                        }
+            // Botones de acciones
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Botón "Marcar como KTK" / "Quitar KTK" - Disponible para todos si NO es KEK Storage
+                if (!isKEKStorage) {
+                    OutlinedButton(
+                        onClick = { onToggleKEK(key) },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (isKTK) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                            contentColor = if (isKTK) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text(if (isKTK) "Quitar KTK" else "Marcar KTK", style = MaterialTheme.typography.labelMedium)
                     }
+                }
 
-                    // Botón Eliminar
+                // Botón Eliminar - Solo para administradores
+                if (isAdmin) {
                     Button(
                         onClick = { onDelete(key) },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -320,15 +345,6 @@ fun KeyCard(
                         Text("Eliminar", style = MaterialTheme.typography.labelMedium)
                     }
                 }
-            } else {
-                // Mensaje para usuarios no admin
-                Text(
-                    text = "Solo administradores pueden modificar o eliminar llaves",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
             }
         }
     }

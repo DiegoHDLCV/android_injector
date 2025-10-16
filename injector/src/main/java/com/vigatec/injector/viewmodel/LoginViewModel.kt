@@ -63,6 +63,9 @@ class LoginViewModel @Inject constructor(
             loginError = null
             val user = userRepository.login(username, password)
             if (user != null) {
+                // IMPORTANTE: Establecer este usuario como el ÚNICO activo (sesión única)
+                userRepository.setActiveUser(user.id)
+                
                 loggedInUser = user
                 loginSuccess = true
 

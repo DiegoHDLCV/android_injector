@@ -1,5 +1,6 @@
 package com.vigatec.injector.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.persistence.entities.InjectedKeyEntity
@@ -37,13 +38,20 @@ class KeyVaultViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val userRepository: UserRepository
 ) : ViewModel() {
+    
+    companion object {
+        private const val TAG = "KeyVaultViewModel"
+    }
 
     private val _uiState = MutableStateFlow(KeyVaultState())
     val uiState = _uiState.asStateFlow()
 
     init {
-        loadCurrentUser()
-        loadKeys()
+        viewModelScope.launch {
+            Log.d(TAG, "KeyVault - Iniciando ViewModel")
+            loadCurrentUser() // Primero cargar usuario
+            loadKeys() // Luego cargar llaves
+        }
     }
 
     /**
@@ -51,29 +59,63 @@ class KeyVaultViewModel @Inject constructor(
      * Nota: Esta es una implementación simplificada.
      * En producción, deberías gestionar la sesión de usuario de forma más robusta.
      */
-    private fun loadCurrentUser() {
-        viewModelScope.launch {
-            try {
-                // Por ahora, asumimos que hay un usuario logueado
-                // En una implementación real, deberías obtener esto de una sesión global
-                val users = userRepository.getAllUsers().first()
-                val currentUser = users.firstOrNull { it.isActive }
-                _uiState.value = _uiState.value.copy(
-                    currentUser = currentUser,
-                    isAdmin = currentUser?.role == "ADMIN"
-                )
-            } catch (e: Exception) {
-                // Si no hay usuarios, mantener valores por defecto
-                e.printStackTrace()
+    private suspend fun loadCurrentUser() {
+        try {
+            // Por ahora, asumimos que hay un usuario logueado
+            // En una implementación real, deberías obtener esto de una sesión global
+            val users = userRepository.getAllUsers().first()
+            Log.d(TAG, "KeyVault - Total usuarios obtenidos: ${users.size}")
+            users.forEachIndexed { index, user ->
+                Log.d(TAG, "KeyVault - Usuario[$index]: username=${user.username}, role=${user.role}, isActive=${user.isActive}")
             }
+            
+            // IMPORTANTE: Solo debería haber un usuario activo a la vez
+            // Si hay múltiples, tomar el último (más reciente)
+            val activeUsers = users.filter { it.isActive }
+            if (activeUsers.size > 1) {
+                Log.w(TAG, "KeyVault - ⚠️ ADVERTENCIA: Hay ${activeUsers.size} usuarios activos. Solo debería haber uno.")
+            }
+            
+            val currentUser = activeUsers.lastOrNull() // Último usuario activo (más reciente)
+            val isAdmin = currentUser?.role == "ADMIN"
+            
+            Log.d(TAG, "KeyVault - Usuario actual: username=${currentUser?.username}, role=${currentUser?.role}")
+            Log.d(TAG, "KeyVault - isAdmin determinado: $isAdmin")
+            
+            _uiState.value = _uiState.value.copy(
+                currentUser = currentUser,
+                isAdmin = isAdmin
+            )
+            
+            Log.d(TAG, "KeyVault - Estado actualizado: isAdmin=${_uiState.value.isAdmin}")
+        } catch (e: Exception) {
+            // Si no hay usuarios, mantener valores por defecto
+            Log.e(TAG, "KeyVault - Error cargando usuario actual", e)
+            e.printStackTrace()
         }
     }
 
     fun loadKeys() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(loading = true)
+            Log.d(TAG, "KeyVault - loadKeys() - isAdmin actual: ${_uiState.value.isAdmin}")
+            
             injectedKeyRepository.getAllInjectedKeys().collect { keys ->
-                val keysWithProfiles = keys.map { key ->
+                Log.d(TAG, "KeyVault - loadKeys() - Total llaves recibidas: ${keys.size}")
+                
+                // Filtrar KEK Storage si el usuario NO es admin
+                val filteredKeys = if (_uiState.value.isAdmin) {
+                    Log.d(TAG, "KeyVault - Usuario es ADMIN, mostrando todas las llaves")
+                    keys // Admin ve todas las llaves
+                } else {
+                    val kekStorageCount = keys.count { it.isKEKStorage() }
+                    Log.d(TAG, "KeyVault - Usuario NO es admin, filtrando $kekStorageCount KEK Storage")
+                    keys.filter { !it.isKEKStorage() } // Usuario normal NO ve KEK Storage
+                }
+                
+                Log.d(TAG, "KeyVault - loadKeys() - Llaves después del filtro: ${filteredKeys.size}")
+                
+                val keysWithProfiles = filteredKeys.map { key ->
                     val profiles = profileRepository.getProfileNamesByKeyKcv(key.kcv)
                     KeyWithProfiles(key = key, assignedProfiles = profiles)
                 }
@@ -83,6 +125,12 @@ class KeyVaultViewModel @Inject constructor(
     }
 
     fun onDeleteKey(key: InjectedKeyEntity) {
+        // Solo administradores pueden eliminar llaves
+        if (!_uiState.value.isAdmin) {
+            Log.w(TAG, "Usuario no autorizado intentó eliminar una llave")
+            return
+        }
+        
         viewModelScope.launch {
             injectedKeyRepository.deleteKey(key)
             loadKeys() // Recargar
@@ -98,6 +146,13 @@ class KeyVaultViewModel @Inject constructor(
     }
 
     fun onConfirmClearAllKeys() {
+        // Solo administradores pueden eliminar todas las llaves
+        if (!_uiState.value.isAdmin) {
+            Log.w(TAG, "Usuario no autorizado intentó eliminar todas las llaves")
+            _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
+            return
+        }
+        
         viewModelScope.launch {
             injectedKeyRepository.deleteAllKeys()
             _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)

@@ -76,6 +76,21 @@ class UserRepository @Inject constructor(private val userDao: UserDao) {
     suspend fun deleteUserById(userId: Int) {
         userDao.deleteUserById(userId)
     }
+    
+    /**
+     * Establece un usuario como el único activo (sesión única).
+     * Desactiva a todos los demás usuarios.
+     */
+    suspend fun setActiveUser(userId: Int) {
+        userDao.setActiveUserById(userId)
+    }
+    
+    /**
+     * Cierra todas las sesiones (desactiva todos los usuarios).
+     */
+    suspend fun deactivateAllUsers() {
+        userDao.deactivateAllUsers()
+    }
 
     suspend fun isUserAdmin(username: String): Boolean {
         val user = userDao.findByUsername(username)

@@ -92,7 +92,10 @@ fun ConfigScreen(
 
             // Botón de cerrar sesión
             Button(
-                onClick = onLogout,
+                onClick = {
+                    viewModel.logout() // Desactivar usuario antes de navegar
+                    onLogout()
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error
