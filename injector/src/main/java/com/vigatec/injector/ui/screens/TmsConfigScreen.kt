@@ -13,7 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.injector.viewmodel.TmsConfigViewModel
-import com.vigatec.injector.viewmodel.TmsParameter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,11 +43,6 @@ fun TmsConfigScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, "Volver")
                     }
-                },
-                actions = {
-                    IconButton(onClick = { viewModel.loadCommonParameters() }) {
-                        Icon(Icons.Default.Refresh, "Actualizar")
-                    }
                 }
             )
         },
@@ -62,92 +56,32 @@ fun TmsConfigScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Estado del TMS
-            TmsStatusCard(isAvailable = uiState.isTmsAvailable)
+            // Estado del servicio TMS
+            TmsServiceStatusCard(isAvailable = uiState.isTmsServiceAvailable)
 
-            if (uiState.isTmsAvailable) {
-                // Botón para crear parámetros de prueba (solo si no hay param.env)
-                if (!viewModel.checkParamFileExists()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
-                                Text(
-                                    text = "Archivo param.env no encontrado",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
-                            }
-                            Text(
-                                text = "Crea parámetros de prueba para testing o sincroniza desde el servidor TMS",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                            Button(
-                                onClick = { viewModel.createTestParameters() },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = !uiState.isLoading
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Crear Parámetros de Prueba")
-                            }
-                        }
-                    }
-                }
-
-                // Sección de búsqueda de parámetro personalizado
-                CustomParameterSection(
-                    customParamName = uiState.customParamName,
-                    customParamValue = uiState.customParamValue,
-                    isLoading = uiState.isLoading,
-                    onParamNameChange = { viewModel.updateCustomParamName(it) },
-                    onReadParameter = { viewModel.readCustomParameter(uiState.customParamName) }
+            if (uiState.isTmsServiceAvailable) {
+                // Botón de descarga desde TMS
+                TmsDownloadCard(
+                    isDownloading = uiState.isDownloading,
+                    onDownloadClick = { viewModel.downloadParametersFromTms() }
                 )
 
-                // Lista de parámetros comunes encontrados
-                if (uiState.parameters.isNotEmpty()) {
-                    Text(
-                        text = "Parámetros Configurados",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    uiState.parameters.forEach { param ->
-                        TmsParameterCard(param)
-                    }
-                } else if (!uiState.isLoading) {
-                    InfoCard(
-                        message = "No se encontraron parámetros configurados. Configure los parámetros desde la plataforma TMS."
-                    )
+                // Mostrar parámetros descargados
+                uiState.parametersJson?.let { json ->
+                    ParametersDisplayCard(parametersJson = json)
                 }
+            } else {
+                // Mensaje cuando el servicio no está disponible
+                ServiceUnavailableCard()
+            }
 
-                // Indicador de carga
-                if (uiState.isLoading) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+            // Indicador de carga
+            if (uiState.isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
                 }
             }
         }
@@ -155,7 +89,7 @@ fun TmsConfigScreen(
 }
 
 @Composable
-fun TmsStatusCard(isAvailable: Boolean) {
+fun TmsServiceStatusCard(isAvailable: Boolean) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -182,7 +116,7 @@ fun TmsStatusCard(isAvailable: Boolean) {
             )
             Column {
                 Text(
-                    text = if (isAvailable) "TMS Disponible" else "TMS No Disponible",
+                    text = if (isAvailable) "Servicio TMS Disponible" else "Servicio TMS No Disponible",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = if (isAvailable)
@@ -192,9 +126,9 @@ fun TmsStatusCard(isAvailable: Boolean) {
                 )
                 Text(
                     text = if (isAvailable)
-                        "El sistema puede leer configuraciones del TMS"
+                        "El sistema puede conectarse al servicio TMS del dispositivo"
                     else
-                        "TMS no soportado en este dispositivo o fabricante",
+                        "El servicio TMS no está disponible o no está instalado",
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isAvailable)
                         MaterialTheme.colorScheme.onPrimaryContainer
@@ -207,13 +141,76 @@ fun TmsStatusCard(isAvailable: Boolean) {
 }
 
 @Composable
-fun CustomParameterSection(
-    customParamName: String,
-    customParamValue: String?,
-    isLoading: Boolean,
-    onParamNameChange: (String) -> Unit,
-    onReadParameter: () -> Unit
+fun TmsDownloadCard(
+    isDownloading: Boolean,
+    onDownloadClick: () -> Unit
 ) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.CloudDownload,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Descargar Parámetros",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Text(
+                        text = "Obtiene los parámetros del servidor TMS",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                }
+            }
+
+            Button(
+                onClick = onDownloadClick,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isDownloading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                if (isDownloading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Descargando...")
+                } else {
+                    Icon(Icons.Default.Download, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Descargar Parámetros Ahora")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ParametersDisplayCard(parametersJson: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -224,103 +221,50 @@ fun CustomParameterSection(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Buscar Parámetro Personalizado",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            OutlinedTextField(
-                value = customParamName,
-                onValueChange = onParamNameChange,
-                label = { Text("Nombre del parámetro") },
-                placeholder = { Text("Ej: url_api, timeout_ms") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                enabled = !isLoading
-            )
-
-            Button(
-                onClick = onReadParameter,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading && customParamName.isNotBlank()
-            ) {
-                Icon(Icons.Default.Search, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Buscar Parámetro")
-            }
-
-            customParamValue?.let { value ->
-                Divider()
-                Text(
-                    text = "Valor encontrado:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    shape = MaterialTheme.shapes.small
-                ) {
-                    Text(
-                        text = value,
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TmsParameterCard(parameter: TmsParameter) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = parameter.key,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Parámetros Descargados",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${parametersJson.length} caracteres",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                IconButton(
+                    onClick = {
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        val clip = android.content.ClipData.newPlainText("TMS Parameters", parametersJson)
+                        clipboard.setPrimaryClip(clip)
+                        android.widget.Toast.makeText(context, "JSON copiado al portapapeles", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Icon(Icons.Default.ContentCopy, contentDescription = "Copiar JSON")
+                }
             }
-
-            Text(
-                text = parameter.description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Divider(modifier = Modifier.padding(vertical = 4.dp))
-
+            
             Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = MaterialTheme.shapes.small
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
             ) {
                 Text(
-                    text = parameter.value,
-                    modifier = Modifier.padding(8.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium
+                    text = parametersJson,
+                    modifier = Modifier
+                        .padding(12.dp)
+                        .verticalScroll(rememberScrollState()),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
             }
         }
@@ -328,7 +272,7 @@ fun TmsParameterCard(parameter: TmsParameter) {
 }
 
 @Composable
-fun InfoCard(message: String) {
+fun ServiceUnavailableCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -346,11 +290,21 @@ fun InfoCard(message: String) {
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column {
+                Text(
+                    text = "Servicio No Disponible",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "El servicio TMS no está instalado o no es compatible con este dispositivo. " +
+                          "Contacte con el proveedor del servicio para obtener soporte.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

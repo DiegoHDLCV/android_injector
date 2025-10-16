@@ -7,55 +7,28 @@ package com.example.manufacturer.base.controllers.tms
 interface ITmsController {
 
     /**
-     * Lee un parámetro de configuración del TMS.
+     * Descarga parámetros desde el servidor TMS.
+     * Esta funcionalidad usa AIDL para conectarse al servicio TMS y descargar parámetros.
      *
-     * @param paramName El nombre del parámetro a leer (ej: "url_api", "timeout_ms").
-     * @return El valor del parámetro como String, o null si no se encuentra.
+     * @param packageName Nombre del paquete de la aplicación para descargar parámetros.
+     * @param onSuccess Callback invocado cuando la descarga es exitosa, con el JSON de parámetros.
+     * @param onError Callback invocado cuando hay un error, con el mensaje de error.
      */
-    fun getTmsParameter(paramName: String): String?
-
-    /**
-     * Lee un parámetro de configuración del TMS con un valor por defecto.
-     *
-     * @param paramName El nombre del parámetro a leer.
-     * @param defaultValue Valor a retornar si el parámetro no existe.
-     * @return El valor del parámetro o el valor por defecto.
-     */
-    fun getTmsParameter(paramName: String, defaultValue: String): String {
-        return getTmsParameter(paramName) ?: defaultValue
+    fun downloadParametersFromTms(
+        packageName: String,
+        onSuccess: (parametersJson: String) -> Unit,
+        onError: (errorMessage: String) -> Unit
+    ) {
+        // Implementación por defecto: no soportado
+        onError("Descarga desde TMS no soportada en este fabricante")
     }
 
     /**
-     * Lee múltiples parámetros de configuración del TMS.
-     *
-     * @param paramNames Lista de nombres de parámetros a leer.
-     * @return Mapa con los parámetros encontrados (key = nombre, value = valor).
+     * Verifica si el servicio TMS está disponible en el dispositivo.
+     * 
+     * @return true si TMS está disponible, false en caso contrario.
      */
-    fun getTmsParameters(paramNames: List<String>): Map<String, String> {
-        return paramNames.mapNotNull { paramName ->
-            getTmsParameter(paramName)?.let { value ->
-                paramName to value
-            }
-        }.toMap()
-    }
-
-    /**
-     * Verifica si un parámetro existe en el TMS.
-     *
-     * @param paramName El nombre del parámetro a verificar.
-     * @return true si el parámetro existe, false en caso contrario.
-     */
-    fun hasTmsParameter(paramName: String): Boolean {
-        return getTmsParameter(paramName) != null
-    }
-
-    /**
-     * Obtiene todos los parámetros configurados en el TMS.
-     * Nota: Esta funcionalidad puede no estar disponible en todos los fabricantes.
-     *
-     * @return Mapa con todos los parámetros disponibles, o un mapa vacío.
-     */
-    fun getAllTmsParameters(): Map<String, String> {
-        return emptyMap()
+    fun isTmsServiceAvailable(): Boolean {
+        return false // Por defecto no está disponible
     }
 }

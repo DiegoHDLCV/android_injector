@@ -6,7 +6,7 @@ import com.example.manufacturer.base.controllers.manager.ITmsManager
 import com.example.manufacturer.base.controllers.tms.ITmsController
 import com.example.manufacturer.base.controllers.tms.TmsException
 import com.example.manufacturer.libraries.aisino.wrapper.AisinoTmsController
-import com.example.manufacturer.libraries.aisino.wrapper.AisinoTmsParameterHelper
+import com.example.manufacturer.libraries.aisino.vtms.VTMSClientConnectionManager
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -30,35 +30,13 @@ object AisinoTmsManager : ITmsManager {
 
             Log.d(TAG, "Inicializando AisinoTmsManager...")
             try {
-                // Verificar si el archivo param.env existe
-                val paramFileExists = AisinoTmsParameterHelper.paramEnvFileExists(application)
-                Log.d(TAG, "Estado del archivo param.env: ${if (paramFileExists) "existe" else "no existe"}")
+                // Inicializar VTMSClientConnectionManager
+                Log.d(TAG, "Inicializando VTMSClientConnectionManager...")
+                VTMSClientConnectionManager.init(application)
+                Log.d(TAG, "VTMSClientConnectionManager inicializado")
 
-                if (!paramFileExists) {
-                    Log.w(TAG, "El archivo param.env no existe. Creando archivo vacío...")
-                    // Crear archivo vacío para que el SDK pueda trabajar con él
-                    val created = AisinoTmsParameterHelper.createEmptyParamEnvFile(application)
-                    if (created) {
-                        Log.i(TAG, "Archivo param.env vacío creado en: ${AisinoTmsParameterHelper.getParamEnvPath(application)}")
-                        Log.i(TAG, "El archivo está listo para recibir parámetros desde:")
-                        Log.i(TAG, "  1. El servidor TMS (sincronización), O")
-                        Log.i(TAG, "  2. La pantalla de configuración TMS (botón 'Crear Parámetros de Prueba')")
-                    } else {
-                        Log.e(TAG, "No se pudo crear el archivo param.env vacío")
-                    }
-                } else {
-                    Log.i(TAG, "Archivo param.env encontrado en: ${AisinoTmsParameterHelper.getParamEnvPath(application)}")
-                    // Mostrar contenido para debug
-                    val content = AisinoTmsParameterHelper.readParamEnvFile(application)
-                    if (content.isNullOrBlank()) {
-                        Log.d(TAG, "El archivo param.env existe pero está vacío")
-                    } else {
-                        Log.d(TAG, "Contenido del archivo param.env:\n$content")
-                    }
-                }
-
-                // Crear la instancia del controlador específico de Aisino
-                val controller = AisinoTmsController()
+                // Crear la instancia del controlador específico de Aisino con contexto
+                val controller = AisinoTmsController(application.applicationContext)
 
                 tmsControllerInstance = controller
                 isInitialized = true

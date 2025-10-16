@@ -5,8 +5,19 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Permisos para VTMS (Vanstone Terminal Management System) -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+
     <!-- Habilita capacidades de USB Host para comunicación con dispositivos USB -->
     <uses-feature android:name="android.hardware.usb.host" android:required="true" />
+
+    <!-- Queries para visibilidad del servicio VTMS -->
+    <queries>
+        <package android:name="com.vanstone.appsdk.api"/>
+        <package android:name="com.vtms.client"/>
+    </queries>
 
     <application
         android:name=".InjectorApplication"
