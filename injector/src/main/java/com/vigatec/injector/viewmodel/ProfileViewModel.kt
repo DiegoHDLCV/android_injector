@@ -16,13 +16,15 @@ import javax.inject.Inject
 
 data class ProfilesScreenState(
     val profiles: List<ProfileEntity> = emptyList(),
+    val filteredProfiles: List<ProfileEntity> = emptyList(),
     val availableKeys: List<InjectedKeyEntity> = emptyList(),
     val isLoading: Boolean = true,
     val selectedProfile: ProfileEntity? = null,
     val showCreateModal: Boolean = false,
     val showManageKeysModal: Boolean = false,
     val showInjectModal: Boolean = false,
-    val formData: ProfileFormData = ProfileFormData()
+    val formData: ProfileFormData = ProfileFormData(),
+    val searchQuery: String = ""
 )
 
 data class ProfileFormData(
@@ -58,6 +60,7 @@ class ProfileViewModel @Inject constructor(
             ) { profiles, keys ->
                 ProfilesScreenState(
                     profiles = profiles,
+                    filteredProfiles = profiles, // Inicialmente sin filtro
                     availableKeys = keys,
                     isLoading = false
                 )
@@ -65,6 +68,33 @@ class ProfileViewModel @Inject constructor(
                 _state.value = it
             }
         }
+    }
+
+    fun onSearchQueryChange(query: String) {
+        _state.value = _state.value.copy(searchQuery = query)
+        filterProfiles(query)
+    }
+
+    private fun filterProfiles(query: String) {
+        val filtered = if (query.isBlank()) {
+            _state.value.profiles
+        } else {
+            _state.value.profiles.filter { profile ->
+                // Filtrar por nombre
+                profile.name.contains(query, ignoreCase = true) ||
+                // Filtrar por descripción
+                profile.description.contains(query, ignoreCase = true) ||
+                // Filtrar por tipo de aplicación
+                profile.applicationType.contains(query, ignoreCase = true) ||
+                // Filtrar por KCV de llaves configuradas
+                profile.keyConfigurations.any { config ->
+                    config.selectedKey.contains(query, ignoreCase = true) ||
+                    config.usage.contains(query, ignoreCase = true) ||
+                    config.keyType.contains(query, ignoreCase = true)
+                }
+            }
+        }
+        _state.value = _state.value.copy(filteredProfiles = filtered)
     }
     
     fun onShowCreateModal(profile: ProfileEntity? = null) {

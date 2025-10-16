@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VpnKey
@@ -36,6 +37,7 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
             KeyVaultTopBar(
                 onRefresh = { viewModel.loadKeys() },
                 onClearAll = { viewModel.onClearAllKeys() },
+                onGenerateTestKeys = { viewModel.generateTestKeys() },
                 loading = state.loading,
                 isAdmin = state.isAdmin
             )
@@ -86,15 +88,27 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KeyVaultTopBar(onRefresh: () -> Unit, onClearAll: () -> Unit, loading: Boolean, isAdmin: Boolean) {
+fun KeyVaultTopBar(
+    onRefresh: () -> Unit,
+    onClearAll: () -> Unit,
+    onGenerateTestKeys: () -> Unit,
+    loading: Boolean,
+    isAdmin: Boolean
+) {
     TopAppBar(
         title = { Text("Almacén de Llaves", fontWeight = FontWeight.Bold) },
         actions = {
             IconButton(onClick = onRefresh, enabled = !loading) {
                 Icon(Icons.Default.Refresh, contentDescription = "Refrescar")
             }
-            // Solo admins pueden limpiar el almacén
+            // Solo admins pueden generar llaves de prueba y limpiar el almacén
             if (isAdmin) {
+                IconButton(
+                    onClick = onGenerateTestKeys,
+                    enabled = !loading
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Generar Llaves de Prueba")
+                }
                 IconButton(onClick = onClearAll, enabled = !loading) {
                     Icon(Icons.Default.Delete, contentDescription = "Limpiar Almacén")
                 }

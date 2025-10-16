@@ -39,12 +39,23 @@ object AppModule {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
                 CoroutineScope(Dispatchers.IO).launch {
+                    // Usuario admin predeterminado
                     userDaoProvider.get().insertUser(
                         User(
                             username = "admin",
                             pass = "admin",
                             role = "ADMIN",
                             fullName = "Administrador"
+                        )
+                    )
+
+                    // Usuario dev para desarrollo y pruebas
+                    userDaoProvider.get().insertUser(
+                        User(
+                            username = "dev",
+                            pass = "dev",
+                            role = "ADMIN",
+                            fullName = "Desarrollador"
                         )
                     )
                 }

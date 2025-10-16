@@ -83,6 +83,9 @@ fun ProfilesScreen(
             } else {
                 ProfilesContent(
                     profiles = state.profiles,
+                    filteredProfiles = state.filteredProfiles,
+                    searchQuery = state.searchQuery,
+                    onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
                     onEdit = { viewModel.onShowCreateModal(it) },
                     onDelete = { viewModel.onDeleteProfile(it) },
                     onInject = {
@@ -249,6 +252,9 @@ fun EmptyStateScreen(onCreateProfile: () -> Unit) {
 @Composable
 private fun ProfilesContent(
     profiles: List<ProfileEntity>,
+    filteredProfiles: List<ProfileEntity>,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
     onEdit: (ProfileEntity) -> Unit,
     onDelete: (ProfileEntity) -> Unit,
     onInject: (ProfileEntity) -> Unit
@@ -263,9 +269,25 @@ private fun ProfilesContent(
             StatisticsHeader(profiles = profiles)
         }
 
-        // Lista de perfiles
+        // Barra de búsqueda
+        item {
+            SearchBar(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                placeholder = "Buscar perfiles..."
+            )
+        }
+
+        // Mensaje si no hay resultados
+        if (filteredProfiles.isEmpty() && searchQuery.isNotEmpty()) {
+            item {
+                EmptySearchResults(query = searchQuery)
+            }
+        }
+
+        // Lista de perfiles filtrados
         items(
-            items = profiles,
+            items = filteredProfiles,
             key = { it.id }
         ) { profile ->
             ProfileCard(
@@ -273,6 +295,81 @@ private fun ProfilesContent(
                 onEdit = { onEdit(profile) },
                 onDelete = { onDelete(profile) },
                 onInject = { onInject(profile) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    placeholder: String
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text(placeholder) },
+        leadingIcon = {
+            Icon(
+                Icons.Default.Search,
+                contentDescription = "Buscar",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(
+                        Icons.Default.Clear,
+                        contentDescription = "Limpiar búsqueda",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surface,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+        )
+    )
+}
+
+@Composable
+private fun EmptySearchResults(query: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                Icons.Default.Search,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+            )
+            Text(
+                text = "No se encontraron resultados",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "No hay perfiles que coincidan con \"$query\"",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -771,6 +868,27 @@ fun getUsageIcon(usage: String): String {
     }
 }
 
+fun getKeyTypeIcon(keyType: String): String {
+    return when {
+        keyType.contains("PIN", ignoreCase = true) -> "🔐"
+        keyType.contains("MAC", ignoreCase = true) -> "🔒"
+        keyType.contains("Data", ignoreCase = true) -> "📄"
+        keyType.contains("Master", ignoreCase = true) -> "🗝️"
+        keyType.contains("DUKPT", ignoreCase = true) -> "🔄"
+        else -> "🔑"
+    }
+}
+
+fun deriveUsageFromKeyType(keyType: String): String {
+    return when {
+        keyType.contains("PIN", ignoreCase = true) -> "PIN"
+        keyType.contains("MAC", ignoreCase = true) -> "MAC"
+        keyType.contains("Data", ignoreCase = true) -> "DATA"
+        keyType.contains("DUKPT", ignoreCase = true) -> "DUKPT"
+        else -> "GENERAL"
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateProfileModal(
@@ -1151,11 +1269,19 @@ fun KeyConfigurationItem(
     onUpdate: (Long, String, String) -> Unit,
     onRemove: () -> Unit
 ) {
-    val usageOptions = remember { listOf("PIN", "MAC", "DATA") }
-
+    val keyTypeOptions = remember {
+        listOf(
+            "Master Session Key",
+            "PIN Encryption Key",
+            "MAC Key",
+            "Data Encryption Key",
+            "DUKPT Initial Key (IPEK)",
+            "DUKPT BDK"
+        )
+    }
 
     // Estados UI
-    var usageExpanded by rememberSaveable { mutableStateOf(false) }
+    var keyTypeExpanded by rememberSaveable { mutableStateOf(false) }
     var keyExpanded by rememberSaveable { mutableStateOf(false) }
 
     // Derivados
@@ -1189,7 +1315,7 @@ fun KeyConfigurationItem(
                             .background(MaterialTheme.colorScheme.primaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(getUsageIcon(config.usage), fontSize = 18.sp)
+                        Text(getKeyTypeIcon(config.keyType), fontSize = 18.sp)
                     }
                     Column {
                         Text(
@@ -1203,7 +1329,6 @@ fun KeyConfigurationItem(
                         Text(
                             text = buildString {
                                 append(headline)
-                                append(" • Uso: ${config.usage.ifBlank { "—" }}")
                                 append(" • Tipo: ${config.keyType.ifBlank { "—" }}")
                                 append(" • Slot: ${config.slot.ifBlank { "—" }}")
                             },
@@ -1241,18 +1366,18 @@ fun KeyConfigurationItem(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(fieldSpacing)
                     ) {
-                        // Uso (solo lectura + menú)
+                        // Tipo de llave (solo lectura + menú)
                         ExposedDropdownMenuBox(
-                            expanded = usageExpanded,
-                            onExpandedChange = { usageExpanded = !usageExpanded }
+                            expanded = keyTypeExpanded,
+                            onExpandedChange = { keyTypeExpanded = !keyTypeExpanded }
                         ) {
                             OutlinedTextField(
-                                value = config.usage,
-                                onValueChange = {}, // evita escritura
+                                value = config.keyType,
+                                onValueChange = {},
                                 readOnly = true,
-                                label = { Text("Uso") },
+                                label = { Text("Tipo de Llave") },
                                 trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = usageExpanded)
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyTypeExpanded)
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1260,25 +1385,56 @@ fun KeyConfigurationItem(
                             )
 
                             ExposedDropdownMenu(
-                                expanded = usageExpanded,
-                                onDismissRequest = { usageExpanded = false },
-                                modifier = Modifier.heightIn(max = 320.dp) // menú más alto
+                                expanded = keyTypeExpanded,
+                                onDismissRequest = { keyTypeExpanded = false },
+                                modifier = Modifier.heightIn(max = 320.dp)
                             ) {
-                                usageOptions.forEach { usage ->
+                                keyTypeOptions.forEach { keyType ->
                                     DropdownMenuItem(
                                         text = {
                                             Row(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                Text(getUsageIcon(usage))
-                                                Text(usage)
+                                                Text(getKeyTypeIcon(keyType))
+                                                Text(keyType)
                                             }
                                         },
                                         onClick = {
-                                            onUpdate(config.id, "usage", usage)
-                                            usageExpanded = false
+                                            onUpdate(config.id, "keyType", keyType)
+                                            // Derivar 'usage' automáticamente del tipo
+                                            val derivedUsage = deriveUsageFromKeyType(keyType)
+                                            onUpdate(config.id, "usage", derivedUsage)
+                                            keyTypeExpanded = false
                                         }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Advertencia para DUKPT Initial Key
+                        if (config.keyType.contains("DUKPT Initial", ignoreCase = true)) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "⚠️ DUKPT Initial Key solo para pruebas. Usar DUKPT BDK en producción",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -1289,6 +1445,7 @@ fun KeyConfigurationItem(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(fieldSpacing)
                     ) {
+                        // Slot se mueve aquí
                     }
 
                     // Slot (validación suave HEX 2 dígitos)
@@ -1427,40 +1584,72 @@ fun KeyConfigurationItem(
                 // ===== Layout 1 columna (móvil/estrecho) =====
                 Column(verticalArrangement = Arrangement.spacedBy(fieldSpacing)) {
 
+                    // Tipo de llave (solo lectura + menú)
                     ExposedDropdownMenuBox(
-                        expanded = usageExpanded,
-                        onExpandedChange = { usageExpanded = !usageExpanded }
+                        expanded = keyTypeExpanded,
+                        onExpandedChange = { keyTypeExpanded = !keyTypeExpanded }
                     ) {
                         OutlinedTextField(
-                            value = config.usage,
+                            value = config.keyType,
                             onValueChange = {},
                             readOnly = true,
-                            label = { Text("Uso") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = usageExpanded) },
+                            label = { Text("Tipo de Llave") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyTypeExpanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .menuAnchor()
                         )
                         ExposedDropdownMenu(
-                            expanded = usageExpanded,
-                            onDismissRequest = { usageExpanded = false },
+                            expanded = keyTypeExpanded,
+                            onDismissRequest = { keyTypeExpanded = false },
                             modifier = Modifier.heightIn(max = 320.dp)
                         ) {
-                            usageOptions.forEach { usage ->
+                            keyTypeOptions.forEach { keyType ->
                                 DropdownMenuItem(
                                     text = {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Text(getUsageIcon(usage))
-                                            Text(usage)
+                                            Text(getKeyTypeIcon(keyType))
+                                            Text(keyType)
                                         }
                                     },
                                     onClick = {
-                                        onUpdate(config.id, "usage", usage)
-                                        usageExpanded = false
+                                        onUpdate(config.id, "keyType", keyType)
+                                        // Derivar 'usage' automáticamente del tipo
+                                        val derivedUsage = deriveUsageFromKeyType(keyType)
+                                        onUpdate(config.id, "usage", derivedUsage)
+                                        keyTypeExpanded = false
                                     }
+                                )
+                            }
+                        }
+                    }
+
+                    // Advertencia para DUKPT Initial Key
+                    if (config.keyType.contains("DUKPT Initial", ignoreCase = true)) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "⚠️ DUKPT Initial Key solo para pruebas. Usar DUKPT BDK en producción",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }

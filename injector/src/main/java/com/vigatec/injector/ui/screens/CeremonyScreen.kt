@@ -84,23 +84,6 @@ fun CeremonyScreen(viewModel: CeremonyViewModel = hiltViewModel()) {
                     2 -> CustodianStep(viewModel)
                     3 -> FinalizationStep(viewModel)
                 }
-
-                Text(
-                    text = "Log de Operaciones:",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
-                )
-                Text(
-                    text = state.log,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
             }
         }
     }

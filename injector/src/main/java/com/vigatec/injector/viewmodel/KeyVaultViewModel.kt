@@ -123,4 +123,91 @@ class KeyVaultViewModel @Inject constructor(
             }
         }
     }
+
+    /**
+     * Genera 5 llaves de prueba automáticamente para desarrollo.
+     * Solo disponible para usuarios administradores.
+     */
+    fun generateTestKeys() {
+        viewModelScope.launch {
+            try {
+                android.util.Log.i("KeyVaultViewModel", "=== GENERANDO LLAVES DE PRUEBA ===")
+
+                // Llave 1: AES-256 para KEK
+                injectedKeyRepository.recordKeyInjectionWithData(
+                    keySlot = -1, // Sin slot específico (es llave de ceremonia)
+                    keyType = "CEREMONY_KEY",
+                    keyAlgorithm = "AES_256",
+                    kcv = "A1B2C3",
+                    keyData = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF", // 32 bytes (AES-256)
+                    status = "ACTIVE",
+                    isKEK = false,
+                    customName = "KEK Test AES-256"
+                )
+                android.util.Log.d("KeyVaultViewModel", "✓ Llave 1 generada: AES-256 KEK")
+
+                // Llave 2: 3DES PIN Encryption
+                injectedKeyRepository.recordKeyInjectionWithData(
+                    keySlot = -1,
+                    keyType = "CEREMONY_KEY",
+                    keyAlgorithm = "DES_TRIPLE",
+                    kcv = "D4E5F6",
+                    keyData = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF", // 24 bytes (3DES)
+                    status = "ACTIVE",
+                    isKEK = false,
+                    customName = "PIN Key 3DES"
+                )
+                android.util.Log.d("KeyVaultViewModel", "✓ Llave 2 generada: 3DES PIN")
+
+                // Llave 3: AES-128 MAC
+                injectedKeyRepository.recordKeyInjectionWithData(
+                    keySlot = -1,
+                    keyType = "CEREMONY_KEY",
+                    keyAlgorithm = "AES_128",
+                    kcv = "789ABC",
+                    keyData = "FEDCBA9876543210FEDCBA9876543210", // 16 bytes (AES-128)
+                    status = "ACTIVE",
+                    isKEK = false,
+                    customName = "MAC Key AES-128"
+                )
+                android.util.Log.d("KeyVaultViewModel", "✓ Llave 3 generada: AES-128 MAC")
+
+                // Llave 4: AES-192 Data Encryption
+                injectedKeyRepository.recordKeyInjectionWithData(
+                    keySlot = -1,
+                    keyType = "CEREMONY_KEY",
+                    keyAlgorithm = "AES_192",
+                    kcv = "DEF012",
+                    keyData = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF", // 24 bytes (AES-192)
+                    status = "ACTIVE",
+                    isKEK = false,
+                    customName = "Data Encryption AES-192"
+                )
+                android.util.Log.d("KeyVaultViewModel", "✓ Llave 4 generada: AES-192 Data")
+
+                // Llave 5: 3DES DUKPT BDK
+                injectedKeyRepository.recordKeyInjectionWithData(
+                    keySlot = -1,
+                    keyType = "CEREMONY_KEY",
+                    keyAlgorithm = "DES_TRIPLE",
+                    kcv = "345678",
+                    keyData = "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789", // 24 bytes (3DES)
+                    status = "ACTIVE",
+                    isKEK = false,
+                    customName = "DUKPT BDK 3DES"
+                )
+                android.util.Log.d("KeyVaultViewModel", "✓ Llave 5 generada: 3DES DUKPT BDK")
+
+                android.util.Log.i("KeyVaultViewModel", "✅ 5 llaves de prueba generadas exitosamente")
+                android.util.Log.i("KeyVaultViewModel", "================================================")
+
+                // Recargar las llaves para mostrar las nuevas
+                loadKeys()
+
+            } catch (e: Exception) {
+                android.util.Log.e("KeyVaultViewModel", "❌ Error al generar llaves de prueba", e)
+                e.printStackTrace()
+            }
+        }
+    }
 } 

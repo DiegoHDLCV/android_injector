@@ -66,9 +66,6 @@ fun DashboardScreen(
                 DashboardStats(stats = dashboardState.stats)
             }
         }
-        //item(key = "quick_actions") { QuickActionsCard(navController) }
-        //item(key = "system_health") { SystemHealthCard(dashboardState) }
-        item(key = "comm_logs") { CommLogsCard(dashboardState.commLogs) }
     }
 }
 
