@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,10 +38,21 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vigatec.injector.ui.navigation.MainScreen
 import com.vigatec.injector.ui.navigation.MainNavGraph
+import com.vigatec.injector.util.PermissionProvider
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.android.components.ActivityComponent
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+@EntryPoint
+@InstallIn(ActivityComponent::class)
+interface MainScaffoldPermissionProviderEntryPoint {
+    fun permissionProvider(): PermissionProvider
+}
 
 data class BottomBarDestination(
     val route: String,
@@ -60,9 +73,18 @@ fun MainScaffold(
     onNavigateToConfig: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val permissionProvider = remember {
+        EntryPointAccessors.fromActivity(
+            context as android.app.Activity,
+            MainScaffoldPermissionProviderEntryPoint::class.java
+        ).permissionProvider()
+    }
+    val userPermissions by permissionProvider.userPermissions.collectAsState()
+    
     Scaffold(
         topBar = { MainTopAppBar(onNavigateToConfig = onNavigateToConfig) },
-        bottomBar = { AppBottomBar(navController = navController) }
+        bottomBar = { AppBottomBar(navController = navController, userPermissions = userPermissions) }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             MainNavGraph(navController = navController, username = username)
@@ -135,12 +157,27 @@ private fun exportLogs(context: Context) {
 
 
 @Composable
-fun AppBottomBar(navController: NavHostController) {
+fun AppBottomBar(navController: NavHostController, userPermissions: Set<String>) {
     NavigationBar {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
 
-        bottomBarDestinations.forEach { screen ->
+        // Filtrar destinos según permisos
+        val filteredDestinations = bottomBarDestinations.filter { destination ->
+            when (destination.route) {
+                MainScreen.Dashboard.route -> true // Dashboard siempre visible
+                MainScreen.KeyVault.route -> userPermissions.contains(PermissionProvider.KEY_VAULT)
+                MainScreen.Ceremony.route -> {
+                    // Ceremony visible si tiene permiso para KEK o Operacional
+                    userPermissions.contains(PermissionProvider.CEREMONY_KEK) ||
+                    userPermissions.contains(PermissionProvider.CEREMONY_OPERATIONAL)
+                }
+                MainScreen.Profiles.route -> userPermissions.contains(PermissionProvider.MANAGE_PROFILES)
+                else -> false
+            }
+        }
+
+        filteredDestinations.forEach { screen ->
             AddItem(
                 screen = screen,
                 currentDestination = currentDestination,

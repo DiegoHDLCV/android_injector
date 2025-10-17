@@ -79,9 +79,10 @@ fun UserManagementScreen(
     // Diálogo para crear usuario
     if (showCreateUserDialog) {
         CreateUserDialog(
+            allPermissions = uiState.allPermissions,
             onDismiss = { showCreateUserDialog = false },
-            onConfirm = { username, password, fullName, role ->
-                viewModel.createUser(username, password, fullName, role)
+            onConfirm = { username, password, fullName, role, selectedPermissions ->
+                viewModel.createUser(username, password, fullName, role, selectedPermissions)
                 showCreateUserDialog = false
             }
         )
@@ -91,9 +92,11 @@ fun UserManagementScreen(
     userToEdit?.let { user ->
         EditUserDialog(
             user = user,
+            allPermissions = uiState.allPermissions,
+            viewModel = viewModel,
             onDismiss = { userToEdit = null },
-            onConfirm = { updatedUser ->
-                viewModel.updateUser(updatedUser)
+            onConfirm = { updatedUser, selectedPermissions ->
+                viewModel.updateUserWithPermissions(updatedUser, selectedPermissions)
                 userToEdit = null
             },
             onChangePassword = { newPassword ->
@@ -233,14 +236,16 @@ fun UserListItem(
 
 @Composable
 fun CreateUserDialog(
+    allPermissions: List<com.vigatec.injector.data.local.entity.Permission>,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, String, String) -> Unit
+    onConfirm: (String, String, String, String, List<String>) -> Unit
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("USER") }
     var passwordVisible by remember { mutableStateOf(false) }
+    var selectedPermissions by remember { mutableStateOf(setOf<String>()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -308,11 +313,78 @@ fun CreateUserDialog(
                         }
                     }
                 }
+                
+                // Sección de permisos
+                if (role == "ADMIN") {
+                    // Para ADMIN, mostrar mensaje informativo
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Text(
+                            text = "Los administradores tienen todos los permisos automáticamente",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                } else {
+                    // Para USER, mostrar checkboxes de permisos
+                    Column {
+                        Text(
+                            "Permisos:",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                        ) {
+                            LazyColumn(
+                                modifier = Modifier.padding(8.dp)
+                            ) {
+                                items(allPermissions) { permission ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Checkbox(
+                                            checked = selectedPermissions.contains(permission.id),
+                                            onCheckedChange = { checked ->
+                                                selectedPermissions = if (checked) {
+                                                    selectedPermissions + permission.id
+                                                } else {
+                                                    selectedPermissions - permission.id
+                                                }
+                                            }
+                                        )
+                                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                                            Text(
+                                                text = permission.name,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                            Text(
+                                                text = permission.description,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(username, password, fullName, role) },
+                onClick = { onConfirm(username, password, fullName, role, selectedPermissions.toList()) },
                 enabled = username.isNotBlank() && password.isNotBlank()
             ) {
                 Text("Crear")
@@ -329,13 +401,24 @@ fun CreateUserDialog(
 @Composable
 fun EditUserDialog(
     user: User,
+    allPermissions: List<com.vigatec.injector.data.local.entity.Permission>,
+    viewModel: UserManagementViewModel,
     onDismiss: () -> Unit,
-    onConfirm: (User) -> Unit,
+    onConfirm: (User, List<String>) -> Unit,
     onChangePassword: (String) -> Unit
 ) {
     var fullName by remember { mutableStateOf(user.fullName) }
     var role by remember { mutableStateOf(user.role) }
     var showPasswordDialog by remember { mutableStateOf(false) }
+    var selectedPermissions by remember { mutableStateOf(setOf<String>()) }
+    var permissionsLoaded by remember { mutableStateOf(false) }
+    
+    // Cargar permisos del usuario al abrir el diálogo
+    LaunchedEffect(user.id) {
+        val userPerms = viewModel.getUserPermissions(user.id)
+        selectedPermissions = userPerms.map { it.id }.toSet()
+        permissionsLoaded = true
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -382,6 +465,75 @@ fun EditUserDialog(
                         }
                     }
                 }
+                
+                // Sección de permisos
+                if (permissionsLoaded) {
+                    if (role == "ADMIN") {
+                        // Para ADMIN, mostrar mensaje informativo
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        ) {
+                            Text(
+                                text = "Los administradores tienen todos los permisos automáticamente",
+                                modifier = Modifier.padding(12.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    } else {
+                        // Para USER, mostrar checkboxes de permisos
+                        Column {
+                            Text(
+                                "Permisos:",
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(200.dp)
+                            ) {
+                                LazyColumn(
+                                    modifier = Modifier.padding(8.dp)
+                                ) {
+                                    items(allPermissions) { permission ->
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Checkbox(
+                                                checked = selectedPermissions.contains(permission.id),
+                                                onCheckedChange = { checked ->
+                                                    selectedPermissions = if (checked) {
+                                                        selectedPermissions + permission.id
+                                                    } else {
+                                                        selectedPermissions - permission.id
+                                                    }
+                                                }
+                                            )
+                                            Column(modifier = Modifier.padding(start = 8.dp)) {
+                                                Text(
+                                                    text = permission.name,
+                                                    style = MaterialTheme.typography.bodyMedium
+                                                )
+                                                Text(
+                                                    text = permission.description,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Button(
                     onClick = { showPasswordDialog = true },
@@ -396,7 +548,7 @@ fun EditUserDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    onConfirm(user.copy(fullName = fullName, role = role))
+                    onConfirm(user.copy(fullName = fullName, role = role), selectedPermissions.toList())
                 }
             ) {
                 Text("Guardar")

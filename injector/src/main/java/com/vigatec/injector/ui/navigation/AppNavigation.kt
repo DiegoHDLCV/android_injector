@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.vigatec.injector.ui.screens.LoginScreen
 import com.vigatec.injector.ui.screens.SplashScreen
+import com.vigatec.injector.util.PermissionProvider
 import com.vigatec.injector.viewmodel.SplashViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.injector.ui.events.UiEvent
@@ -20,6 +21,18 @@ import com.vigatec.injector.ui.screens.LogsScreen
 import com.vigatec.injector.ui.screens.UserManagementScreen
 import com.vigatec.injector.ui.screens.TmsConfigScreen
 import com.vigatec.injector.viewmodel.LoginViewModel
+import javax.inject.Inject
+import androidx.compose.ui.platform.LocalContext
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.android.components.ActivityComponent
+
+@EntryPoint
+@InstallIn(ActivityComponent::class)
+interface PermissionProviderEntryPoint {
+    fun permissionProvider(): PermissionProvider
+}
 
 @Composable
 fun AppNavigation() {
@@ -74,8 +87,17 @@ fun AppNavigation() {
         }
 
         composable(Screen.Config.route) {
+            val context = LocalContext.current
+            val permissionProvider = remember {
+                EntryPointAccessors.fromActivity(
+                    context as android.app.Activity,
+                    PermissionProviderEntryPoint::class.java
+                ).permissionProvider()
+            }
+            
             ConfigScreen(
                 currentUsername = currentUsername,
+                permissionProvider = permissionProvider,
                 onNavigateToLogs = {
                     navController.navigate(Screen.Logs.route)
                 },

@@ -1,7 +1,9 @@
 package com.vigatec.injector.repository
 
 import android.util.Log
+import com.vigatec.injector.data.local.dao.PermissionDao
 import com.vigatec.injector.data.local.dao.UserDao
+import com.vigatec.injector.data.local.entity.Permission
 import com.vigatec.injector.data.local.entity.User
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -9,7 +11,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class UserRepository @Inject constructor(private val userDao: UserDao) {
+class UserRepository @Inject constructor(
+    private val userDao: UserDao,
+    private val permissionDao: PermissionDao
+) {
 
     companion object {
         private const val TAG = "UserRepository"
@@ -194,6 +199,38 @@ class UserRepository @Inject constructor(private val userDao: UserDao) {
         } catch (e: Exception) {
             Log.e(TAG, "✗ Error al listar usuarios", e)
             Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════════
+    // MÉTODOS DE PERMISOS
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    fun getAllPermissions(): Flow<List<Permission>> {
+        return permissionDao.getAllPermissions()
+    }
+    
+    fun getUserPermissions(userId: Int): Flow<List<Permission>> {
+        return permissionDao.getUserPermissions(userId)
+    }
+    
+    suspend fun getUserPermissionsSync(userId: Int): List<Permission> {
+        return permissionDao.getUserPermissionsSync(userId)
+    }
+    
+    suspend fun updateUserPermissions(userId: Int, permissionIds: List<String>) {
+        Log.d(TAG, "─────────────────────────────────────────────────────────────")
+        Log.d(TAG, "Actualizando permisos para usuario ID: $userId")
+        Log.d(TAG, "Permisos a asignar: ${permissionIds.joinToString(", ")}")
+        
+        try {
+            permissionDao.updateUserPermissions(userId, permissionIds)
+            Log.i(TAG, "✓ Permisos actualizados exitosamente")
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ Error al actualizar permisos", e)
+            throw e
+        } finally {
+            Log.d(TAG, "─────────────────────────────────────────────────────────────")
         }
     }
 } 

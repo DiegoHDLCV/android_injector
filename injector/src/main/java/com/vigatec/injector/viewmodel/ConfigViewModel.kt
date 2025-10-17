@@ -4,7 +4,9 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vigatec.injector.data.local.entity.User
+import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.injector.repository.UserRepository
+import com.vigatec.injector.util.PermissionProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +22,9 @@ data class ConfigUiState(
 
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val sessionManager: SessionManager,
+    private val permissionProvider: PermissionProvider
 ) : ViewModel() {
 
     companion object {
@@ -52,15 +56,22 @@ class ConfigViewModel @Inject constructor(
     
     /**
      * Cierra la sesión del usuario actual.
-     * NOTA: Ya NO desactivamos usuarios aquí. El campo isActive es SOLO para control de acceso.
      */
     fun logout() {
-        Log.d(TAG, "═══════════════════════════════════════════════════════════")
-        Log.d(TAG, "Cerrando sesión del usuario actual")
-        Log.d(TAG, "NOTA: isActive ya NO se modifica en logout.")
-        Log.d(TAG, "      Ese campo es SOLO para que admins habiliten/deshabiliten acceso")
-        Log.d(TAG, "═══════════════════════════════════════════════════════════")
-        // Ya NO llamamos a deactivateAllUsers() porque isActive es para control de acceso
-        // El usuario simplemente vuelve al login
+        viewModelScope.launch {
+            Log.d(TAG, "═══════════════════════════════════════════════════════════")
+            Log.d(TAG, "Cerrando sesión del usuario actual")
+
+            // Limpiar la sesión en SessionManager
+            sessionManager.clearSession()
+            Log.d(TAG, "✓ Sesión limpiada en SessionManager")
+
+            // Limpiar permisos del usuario
+            permissionProvider.clear()
+            Log.d(TAG, "✓ Permisos limpiados")
+
+            Log.d(TAG, "✓ Logout completado exitosamente")
+            Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        }
     }
 }

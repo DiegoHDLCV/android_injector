@@ -3,6 +3,7 @@ package com.vigatec.injector.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vigatec.injector.data.local.entity.Permission
 import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,6 +15,7 @@ import javax.inject.Inject
 
 data class UserManagementUiState(
     val users: List<User> = emptyList(),
+    val allPermissions: List<Permission> = emptyList(),
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val successMessage: String? = null
@@ -36,6 +38,20 @@ class UserManagementViewModel @Inject constructor(
         Log.d(TAG, "UserManagementViewModel inicializado")
         Log.d(TAG, "═══════════════════════════════════════════════════════════")
         loadUsers()
+        loadPermissions()
+    }
+    
+    private fun loadPermissions() {
+        viewModelScope.launch {
+            try {
+                userRepository.getAllPermissions().collect { permissions ->
+                    Log.d(TAG, "✓ ${permissions.size} permisos cargados")
+                    _uiState.value = _uiState.value.copy(allPermissions = permissions)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "✗ Error al cargar permisos", e)
+            }
+        }
     }
 
     private fun loadUsers() {
@@ -88,7 +104,8 @@ class UserManagementViewModel @Inject constructor(
         username: String,
         password: String,
         fullName: String,
-        role: String
+        role: String,
+        selectedPermissions: List<String> = emptyList()
     ) {
         viewModelScope.launch {
             try {
@@ -125,8 +142,20 @@ class UserManagementViewModel @Inject constructor(
                     isActive = true
                 )
 
-                val result = userRepository.insertUser(newUser)
-                if (result > 0) {
+                val userId = userRepository.insertUser(newUser)
+                if (userId > 0) {
+                    // Asignar permisos
+                    if (role == "ADMIN") {
+                        // ADMIN obtiene TODOS los permisos automáticamente
+                        val allPermissionIds = _uiState.value.allPermissions.map { it.id }
+                        userRepository.updateUserPermissions(userId.toInt(), allPermissionIds)
+                        Log.d(TAG, "✓ Usuario ADMIN creado con TODOS los permisos")
+                    } else {
+                        // USER obtiene solo los permisos seleccionados
+                        userRepository.updateUserPermissions(userId.toInt(), selectedPermissions)
+                        Log.d(TAG, "✓ Usuario USER creado con ${selectedPermissions.size} permisos")
+                    }
+                    
                     _uiState.value = _uiState.value.copy(
                         successMessage = "Usuario creado exitosamente"
                     )
@@ -136,6 +165,7 @@ class UserManagementViewModel @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "Error al crear usuario", e)
                 _uiState.value = _uiState.value.copy(
                     errorMessage = "Error al crear usuario: ${e.message}"
                 )
@@ -155,6 +185,45 @@ class UserManagementViewModel @Inject constructor(
                     errorMessage = "Error al actualizar usuario: ${e.message}"
                 )
             }
+        }
+    }
+    
+    fun updateUserWithPermissions(user: User, selectedPermissions: List<String>) {
+        viewModelScope.launch {
+            try {
+                // Actualizar usuario
+                userRepository.updateUser(user)
+                
+                // Actualizar permisos
+                if (user.role == "ADMIN") {
+                    // ADMIN siempre tiene todos los permisos (no editables)
+                    val allPermissionIds = _uiState.value.allPermissions.map { it.id }
+                    userRepository.updateUserPermissions(user.id, allPermissionIds)
+                    Log.d(TAG, "✓ Usuario ADMIN actualizado con TODOS los permisos")
+                } else {
+                    // USER obtiene los permisos seleccionados
+                    userRepository.updateUserPermissions(user.id, selectedPermissions)
+                    Log.d(TAG, "✓ Usuario USER actualizado con ${selectedPermissions.size} permisos")
+                }
+                
+                _uiState.value = _uiState.value.copy(
+                    successMessage = "Usuario y permisos actualizados exitosamente"
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al actualizar usuario y permisos", e)
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Error al actualizar usuario: ${e.message}"
+                )
+            }
+        }
+    }
+    
+    suspend fun getUserPermissions(userId: Int): List<Permission> {
+        return try {
+            userRepository.getUserPermissionsSync(userId)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al obtener permisos del usuario", e)
+            emptyList()
         }
     }
 

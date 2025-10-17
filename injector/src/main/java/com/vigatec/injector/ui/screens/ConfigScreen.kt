@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.vigatec.injector.util.PermissionProvider
 import com.vigatec.injector.viewmodel.ConfigViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -18,6 +19,7 @@ import com.vigatec.injector.viewmodel.ConfigViewModel
 fun ConfigScreen(
     currentUsername: String,
     viewModel: ConfigViewModel = hiltViewModel(),
+    permissionProvider: PermissionProvider,
     onNavigateToLogs: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
     onNavigateToTmsConfig: () -> Unit = {},
@@ -25,6 +27,7 @@ fun ConfigScreen(
     onLogout: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val userPermissions by permissionProvider.userPermissions.collectAsState()
 
     LaunchedEffect(currentUsername) {
         viewModel.loadCurrentUser(currentUsername)
@@ -60,23 +63,27 @@ fun ConfigScreen(
             }
 
             // Sección de TMS
-            ConfigOptionCard(
-                title = "Terminal Management System (TMS)",
-                description = "Configurar conexión y parámetros del sistema de gestión de terminales",
-                icon = Icons.Default.Cloud,
-                onClick = onNavigateToTmsConfig
-            )
+            if (userPermissions.contains(PermissionProvider.TMS_CONFIG)) {
+                ConfigOptionCard(
+                    title = "Terminal Management System (TMS)",
+                    description = "Configurar conexión y parámetros del sistema de gestión de terminales",
+                    icon = Icons.Default.Cloud,
+                    onClick = onNavigateToTmsConfig
+                )
+            }
 
             // Sección de Logs
-            ConfigOptionCard(
-                title = "Logs de Inyección",
-                description = "Ver historial de operaciones de inyección",
-                icon = Icons.Default.History,
-                onClick = onNavigateToLogs
-            )
+            if (userPermissions.contains(PermissionProvider.VIEW_LOGS)) {
+                ConfigOptionCard(
+                    title = "Logs de Inyección",
+                    description = "Ver historial de operaciones de inyección",
+                    icon = Icons.Default.History,
+                    onClick = onNavigateToLogs
+                )
+            }
 
-            // Sección de Gestión de Usuarios (solo admin)
-            if (uiState.isAdmin) {
+            // Sección de Gestión de Usuarios
+            if (userPermissions.contains(PermissionProvider.MANAGE_USERS)) {
                 ConfigOptionCard(
                     title = "Gestión de Usuarios",
                     description = "Crear, editar y administrar usuarios del sistema",

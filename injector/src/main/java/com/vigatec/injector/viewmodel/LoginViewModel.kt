@@ -8,7 +8,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.data.local.preferences.UserPreferencesManager
+import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.injector.repository.UserRepository
+import com.vigatec.injector.util.PermissionProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -17,7 +19,9 @@ import javax.inject.Inject
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val userRepository: UserRepository,
-    private val userPreferencesManager: UserPreferencesManager
+    private val userPreferencesManager: UserPreferencesManager,
+    private val sessionManager: SessionManager,
+    private val permissionProvider: PermissionProvider
 ) : ViewModel() {
 
     companion object {
@@ -110,13 +114,23 @@ class LoginViewModel @Inject constructor(
                 Log.d(TAG, "  - FullName: ${user.fullName}")
                 Log.d(TAG, "  - IsActive: ${user.isActive}")
                 Log.d(TAG, "  - CreatedAt: ${user.createdAt}")
-                
-                // NOTA: Ya NO usamos setActiveUser() para sesión única
-                // El campo isActive ahora sirve SOLO para habilitar/deshabilitar acceso
-                Log.d(TAG, "✓ Campo isActive usado SOLO para control de acceso (habilitado/deshabilitado)")
-                
+
+                // CRÍTICO: Guardar la sesión del usuario usando SessionManager
+                Log.d(TAG, "Guardando sesión en SessionManager...")
+                sessionManager.saveSession(
+                    userId = user.id,
+                    username = user.username,
+                    role = user.role
+                )
+                Log.d(TAG, "✓ Sesión guardada exitosamente")
+
                 loggedInUser = user
                 loginSuccess = true
+
+                // Cargar permisos del usuario
+                Log.d(TAG, "Cargando permisos del usuario...")
+                permissionProvider.loadPermissions(username)
+                Log.d(TAG, "✓ Permisos cargados")
 
                 // Guardar preferencias si se marcó "recordar usuario"
                 if (rememberUser) {
@@ -129,7 +143,7 @@ class LoginViewModel @Inject constructor(
                     userPreferencesManager.clearUserPreferences()
                     Log.d(TAG, "✓ Preferencias limpiadas")
                 }
-                
+
                 Log.i(TAG, "✓✓✓ LOGIN EXITOSO ✓✓✓")
             } else {
                 Log.e(TAG, "✗ Autenticación FALLIDA")

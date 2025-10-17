@@ -7,7 +7,7 @@ import com.example.persistence.entities.InjectedKeyEntity
 import com.example.persistence.repository.InjectedKeyRepository
 import com.example.persistence.repository.ProfileRepository
 import com.vigatec.injector.data.local.entity.User
-import com.vigatec.injector.repository.UserRepository
+import com.vigatec.injector.data.local.preferences.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,7 +36,7 @@ data class KeyVaultState(
 class KeyVaultViewModel @Inject constructor(
     private val injectedKeyRepository: InjectedKeyRepository,
     private val profileRepository: ProfileRepository,
-    private val userRepository: UserRepository
+    private val sessionManager: SessionManager
 ) : ViewModel() {
     
     companion object {
@@ -56,40 +56,36 @@ class KeyVaultViewModel @Inject constructor(
 
     /**
      * Carga el usuario actual para determinar permisos
-     * Nota: Esta es una implementación simplificada.
-     * En producción, deberías gestionar la sesión de usuario de forma más robusta.
      */
     private suspend fun loadCurrentUser() {
         try {
-            // Por ahora, asumimos que hay un usuario logueado
-            // En una implementación real, deberías obtener esto de una sesión global
-            val users = userRepository.getAllUsers().first()
-            Log.d(TAG, "KeyVault - Total usuarios obtenidos: ${users.size}")
-            users.forEachIndexed { index, user ->
-                Log.d(TAG, "KeyVault - Usuario[$index]: username=${user.username}, role=${user.role}, isActive=${user.isActive}")
+            Log.d(TAG, "KeyVault - Cargando usuario de sesión...")
+
+            // CORRECCIÓN: Usar SessionManager en lugar de buscar usuarios activos
+            val session = sessionManager.getCurrentSession()
+
+            if (session != null) {
+                val (userId, username, role) = session
+                val isAdmin = role == "ADMIN"
+
+                Log.d(TAG, "KeyVault - Usuario de sesión: username=$username, role=$role")
+                Log.d(TAG, "KeyVault - isAdmin determinado: $isAdmin")
+
+                _uiState.value = _uiState.value.copy(
+                    currentUser = null, // Ya no necesitamos el objeto User completo aquí
+                    isAdmin = isAdmin
+                )
+
+                Log.d(TAG, "KeyVault - Estado actualizado: isAdmin=${_uiState.value.isAdmin}")
+            } else {
+                Log.w(TAG, "KeyVault - ⚠️ No hay sesión activa")
+                _uiState.value = _uiState.value.copy(
+                    currentUser = null,
+                    isAdmin = false
+                )
             }
-            
-            // IMPORTANTE: Solo debería haber un usuario activo a la vez
-            // Si hay múltiples, tomar el último (más reciente)
-            val activeUsers = users.filter { it.isActive }
-            if (activeUsers.size > 1) {
-                Log.w(TAG, "KeyVault - ⚠️ ADVERTENCIA: Hay ${activeUsers.size} usuarios activos. Solo debería haber uno.")
-            }
-            
-            val currentUser = activeUsers.lastOrNull() // Último usuario activo (más reciente)
-            val isAdmin = currentUser?.role == "ADMIN"
-            
-            Log.d(TAG, "KeyVault - Usuario actual: username=${currentUser?.username}, role=${currentUser?.role}")
-            Log.d(TAG, "KeyVault - isAdmin determinado: $isAdmin")
-            
-            _uiState.value = _uiState.value.copy(
-                currentUser = currentUser,
-                isAdmin = isAdmin
-            )
-            
-            Log.d(TAG, "KeyVault - Estado actualizado: isAdmin=${_uiState.value.isAdmin}")
         } catch (e: Exception) {
-            // Si no hay usuarios, mantener valores por defecto
+            // Si hay error, mantener valores por defecto
             Log.e(TAG, "KeyVault - Error cargando usuario actual", e)
             e.printStackTrace()
         }

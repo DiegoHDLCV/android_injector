@@ -7,6 +7,7 @@ import com.example.persistence.entities.KEKType
 import com.vigatec.utils.security.StorageKeyManager
 import com.vigatec.utils.KcvCalculator
 import com.vigatec.utils.KeyStoreManager
+import com.vigatec.injector.data.local.preferences.SessionManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -46,7 +47,7 @@ data class CeremonyState(
 @HiltViewModel
 class CeremonyViewModel @Inject constructor(
     private val injectedKeyRepository: InjectedKeyRepository,
-    private val userRepository: com.vigatec.injector.repository.UserRepository
+    private val sessionManager: SessionManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CeremonyState(component = "E59D620E1A6D311F19342054AB01ABF7"))
@@ -68,31 +69,27 @@ class CeremonyViewModel @Inject constructor(
     private fun loadCurrentUser() {
         viewModelScope.launch {
             try {
-                // Obtener usuario activo
-                val users = userRepository.getAllUsers().first()
-                android.util.Log.d("CeremonyViewModel", "Ceremony - Total usuarios obtenidos: ${users.size}")
-                users.forEachIndexed { index, user ->
-                    android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario[$index]: username=${user.username}, role=${user.role}, isActive=${user.isActive}")
+                android.util.Log.d("CeremonyViewModel", "Ceremony - Cargando usuario de sesión...")
+
+                // CORRECCIÓN: Usar SessionManager en lugar de buscar usuarios activos
+                val session = sessionManager.getCurrentSession()
+
+                if (session != null) {
+                    val (userId, username, role) = session
+                    val isAdmin = role == "ADMIN"
+
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario de sesión: username=$username, role=$role")
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - isAdmin determinado: $isAdmin")
+
+                    _uiState.value = _uiState.value.copy(
+                        isAdmin = isAdmin
+                    )
+
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - Estado actualizado: isAdmin=${_uiState.value.isAdmin}")
+                } else {
+                    android.util.Log.w("CeremonyViewModel", "Ceremony - ⚠️ No hay sesión activa")
+                    _uiState.value = _uiState.value.copy(isAdmin = false)
                 }
-                
-                // IMPORTANTE: Solo debería haber un usuario activo a la vez
-                // Si hay múltiples, tomar el último (más reciente)
-                val activeUsers = users.filter { it.isActive }
-                if (activeUsers.size > 1) {
-                    android.util.Log.w("CeremonyViewModel", "Ceremony - ⚠️ ADVERTENCIA: Hay ${activeUsers.size} usuarios activos. Solo debería haber uno.")
-                }
-                
-                val currentUser = activeUsers.lastOrNull() // Último usuario activo (más reciente)
-                val isAdmin = currentUser?.role == "ADMIN"
-                
-                android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario actual: username=${currentUser?.username}, role=${currentUser?.role}")
-                android.util.Log.d("CeremonyViewModel", "Ceremony - isAdmin determinado: $isAdmin")
-                
-                _uiState.value = _uiState.value.copy(
-                    isAdmin = isAdmin
-                )
-                
-                android.util.Log.d("CeremonyViewModel", "Ceremony - Estado actualizado: isAdmin=${_uiState.value.isAdmin}")
             } catch (e: Exception) {
                 // Si hay error, asumir no admin
                 android.util.Log.e("CeremonyViewModel", "Ceremony - Error cargando usuario actual", e)
