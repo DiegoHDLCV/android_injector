@@ -1,5 +1,6 @@
 package com.vigatec.injector.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vigatec.injector.data.local.entity.User
@@ -21,6 +22,10 @@ data class ConfigUiState(
 class ConfigViewModel @Inject constructor(
     private val userRepository: UserRepository
 ) : ViewModel() {
+
+    companion object {
+        private const val TAG = "ConfigViewModel"
+    }
 
     private val _uiState = MutableStateFlow(ConfigUiState())
     val uiState: StateFlow<ConfigUiState> = _uiState.asStateFlow()
@@ -47,15 +52,15 @@ class ConfigViewModel @Inject constructor(
     
     /**
      * Cierra la sesión del usuario actual.
+     * NOTA: Ya NO desactivamos usuarios aquí. El campo isActive es SOLO para control de acceso.
      */
     fun logout() {
-        viewModelScope.launch {
-            try {
-                // Desactivar todos los usuarios (cerrar sesión)
-                userRepository.deactivateAllUsers()
-            } catch (e: Exception) {
-                // Silenciosamente fallar - el usuario aún navegará al login
-            }
-        }
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        Log.d(TAG, "Cerrando sesión del usuario actual")
+        Log.d(TAG, "NOTA: isActive ya NO se modifica en logout.")
+        Log.d(TAG, "      Ese campo es SOLO para que admins habiliten/deshabiliten acceso")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        // Ya NO llamamos a deactivateAllUsers() porque isActive es para control de acceso
+        // El usuario simplemente vuelve al login
     }
 }

@@ -1,5 +1,6 @@
 package com.vigatec.injector.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vigatec.injector.data.local.entity.User
@@ -23,24 +24,58 @@ class UserManagementViewModel @Inject constructor(
     private val userRepository: UserRepository
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "UserManagementVM"
+    }
+
     private val _uiState = MutableStateFlow(UserManagementUiState())
     val uiState: StateFlow<UserManagementUiState> = _uiState.asStateFlow()
 
     init {
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        Log.d(TAG, "UserManagementViewModel inicializado")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
         loadUsers()
     }
 
     private fun loadUsers() {
         viewModelScope.launch {
+            Log.d(TAG, "─────────────────────────────────────────────────────────────")
+            Log.d(TAG, "Cargando lista de usuarios desde BD...")
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
                 userRepository.getAllUsers().collect { users ->
+                    Log.d(TAG, "✓ Usuarios cargados: ${users.size}")
+                    Log.d(TAG, "")
+                    Log.d(TAG, "═══ DETALLE DE USUARIOS EN GESTIÓN ═══")
+                    users.forEachIndexed { index, user ->
+                        Log.d(TAG, "Usuario #${index + 1}:")
+                        Log.d(TAG, "  - ID: ${user.id}")
+                        Log.d(TAG, "  - Username: '${user.username}'")
+                        Log.d(TAG, "  - FullName: '${user.fullName}'")
+                        Log.d(TAG, "  - Role: ${user.role}")
+                        Log.d(TAG, "  - IsActive: ${user.isActive} ${if (user.isActive) "✓ ACTIVO" else "✗ INACTIVO"}")
+                        Log.d(TAG, "")
+                    }
+                    Log.d(TAG, "═════════════════════════════════════════════════")
+                    Log.d(TAG, "")
+                    Log.w(TAG, "═══ CONTROL DE ACCESO CON isActive ═══")
+                    Log.w(TAG, "")
+                    Log.w(TAG, "El campo 'isActive' controla si un usuario puede acceder:")
+                    Log.w(TAG, "  • isActive = true  → Usuario HABILITADO (puede hacer login)")
+                    Log.w(TAG, "  • isActive = false → Usuario DESHABILITADO (login bloqueado)")
+                    Log.w(TAG, "")
+                    Log.w(TAG, "Usa el switch en esta pantalla para habilitar/deshabilitar usuarios.")
+                    Log.w(TAG, "Los usuarios deshabilitados NO podrán iniciar sesión.")
+                    Log.d(TAG, "─────────────────────────────────────────────────────────────")
+                    
                     _uiState.value = _uiState.value.copy(
                         users = users,
                         isLoading = false
                     )
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "✗ Error al cargar usuarios", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     errorMessage = "Error al cargar usuarios: ${e.message}"

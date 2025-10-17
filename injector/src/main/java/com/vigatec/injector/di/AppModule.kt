@@ -1,6 +1,7 @@
 package com.vigatec.injector.di
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -23,12 +24,18 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
+    private const val TAG = "AppModule"
+
     @Provides
     @Singleton
     fun provideAppDatabase(
         @ApplicationContext context: Context,
         userDaoProvider: Provider<com.vigatec.injector.data.local.dao.UserDao>
     ): AppDatabase {
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        Log.d(TAG, "Creando instancia de AppDatabase")
+        Log.d(TAG, "═══════════════════════════════════════════════════════════")
+        
         return Room.databaseBuilder(
             context,
             AppDatabase::class.java,
@@ -38,27 +45,66 @@ object AppModule {
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)
+                Log.i(TAG, "═══════════════════════════════════════════════════════════")
+                Log.i(TAG, "⚠ BASE DE DATOS CREADA POR PRIMERA VEZ ⚠")
+                Log.i(TAG, "Insertando usuarios predeterminados...")
+                Log.i(TAG, "═══════════════════════════════════════════════════════════")
+                
                 CoroutineScope(Dispatchers.IO).launch {
-                    // Usuario admin predeterminado
-                    userDaoProvider.get().insertUser(
-                        User(
+                    try {
+                        // Usuario admin predeterminado
+                        val adminUser = User(
                             username = "admin",
                             pass = "admin",
                             role = "ADMIN",
-                            fullName = "Administrador"
+                            fullName = "Administrador",
+                            isActive = true  // IMPORTANTE: Usuario activo por defecto
                         )
-                    )
+                        Log.d(TAG, "Insertando usuario ADMIN:")
+                        Log.d(TAG, "  - Username: '${adminUser.username}'")
+                        Log.d(TAG, "  - Password: '${adminUser.pass}'")
+                        Log.d(TAG, "  - Role: ${adminUser.role}")
+                        Log.d(TAG, "  - FullName: ${adminUser.fullName}")
+                        
+                        val adminId = userDaoProvider.get().insertUser(adminUser)
+                        Log.i(TAG, "✓ Usuario ADMIN insertado con ID: $adminId")
 
-                    // Usuario dev para desarrollo y pruebas
-                    userDaoProvider.get().insertUser(
-                        User(
+                        // Usuario dev para desarrollo y pruebas
+                        val devUser = User(
                             username = "dev",
                             pass = "dev",
                             role = "ADMIN",
-                            fullName = "Desarrollador"
+                            fullName = "Desarrollador",
+                            isActive = true  // IMPORTANTE: Usuario activo por defecto
                         )
-                    )
+                        Log.d(TAG, "Insertando usuario DEV:")
+                        Log.d(TAG, "  - Username: '${devUser.username}'")
+                        Log.d(TAG, "  - Password: '${devUser.pass}'")
+                        Log.d(TAG, "  - Role: ${devUser.role}")
+                        Log.d(TAG, "  - FullName: ${devUser.fullName}")
+                        
+                        val devId = userDaoProvider.get().insertUser(devUser)
+                        Log.i(TAG, "✓ Usuario DEV insertado con ID: $devId")
+                        
+                        Log.i(TAG, "═══════════════════════════════════════════════════════════")
+                        Log.i(TAG, "✓✓✓ Usuarios predeterminados creados exitosamente")
+                        Log.i(TAG, "═══════════════════════════════════════════════════════════")
+                        
+                    } catch (e: Exception) {
+                        Log.e(TAG, "✗✗✗ ERROR al crear usuarios predeterminados", e)
+                        Log.e(TAG, "═══════════════════════════════════════════════════════════")
+                    }
                 }
+            }
+            
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                super.onOpen(db)
+                Log.d(TAG, "─────────────────────────────────────────────────────────────")
+                Log.d(TAG, "Base de datos ABIERTA (ya existía)")
+                Log.d(TAG, "")
+                Log.d(TAG, "NOTA: isActive controla el acceso (habilitado/deshabilitado)")
+                Log.d(TAG, "      Los admins pueden activar/desactivar usuarios desde Gestión")
+                Log.d(TAG, "─────────────────────────────────────────────────────────────")
             }
         }).build()
     }
