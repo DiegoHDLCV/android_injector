@@ -11,7 +11,11 @@ import com.vigatec.injector.ui.screens.ProfilesScreen
 import com.vigatec.injector.ui.screens.RawDataListenerScreen
 
 @Composable
-fun MainNavGraph(navController: NavHostController, username: String) {
+fun MainNavGraph(
+    navController: NavHostController,
+    username: String,
+    onNavigateToExportImport: () -> Unit = {}
+) {
     NavHost(
         navController = navController,
         startDestination = MainScreen.Dashboard.route,
@@ -21,7 +25,9 @@ fun MainNavGraph(navController: NavHostController, username: String) {
             DashboardScreen(username, navController)
         }
         composable(MainScreen.KeyVault.route) {
-            KeyVaultScreen()
+            KeyVaultScreen(
+                onNavigateToExportImport = onNavigateToExportImport
+            )
         }
         composable(MainScreen.Ceremony.route) {
             CeremonyScreen()

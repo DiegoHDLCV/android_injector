@@ -70,7 +70,8 @@ val bottomBarDestinations = listOf(
 @Composable
 fun MainScaffold(
     username: String,
-    onNavigateToConfig: () -> Unit = {}
+    onNavigateToConfig: () -> Unit = {},
+    onNavigateToExportImport: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -81,13 +82,17 @@ fun MainScaffold(
         ).permissionProvider()
     }
     val userPermissions by permissionProvider.userPermissions.collectAsState()
-    
+
     Scaffold(
         topBar = { MainTopAppBar(onNavigateToConfig = onNavigateToConfig) },
         bottomBar = { AppBottomBar(navController = navController, userPermissions = userPermissions) }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            MainNavGraph(navController = navController, username = username)
+            MainNavGraph(
+                navController = navController,
+                username = username,
+                onNavigateToExportImport = onNavigateToExportImport
+            )
         }
     }
 }

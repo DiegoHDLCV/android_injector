@@ -189,8 +189,8 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
                 }
             }
 
-            // Opción: KEK Storage (solo visible para admin)
-            if (state.isAdmin) {
+            // Opción: KEK Storage (solo visible si tiene permiso)
+            if (state.canCreateKEK) {
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Card(
@@ -292,6 +292,67 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
         Button(onClick = { viewModel.startCeremony() }, modifier = Modifier.fillMaxWidth()) {
             Text("Iniciar Ceremonia")
         }
+    }
+
+    // Diálogo de error de validación de KEK
+    if (state.kekValidationError != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.clearKekValidationError() },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(
+                    text = "No se puede iniciar la ceremonia",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = state.kekValidationError!!,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    if (!state.isAdmin && !state.hasKEKStorage) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "ℹ️ Información adicional",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Las llaves operacionales se cifran con la KEK Storage para mayor seguridad. " +
+                                           "Un administrador debe crear primero una KEK Storage antes de que puedas crear llaves operacionales.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.clearKekValidationError() }
+                ) {
+                    Text("Entendido")
+                }
+            }
+        )
     }
 }
 

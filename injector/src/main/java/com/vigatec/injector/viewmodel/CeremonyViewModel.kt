@@ -8,6 +8,7 @@ import com.vigatec.utils.security.StorageKeyManager
 import com.vigatec.utils.KcvCalculator
 import com.vigatec.utils.KeyStoreManager
 import com.vigatec.injector.data.local.preferences.SessionManager
+import com.vigatec.injector.util.PermissionProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,13 +42,17 @@ data class CeremonyState(
     val componentError: String? = null,       // Error de validación de componente
     val selectedKEKType: KEKType = KEKType.NONE,  // Tipo de KEK: NONE, KEK_STORAGE, KEK_TRANSPORT
     val hasKEKStorage: Boolean = false,       // Si existe KEK Storage (necesaria para llaves operacionales)
-    val isAdmin: Boolean = false              // Si el usuario actual es administrador
+    val isAdmin: Boolean = false,             // Si el usuario actual es administrador
+    val kekValidationError: String? = null,   // Error cuando no hay KEK y se intenta crear llave operacional
+    val canCreateKEK: Boolean = false,        // Si el usuario tiene permiso para crear KEK
+    val canCreateOperational: Boolean = false // Si el usuario tiene permiso para crear llaves operacionales
 )
 
 @HiltViewModel
 class CeremonyViewModel @Inject constructor(
     private val injectedKeyRepository: InjectedKeyRepository,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val permissionProvider: PermissionProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CeremonyState(component = "E59D620E1A6D311F19342054AB01ABF7"))
@@ -78,22 +83,38 @@ class CeremonyViewModel @Inject constructor(
                     val (userId, username, role) = session
                     val isAdmin = role == "ADMIN"
 
+                    // Cargar permisos del usuario
+                    val canCreateKEK = permissionProvider.hasPermission(PermissionProvider.CEREMONY_KEK)
+                    val canCreateOperational = permissionProvider.hasPermission(PermissionProvider.CEREMONY_OPERATIONAL)
+
                     android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario de sesión: username=$username, role=$role")
                     android.util.Log.d("CeremonyViewModel", "Ceremony - isAdmin determinado: $isAdmin")
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - Permiso CEREMONY_KEK: $canCreateKEK")
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - Permiso CEREMONY_OPERATIONAL: $canCreateOperational")
 
                     _uiState.value = _uiState.value.copy(
-                        isAdmin = isAdmin
+                        isAdmin = isAdmin,
+                        canCreateKEK = canCreateKEK,
+                        canCreateOperational = canCreateOperational
                     )
 
                     android.util.Log.d("CeremonyViewModel", "Ceremony - Estado actualizado: isAdmin=${_uiState.value.isAdmin}")
                 } else {
                     android.util.Log.w("CeremonyViewModel", "Ceremony - ⚠️ No hay sesión activa")
-                    _uiState.value = _uiState.value.copy(isAdmin = false)
+                    _uiState.value = _uiState.value.copy(
+                        isAdmin = false,
+                        canCreateKEK = false,
+                        canCreateOperational = false
+                    )
                 }
             } catch (e: Exception) {
                 // Si hay error, asumir no admin
                 android.util.Log.e("CeremonyViewModel", "Ceremony - Error cargando usuario actual", e)
-                _uiState.value = _uiState.value.copy(isAdmin = false)
+                _uiState.value = _uiState.value.copy(
+                    isAdmin = false,
+                    canCreateKEK = false,
+                    canCreateOperational = false
+                )
             }
         }
     }
@@ -142,10 +163,76 @@ class CeremonyViewModel @Inject constructor(
     }
 
     fun startCeremony() {
+        android.util.Log.d("CeremonyViewModel", "═══════════════════════════════════════════════════════════")
+        android.util.Log.d("CeremonyViewModel", "Iniciando ceremonia de llaves")
+        android.util.Log.d("CeremonyViewModel", "  - Tipo de llave: ${_uiState.value.selectedKEKType}")
+        android.util.Log.d("CeremonyViewModel", "  - ¿Tiene KEK Storage?: ${_uiState.value.hasKEKStorage}")
+        android.util.Log.d("CeremonyViewModel", "  - ¿Es Admin?: ${_uiState.value.isAdmin}")
+
+        // Verificar permisos específicos
+        val hasCeremonyKEKPermission = permissionProvider.hasPermission(PermissionProvider.CEREMONY_KEK)
+        val hasCeremonyOperationalPermission = permissionProvider.hasPermission(PermissionProvider.CEREMONY_OPERATIONAL)
+
+        android.util.Log.d("CeremonyViewModel", "  - Permiso CEREMONY_KEK: $hasCeremonyKEKPermission")
+        android.util.Log.d("CeremonyViewModel", "  - Permiso CEREMONY_OPERATIONAL: $hasCeremonyOperationalPermission")
+
+        // VALIDACIÓN 1: Verificar permiso para crear llaves KEK
+        if (_uiState.value.selectedKEKType != KEKType.NONE && !hasCeremonyKEKPermission) {
+            android.util.Log.w("CeremonyViewModel", "⚠️ Usuario sin permiso CEREMONY_KEK intenta crear KEK")
+
+            _uiState.value = _uiState.value.copy(
+                kekValidationError = "No tiene permisos para crear llaves KEK. " +
+                    "Por favor, contacte con un administrador para obtener el permiso 'Ceremonia KEK'."
+            )
+
+            android.util.Log.d("CeremonyViewModel", "═══════════════════════════════════════════════════════════")
+            return
+        }
+
+        // VALIDACIÓN 2: Verificar permiso para crear llaves operacionales
+        if (_uiState.value.selectedKEKType == KEKType.NONE && !hasCeremonyOperationalPermission) {
+            android.util.Log.w("CeremonyViewModel", "⚠️ Usuario sin permiso CEREMONY_OPERATIONAL intenta crear llave operacional")
+
+            _uiState.value = _uiState.value.copy(
+                kekValidationError = "No tiene permisos para crear llaves operacionales. " +
+                    "Por favor, contacte con un administrador para obtener el permiso 'Ceremonia Operacional'."
+            )
+
+            android.util.Log.d("CeremonyViewModel", "═══════════════════════════════════════════════════════════")
+            return
+        }
+
+        // VALIDACIÓN 3: Si se intenta crear una llave operacional (NONE) sin KEK Storage
+        if (_uiState.value.selectedKEKType == KEKType.NONE && !_uiState.value.hasKEKStorage) {
+            android.util.Log.w("CeremonyViewModel", "⚠️ No se puede crear llave operacional sin KEK Storage")
+
+            val errorMessage = if (hasCeremonyKEKPermission) {
+                "No se puede crear una llave operacional sin una KEK Storage. " +
+                "Por favor, cree primero una llave KEK Storage desde esta pantalla."
+            } else {
+                "No se puede crear una llave operacional porque no existe una KEK Storage. " +
+                "Por favor, contacte con un administrador o usuario con permisos para que cree primero una KEK Storage."
+            }
+
+            _uiState.value = _uiState.value.copy(
+                kekValidationError = errorMessage
+            )
+
+            android.util.Log.d("CeremonyViewModel", "═══════════════════════════════════════════════════════════")
+            return
+        }
+
+        // Limpiar errores previos
+        _uiState.value = _uiState.value.copy(kekValidationError = null)
+
+        android.util.Log.d("CeremonyViewModel", "✓ Validaciones pasadas, iniciando ceremonia")
+        android.util.Log.d("CeremonyViewModel", "═══════════════════════════════════════════════════════════")
+
         addToLog("=== INICIANDO CEREMONIA DE LLAVES ===")
         addToLog("Configuración inicial:")
         addToLog("  - Número de custodios: ${_uiState.value.numCustodians}")
         addToLog("  - Tipo de llave: ${_uiState.value.selectedKeyType.displayName}")
+        addToLog("  - Tipo de KEK: ${_uiState.value.selectedKEKType}")
         addToLog("  - Longitud esperada: ${_uiState.value.selectedKeyType.bytesRequired * 2} caracteres hex")
         addToLog("  - Componente inicial: ${_uiState.value.component}")
         addToLog("  - Estado del repositorio: Inicializado")
@@ -311,5 +398,8 @@ class CeremonyViewModel @Inject constructor(
         _uiState.value = CeremonyState() // Resetea al estado inicial
     }
 
+    fun clearKekValidationError() {
+        _uiState.value = _uiState.value.copy(kekValidationError = null)
+    }
 
 }

@@ -11,6 +11,7 @@ sealed class Screen(val route: String) {
     }
     object UserManagement : Screen("user_management")
     object TmsConfig : Screen("tms_config")
+    object ExportImport : Screen("export_import")
 }
 
 sealed class MainScreen(val route: String) {

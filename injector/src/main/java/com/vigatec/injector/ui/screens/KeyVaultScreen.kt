@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
@@ -29,7 +30,10 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
-fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
+fun KeyVaultScreen(
+    viewModel: KeyVaultViewModel = hiltViewModel(),
+    onNavigateToExportImport: () -> Unit = {}
+) {
     val state by viewModel.uiState.collectAsState()
 
     Scaffold(
@@ -38,6 +42,7 @@ fun KeyVaultScreen(viewModel: KeyVaultViewModel = hiltViewModel()) {
                 onRefresh = { viewModel.loadKeys() },
                 onClearAll = { viewModel.onShowClearAllConfirmation() },
                 onGenerateTestKeys = { viewModel.generateTestKeys() },
+                onNavigateToExportImport = onNavigateToExportImport,
                 loading = state.loading,
                 isAdmin = state.isAdmin
             )
@@ -124,6 +129,7 @@ fun KeyVaultTopBar(
     onRefresh: () -> Unit,
     onClearAll: () -> Unit,
     onGenerateTestKeys: () -> Unit,
+    onNavigateToExportImport: () -> Unit,
     loading: Boolean,
     isAdmin: Boolean
 ) {
@@ -133,8 +139,14 @@ fun KeyVaultTopBar(
             IconButton(onClick = onRefresh, enabled = !loading) {
                 Icon(Icons.Default.Refresh, contentDescription = "Refrescar")
             }
-            // Solo admins pueden generar llaves de prueba y limpiar el almacén
+            // Solo admins pueden acceder a exportar/importar
             if (isAdmin) {
+                IconButton(
+                    onClick = onNavigateToExportImport,
+                    enabled = !loading
+                ) {
+                    Icon(Icons.Default.ImportExport, contentDescription = "Exportar/Importar")
+                }
                 IconButton(
                     onClick = onGenerateTestKeys,
                     enabled = !loading

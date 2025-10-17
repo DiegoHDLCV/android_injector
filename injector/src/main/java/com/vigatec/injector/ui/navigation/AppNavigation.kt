@@ -20,6 +20,7 @@ import com.vigatec.injector.ui.screens.ConfigScreen
 import com.vigatec.injector.ui.screens.LogsScreen
 import com.vigatec.injector.ui.screens.UserManagementScreen
 import com.vigatec.injector.ui.screens.TmsConfigScreen
+import com.vigatec.injector.ui.screens.ExportImportScreen
 import com.vigatec.injector.viewmodel.LoginViewModel
 import javax.inject.Inject
 import androidx.compose.ui.platform.LocalContext
@@ -82,6 +83,9 @@ fun AppNavigation() {
                 username = currentUsername,
                 onNavigateToConfig = {
                     navController.navigate(Screen.Config.route)
+                },
+                onNavigateToExportImport = {
+                    navController.navigate(Screen.ExportImport.route)
                 }
             )
         }
@@ -142,6 +146,14 @@ fun AppNavigation() {
         composable(Screen.TmsConfig.route) {
             TmsConfigScreen(
                 onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.ExportImport.route) {
+            ExportImportScreen(
+                onNavigateBack = {
                     navController.popBackStack()
                 }
             )

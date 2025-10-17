@@ -29,6 +29,7 @@ class PermissionProvider @Inject constructor(
         const val MANAGE_USERS = "manage_users"
         const val TMS_CONFIG = "tms_config"
         const val RAW_DATA_LISTENER = "raw_data_listener"
+        const val EXPORT_IMPORT_KEYS = "export_import_keys"
     }
     
     private val _userPermissions = MutableStateFlow<Set<String>>(emptySet())
@@ -63,7 +64,8 @@ class PermissionProvider @Inject constructor(
                     VIEW_LOGS,
                     MANAGE_USERS,
                     TMS_CONFIG,
-                    RAW_DATA_LISTENER
+                    RAW_DATA_LISTENER,
+                    EXPORT_IMPORT_KEYS
                 )
             } else {
                 // Obtener permisos desde la BD
