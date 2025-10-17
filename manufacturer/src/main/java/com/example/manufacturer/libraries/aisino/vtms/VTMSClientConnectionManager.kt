@@ -7,8 +7,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.util.Log
-import com.vtms.client.ITmsApp
-import com.vtms.client.ITmsManager
+import com.vtms.client.VTmsManager
+import com.vtms.client.param.IParamManager
 import com.vtms.client.OnTransResultListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,14 +28,42 @@ object VTMSClientConnectionManager {
     private const val CONNECTING_PENDING_DURATION = 20 // 20 segundos timeout
 
     private var context: Application? = null
-    private var paramDownloadService: ITmsApp? = null
-    private var vtmsRemoteService: ITmsManager? = null
+    private var paramDownloadService: IParamManager? = null
+    private var vtmsRemoteService: VTmsManager? = null
     private var isConnectedFailed = false
     
     private val scope = CoroutineScope(Dispatchers.IO)
 
     private val isConnected: Boolean
         get() = paramDownloadService != null
+
+    /**
+     * Método auxiliar para inspeccionar los métodos disponibles en un objeto usando reflexión.
+     */
+    private fun inspectAvailableMethods(obj: Any) {
+        try {
+            val methods = obj.javaClass.methods
+                .filter { !it.name.startsWith("access$") } // Filtrar métodos de acceso sintéticos
+                .filter { !it.declaringClass.name.startsWith("java.lang") } // Filtrar métodos de Object
+                .filter { !it.declaringClass.name.startsWith("android.os.IInterface") } // Filtrar métodos de IInterface
+                .sortedBy { it.name }
+            
+            Log.d(TAG, "Total de métodos encontrados: ${methods.size}")
+            Log.d(TAG, "")
+            
+            methods.forEachIndexed { index, method ->
+                val params = method.parameterTypes.joinToString(", ") { it.simpleName }
+                val returnType = method.returnType.simpleName
+                Log.d(TAG, "${index + 1}. ${method.name}($params): $returnType")
+            }
+            
+            if (methods.isEmpty()) {
+                Log.d(TAG, "⚠ No se encontraron métodos públicos en el objeto")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al inspeccionar métodos: ${e.message}", e)
+        }
+    }
 
     /**
      * Inicializa el manager con el contexto de la aplicación.
@@ -73,37 +101,67 @@ object VTMSClientConnectionManager {
                 }
 
                 try {
-                    // Obtener referencia al servicio remoto usando ITmsManager (interfaz correcta)
-                    vtmsRemoteService = ITmsManager.Stub.asInterface(service)
-                    Log.d(TAG, "  - ITmsManager.Stub.asInterface() exitoso")
+                    // Obtener referencia al servicio remoto usando VTmsManager (interfaz correcta)
+                    vtmsRemoteService = VTmsManager.Stub.asInterface(service)
+                    Log.d(TAG, "  - VTmsManager.Stub.asInterface() exitoso")
 
                     // Obtener el gestor de parámetros
                     paramDownloadService = vtmsRemoteService?.paramManager
                     Log.d(TAG, "  - ParamManager obtenido: ${paramDownloadService != null}")
 
-                    // Inspeccionar el ITmsApp para diagnóstico
-                    paramDownloadService?.let { tmsApp ->
+                    // Inspeccionar el IParamManager para diagnóstico
+                    paramDownloadService?.let { paramManager ->
                         try {
-                            Log.d(TAG, "═══ Inspeccionando ITmsApp recibido ═══")
-                            Log.d(TAG, "ITmsApp class: ${tmsApp.javaClass.name}")
+                            Log.d(TAG, "═══ Inspeccionando IParamManager recibido ═══")
+                            Log.d(TAG, "IParamManager class: ${paramManager.javaClass.name}")
                             val interfaceDescriptor = try {
-                                tmsApp.asBinder().interfaceDescriptor
+                                paramManager.asBinder().interfaceDescriptor
                             } catch (e: Exception) {
                                 "No se pudo obtener"
                             }
                             Log.d(TAG, "Interface descriptor: $interfaceDescriptor")
-                            Log.d(TAG, "✓ Interface correcta: com.vtms.client.ITmsApp")
+                            Log.d(TAG, "✓ Interface correcta: com.vtms.client.param.IParamManager")
+                            
+                            // Listar métodos disponibles en IParamManager
+                            Log.d(TAG, "")
+                            Log.d(TAG, "═══ Métodos disponibles en IParamManager ═══")
+                            inspectAvailableMethods(paramManager)
+                            
                             Log.d(TAG, "═════════════════════════════════════════")
                         } catch (e: Exception) {
-                            Log.w(TAG, "Error inspeccionando ITmsApp: ${e.message}")
+                            Log.w(TAG, "Error inspeccionando IParamManager: ${e.message}")
+                        }
+                    }
+
+                    // Inspeccionar el VTmsManager
+                    vtmsRemoteService?.let { vtmsService ->
+                        try {
+                            Log.d(TAG, "")
+                            Log.d(TAG, "═══ Inspeccionando VTmsManager recibido ═══")
+                            Log.d(TAG, "VTmsManager class: ${vtmsService.javaClass.name}")
+                            val interfaceDescriptor = try {
+                                vtmsService.asBinder().interfaceDescriptor
+                            } catch (e: Exception) {
+                                "No se pudo obtener"
+                            }
+                            Log.d(TAG, "Interface descriptor: $interfaceDescriptor")
+                            
+                            // Listar métodos disponibles en VTmsManager
+                            Log.d(TAG, "")
+                            Log.d(TAG, "═══ Métodos disponibles en VTmsManager ═══")
+                            inspectAvailableMethods(vtmsService)
+                            
+                            Log.d(TAG, "═════════════════════════════════════════")
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error inspeccionando VTmsManager: ${e.message}")
                         }
                     }
 
                     isConnectedFailed = false
                     Log.i(TAG, "✓ Conexión VTMS completada y lista para uso")
                 } catch (e: SecurityException) {
-                    Log.e(TAG, "═══ SecurityException al acceder a ITmsManager ═══")
-                    Log.e(TAG, "El servicio TMSService NO implementa com.vtms.client.ITmsManager correctamente")
+                    Log.e(TAG, "═══ SecurityException al acceder a VTmsManager ═══")
+                    Log.e(TAG, "El servicio TMSService NO implementa com.vtms.client.VTmsManager correctamente")
                     service?.let {
                         try {
                             Log.e(TAG, "Interface descriptor del servicio: ${it.interfaceDescriptor}")
