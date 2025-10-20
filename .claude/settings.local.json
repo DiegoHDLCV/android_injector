@@ -9,7 +9,9 @@
       "Bash(./gradlew clean build:*)",
       "Bash(./gradlew:*)",
       "Bash(chmod:*)",
-      "Bash(pip3 install:*)"
+      "Bash(pip3 install:*)",
+      "Bash(git add injector/src/main/java/com/vigatec/injector/util/SystemInfoProvider.kt injector/src/main/java/com/vigatec/injector/di/AppModule.kt injector/src/main/java/com/vigatec/injector/viewmodel/ConfigViewModel.kt injector/src/main/java/com/vigatec/injector/ui/screens/ConfigScreen.kt)",
+      "Bash(git commit -m \"$(cat <<''EOF''\n[DIEGOH][AI-69] Implementar versiones reales en pantalla de configuración\n\nSe agregó SystemInfoProvider para obtener dinámicamente:\n- Versión de la aplicación desde PackageManager\n- Versión de la base de datos desde Room Database\n- Información adicional del sistema (Android, dispositivo, etc.)\n\nSe integró en ConfigViewModel y ConfigScreen para mostrar valores\nreales en lugar de hardcodeados. Se agregó provider de Context en\nAppModule para inyección de dependencias con Hilt.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
