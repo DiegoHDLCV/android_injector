@@ -2,39 +2,34 @@
 
 package com.vigatec.android_injector.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.example.config.CommProtocol
 import com.example.config.SystemConfig
 import com.vigatec.android_injector.ui.Navigator
+import com.vigatec.android_injector.ui.components.InjectionFeedCard
 import com.vigatec.android_injector.ui.events.UiEvent
-import com.vigatec.android_injector.ui.navigation.Routes // Asegúrate de tener este import
+import com.vigatec.android_injector.ui.navigation.Routes
 import com.vigatec.android_injector.viewmodel.ConnectionStatus
 import com.vigatec.android_injector.viewmodel.MainViewModel
-import com.vigatec.android_injector.util.LogcatReader
-import com.example.communication.polling.CommLog
-import com.example.communication.polling.CommLogEntry
 import kotlinx.coroutines.flow.collectLatest
 
 @Composable
@@ -42,17 +37,11 @@ fun MainScreen(navController: NavHostController) {
     val viewModel: MainViewModel = hiltViewModel()
     val status by viewModel.connectionStatus.collectAsState()
     val cableDetected by viewModel.cableConnected.collectAsState()
+    val recentInjections by viewModel.recentInjections.collectAsState()
 
-    // ELIMINADO: Auto-start automático. Ahora el usuario controla cuándo iniciar la escucha
-    // o se puede detectar el cable y auto-iniciar
-
-    val commLogs by CommLog.entries.collectAsState()
-    val logcatLines by LogcatReader.lines.collectAsState()
-    val rawDataReceived by viewModel.rawReceivedData.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val scrollState = rememberScrollState()
-
     var selectedProtocol by remember { mutableStateOf(SystemConfig.commProtocolSelected) }
+    var showAdvancedSettings by remember { mutableStateOf(false) }
 
     LaunchedEffect(key1 = true) {
         viewModel.snackbarEvent.collectLatest { message ->
@@ -66,10 +55,6 @@ fun MainScreen(navController: NavHostController) {
         }
     }
 
-    LaunchedEffect(rawDataReceived) {
-        scrollState.animateScrollTo(scrollState.maxValue)
-    }
-
     Scaffold(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { paddingValues ->
@@ -80,297 +65,318 @@ fun MainScreen(navController: NavHostController) {
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Indicador de cable USB con más detalle
-            androidx.compose.material3.Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = androidx.compose.material3.CardDefaults.cardColors(
-                    containerColor = if (cableDetected) Color.Green.copy(alpha = 0.2f) else Color.Red.copy(alpha = 0.2f)
-                )
+            // ========== 1. INDICADOR DE CABLE USB ==========
+            UsbCableStatusCard(cableDetected = cableDetected)
+
+            // ========== 2. ESTADO DE CONEXIÓN ==========
+            ConnectionStatusCard(status = status)
+
+            // ========== 3. BOTONES DE CONTROL ==========
+            ControlButtons(
+                status = status,
+                onStartListening = { viewModel.startListening() },
+                onStopListening = { viewModel.stopListening() }
+            )
+
+            // ========== 4. FEED DE LLAVES INYECTADAS (NUEVO!) ==========
+            InjectionFeedCard(injections = recentInjections)
+
+            // ========== 5. BOTÓN VER TODAS LAS LLAVES ==========
+            Button(
+                onClick = { navController.navigate(Routes.InjectedKeysScreen.route) },
+                enabled = status == ConnectionStatus.DISCONNECTED ||
+                         status == ConnectionStatus.LISTENING ||
+                         status == ConnectionStatus.ERROR,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = if (cableDetected) "🔌 Cable USB CONECTADO" else "⚠️ Cable USB NO DETECTADO",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = if (cableDetected) Color(0xFF006400) else Color.Red
-                        )
+                Icon(
+                    imageVector = Icons.Default.List,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Ver Todas las Llaves Inyectadas")
+            }
+
+            // ========== 6. CONFIGURACIÓN AVANZADA (COLAPSABLE) ==========
+            AdvancedSettingsCard(
+                isExpanded = showAdvancedSettings,
+                onToggle = { showAdvancedSettings = !showAdvancedSettings },
+                selectedProtocol = selectedProtocol,
+                onProtocolSelected = { protocol ->
+                    selectedProtocol = protocol
+                    viewModel.setProtocol(protocol)
+                },
+                isConnectionActive = status != ConnectionStatus.DISCONNECTED &&
+                                   status != ConnectionStatus.ERROR
+            )
+        }
+    }
+}
+
+/**
+ * Card de estado del cable USB
+ */
+@Composable
+private fun UsbCableStatusCard(cableDetected: Boolean) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (cableDetected)
+                Color(0xFF4CAF50).copy(alpha = 0.15f)
+            else
+                Color(0xFFFF5722).copy(alpha = 0.15f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (cableDetected) Icons.Default.Usb else Icons.Default.UsbOff,
+                contentDescription = null,
+                tint = if (cableDetected) Color(0xFF4CAF50) else Color(0xFFFF5722),
+                modifier = Modifier.size(32.dp)
+            )
+            Column {
+                Text(
+                    text = if (cableDetected) "Cable USB Conectado" else "Cable USB No Detectado",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (cableDetected) Color(0xFF4CAF50) else Color(0xFFFF5722)
+                )
+                Text(
+                    text = if (cableDetected)
+                        "Puerto disponible. Pulse 'Iniciar Escucha' para comenzar."
+                    else
+                        "Conecte el cable USB y espere unos segundos.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Card de estado de la conexión
+ */
+@Composable
+private fun ConnectionStatusCard(status: ConnectionStatus) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Estado de Conexión",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (status == ConnectionStatus.LISTENING ||
+                    status == ConnectionStatus.OPENING ||
+                    status == ConnectionStatus.INITIALIZING ||
+                    status == ConnectionStatus.CLOSING) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 3.dp
+                    )
+                }
+
+                Text(
+                    text = when(status) {
+                        ConnectionStatus.DISCONNECTED -> "DESCONECTADO"
+                        ConnectionStatus.INITIALIZING -> "INICIALIZANDO..."
+                        ConnectionStatus.OPENING -> "ABRIENDO PUERTO..."
+                        ConnectionStatus.LISTENING -> "ESCUCHANDO"
+                        ConnectionStatus.CLOSING -> "CERRANDO..."
+                        ConnectionStatus.ERROR -> "ERROR"
+                    },
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = when(status) {
+                        ConnectionStatus.LISTENING -> Color(0xFF4CAF50)
+                        ConnectionStatus.ERROR -> MaterialTheme.colorScheme.error
+                        ConnectionStatus.INITIALIZING, ConnectionStatus.OPENING, ConnectionStatus.CLOSING ->
+                            MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.onSurface
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Botones de control de conexión
+ */
+@Composable
+private fun ControlButtons(
+    status: ConnectionStatus,
+    onStartListening: () -> Unit,
+    onStopListening: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Button(
+            onClick = onStartListening,
+            enabled = status == ConnectionStatus.DISCONNECTED || status == ConnectionStatus.ERROR,
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Iniciar Escucha")
+        }
+
+        Button(
+            onClick = onStopListening,
+            enabled = status != ConnectionStatus.DISCONNECTED && status != ConnectionStatus.CLOSING,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error
+            ),
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Stop,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Detener")
+        }
+    }
+}
+
+/**
+ * Sección colapsable de configuración avanzada
+ */
+@Composable
+private fun AdvancedSettingsCard(
+    isExpanded: Boolean,
+    onToggle: () -> Unit,
+    selectedProtocol: CommProtocol,
+    onProtocolSelected: (CommProtocol) -> Unit,
+    isConnectionActive: Boolean
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Header clickeable
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Text(
-                        text = if (cableDetected) 
-                            "✓ Puerto físico disponible. Pulse 'Iniciar Escucha' para comenzar." 
-                        else 
-                            "✗ Puerto no disponible. Conecte el cable USB y espere unos segundos.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (cableDetected) Color(0xFF006400) else Color.Red,
-                        modifier = Modifier.fillMaxWidth()
+                        text = "Configuración Avanzada",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                IconButton(onClick = onToggle) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Contraer" else "Expandir"
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text("Estado Conexión Serial:", style = MaterialTheme.typography.titleLarge)
-            Text(status.name, style = MaterialTheme.typography.headlineMedium, color = when(status) {
-                ConnectionStatus.LISTENING -> Color.Green
-                ConnectionStatus.ERROR -> MaterialTheme.colorScheme.error
-                else -> MaterialTheme.colorScheme.onSurface
-            })
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (status == ConnectionStatus.LISTENING || status == ConnectionStatus.OPENING || status == ConnectionStatus.INITIALIZING || status == ConnectionStatus.CLOSING) {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            Text("Protocolo de Comunicación:", style = MaterialTheme.typography.titleMedium)
-            Row(Modifier.selectableGroup()) {
-                val isConnectionActive = status != ConnectionStatus.DISCONNECTED && status != ConnectionStatus.ERROR
-                CommProtocol.values().forEach { protocol ->
-                    Row(
-                        Modifier
-                            .height(56.dp)
-                            .selectable(
-                                selected = (selectedProtocol == protocol),
-                                onClick = {
-                                    selectedProtocol = protocol
-                                    viewModel.setProtocol(protocol)
-                                },
-                                role = Role.RadioButton,
-                                enabled = !isConnectionActive
-                            )
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = (selectedProtocol == protocol),
-                            onClick = null,
-                            enabled = !isConnectionActive
-                        )
-                        Text(
-                            text = protocol.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(start = 16.dp)
-                        )
-                    }
-                }
-            }
-            if (status != ConnectionStatus.DISCONNECTED && status != ConnectionStatus.ERROR) {
-                Text(
-                    text = "Detén la conexión para cambiar de protocolo",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { viewModel.startListening() },
-                    enabled = status == ConnectionStatus.DISCONNECTED || status == ConnectionStatus.ERROR
-                ) {
-                    Text("Iniciar Escucha")
-                }
-                Button(
-                    onClick = { viewModel.stopListening() },
-                    enabled = status != ConnectionStatus.DISCONNECTED && status != ConnectionStatus.CLOSING
-                ) {
-                    Text("Detener Escucha")
-                }
-            }
-
-            // --- CÓDIGO AÑADIDO ---
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = { navController.navigate(Routes.InjectedKeysScreen.route) },
-                // Habilita el botón siempre que la app no esté en un estado de transición
-                enabled = status == ConnectionStatus.DISCONNECTED || status == ConnectionStatus.LISTENING || status == ConnectionStatus.ERROR
+            // Contenido colapsable
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically()
             ) {
-                Text("Ver Llaves Inyectadas")
-            }
-            // --- FIN DEL CÓDIGO AÑADIDO ---
-
-            // --- BOTONES DE ENVÍO AGREGADOS ---
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { viewModel.sendAck() },
-                    enabled = status == ConnectionStatus.LISTENING
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Enviar ACK")
-                }
-            }
+                    Divider()
 
-            // Campo para datos personalizados
-            var customDataText by remember { mutableStateOf("") }
+                    Text(
+                        text = "Protocolo de Comunicación",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            androidx.compose.material3.OutlinedTextField(
-                value = customDataText,
-                onValueChange = { customDataText = it },
-                label = { Text("Datos personalizados (ASCII)") },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = status == ConnectionStatus.LISTENING,
-                singleLine = true
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Button(
-                onClick = {
-                    if (customDataText.isNotEmpty()) {
-                        viewModel.sendCustomData(customDataText)
-                        customDataText = ""
-                    }
-                },
-                enabled = status == ConnectionStatus.LISTENING && customDataText.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Enviar Datos Personalizados")
-            }
-            // --- FIN BOTONES DE ENVÍO ---
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- BOTÓN DE EMERGENCIA ---
-//            Button(
-//                onClick = { viewModel.emergencyReset() },
-//                enabled = true, // Siempre habilitado para emergencias
-//                modifier = Modifier
-//                    .fillMaxWidth()
-//                    .background(
-//                        color = Color.Red.copy(alpha = 0.1f),
-//                        shape = MaterialTheme.shapes.medium
-//                    )
-//            ) {
-//                Text(
-//                    text = "🚨 RESET DE EMERGENCIA",
-//                    color = Color.Red,
-//                    style = MaterialTheme.typography.bodyLarge
-//                )
-//            }
-            Text(
-                text = "Usar solo si la app se queda colgada",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.Red.copy(alpha = 0.7f)
-            )
-            // --- FIN BOTÓN DE EMERGENCIA ---
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Panel de Logs de Comunicación (incluye detección de cable)
-            CommLogsPanel(entries = commLogs)
-
-            // Panel de Logcat (proceso actual)
-            //LogcatPanel(lines = logcatLines)
-
-            Text("Log de Datos Recibidos:", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = rawDataReceived.ifEmpty { "Esperando datos..." },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .border(1.dp, MaterialTheme.colorScheme.outline)
-                    .padding(8.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun CommLogsPanel(entries: List<CommLogEntry>) {
-    androidx.compose.material3.Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 120.dp, max = 220.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text("Logs de Comunicación (SubPOS)", style = MaterialTheme.typography.titleSmall)
-            if (entries.isEmpty()) {
-                Text("Sin registros aún…", style = MaterialTheme.typography.bodySmall)
-            } else {
-                val last = entries.takeLast(120).asReversed()
-                androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 180.dp)) {
-                    items(last.size) { idx ->
-                        val e = last[idx]
-                        val color = when (e.level) {
-                            "E" -> MaterialTheme.colorScheme.error
-                            "W" -> MaterialTheme.colorScheme.tertiary
-                            else -> MaterialTheme.colorScheme.onSurface
+                    Column(modifier = Modifier.selectableGroup()) {
+                        CommProtocol.values().forEach { protocol ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .selectable(
+                                        selected = (selectedProtocol == protocol),
+                                        onClick = { onProtocolSelected(protocol) },
+                                        role = Role.RadioButton,
+                                        enabled = !isConnectionActive
+                                    )
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = (selectedProtocol == protocol),
+                                    onClick = null,
+                                    enabled = !isConnectionActive
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = protocol.name,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
                         }
-                        Text("[${e.level}] ${e.tag}: ${e.message}", color = color, style = MaterialTheme.typography.bodySmall)
                     }
-                }
-            }
-        }
-    }
-}
 
-@Composable
-private fun LogcatPanel(lines: List<String>) {
-    androidx.compose.material3.Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 120.dp, max = 240.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text("Logcat (proceso actual)", style = MaterialTheme.typography.titleSmall)
-            val allowedTags = setOf(
-                "AisinoComController",
-                "AisinoCommManager",
-                "CommSDKManager",
-                "CommunicationSDKManager",
-                "PollingService",
-                "NewposComController",
-                "UrovoComController",
-                "IComController",
-                "MainViewModel", // solo tomaremos líneas con palabras de puerto/serial abajo
-                "SdkApi"
-            )
-            val keywords = setOf(
-                "UART", "USB", "Serial", "Baud", "write", "read", "RX", "TX",
-                "Port", "open", "close", "SystemInit_Api", "Attempting to read",
-                "Attempting to open", "opened successfully", "reset", "baud rate"
-            )
-            val filtered = lines.filter { raw ->
-                val line = raw.trim()
-                val tagMatch = allowedTags.any { t -> line.contains(" $t ") || line.contains("$t ") }
-                val keywordMatch = keywords.any { kw -> line.contains(kw, ignoreCase = true) }
-                if (line.contains("MainViewModel")) {
-                    // Solo logs de MV relacionados a comunicación
-                    keywordMatch
-                } else {
-                    tagMatch || keywordMatch
-                }
-            }
-            if (filtered.isEmpty()) {
-                Text("Sin líneas aún…", style = MaterialTheme.typography.bodySmall)
-            } else {
-                val last = filtered.takeLast(120).asReversed()
-                androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 200.dp)) {
-                    items(last.size) { idx ->
-                        Text(last[idx], style = MaterialTheme.typography.bodySmall)
+                    if (isConnectionActive) {
+                        Text(
+                            text = "⚠ Detén la conexión para cambiar de protocolo",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }

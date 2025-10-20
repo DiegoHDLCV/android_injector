@@ -40,6 +40,7 @@ import java.nio.charset.Charset
 import javax.inject.Inject
 
 import com.example.manufacturer.base.models.KeyType as GenericKeyType
+import java.util.UUID
 
 enum class ConnectionStatus {
     DISCONNECTED,
@@ -49,6 +50,18 @@ enum class ConnectionStatus {
     CLOSING,
     ERROR
 }
+
+/**
+ * Representa un evento de inyección de llave para mostrar en el feed visual
+ */
+data class InjectionEvent(
+    val id: String = UUID.randomUUID().toString(),
+    val timestamp: Long = System.currentTimeMillis(),
+    val keyType: String,           // "KEK", "KTK", "Operacional", etc.
+    val slot: String,              // Número de slot donde se inyectó
+    val success: Boolean,          // true = éxito, false = fallo
+    val algorithm: String = ""     // TDES, AES, etc. (opcional)
+)
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -70,6 +83,11 @@ class MainViewModel @Inject constructor(
 
     private val _cableConnected = MutableStateFlow(false)
     val cableConnected = _cableConnected.asStateFlow()
+
+    // Feed de inyecciones recientes (máximo 5 elementos)
+    private val _recentInjections = MutableStateFlow<List<InjectionEvent>>(emptyList())
+    val recentInjections = _recentInjections.asStateFlow()
+    private val MAX_FEED_ITEMS = 5
 
     private var comController: IComController? = null
     private var pedController: IPedController? = null
@@ -630,6 +648,16 @@ class MainViewModel @Inject constructor(
                 status = injectionStatus
             )
             Log.i(TAG, "Resultado de inyección para slot ${command.keySlot} registrado en la BD como: $injectionStatus")
+
+            // Agregar al feed visual
+            addInjectionToFeed(
+                InjectionEvent(
+                    keyType = genericKeyType.name,
+                    slot = command.keySlot.toString(),
+                    success = injectionStatus == "SUCCESSFUL",
+                    algorithm = genericAlgorithm.name
+                )
+            )
         }
 
         val response = messageFormatter.format("02", listOf(responseCode, command.keyChecksum))
@@ -930,6 +958,25 @@ class MainViewModel @Inject constructor(
         return joinToString(separator) { "%02X".format(it) }
     }
 
+    /**
+     * Agrega un evento de inyección al feed visual
+     * Mantiene solo los últimos MAX_FEED_ITEMS elementos
+     */
+    private fun addInjectionToFeed(event: InjectionEvent) {
+        val currentList = _recentInjections.value.toMutableList()
+        // Agregar al inicio de la lista (más reciente primero)
+        currentList.add(0, event)
+        // Mantener solo los últimos MAX_FEED_ITEMS
+        if (currentList.size > MAX_FEED_ITEMS) {
+            currentList.removeAt(currentList.size - 1)
+        }
+        _recentInjections.value = currentList
+        Log.d(TAG, "Feed actualizado: ${currentList.size} elementos | Último: ${event.keyType} en slot ${event.slot}")
+    }
+
+    // MÉTODOS DE ENVÍO (Comentados - no se usan en la nueva UI, pero se preservan para futuras funcionalidades)
+
+    /*
     fun sendAck() = viewModelScope.launch {
         connectionMutex.withLock {
             if (!ensureComControllerIsReady()) return@withLock
@@ -965,4 +1012,5 @@ class MainViewModel @Inject constructor(
             }
         }
     }
+    */
 }
