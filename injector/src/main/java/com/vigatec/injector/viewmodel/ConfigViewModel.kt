@@ -7,6 +7,7 @@ import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.injector.repository.UserRepository
 import com.vigatec.injector.util.PermissionProvider
+import com.vigatec.injector.util.SystemInfoProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,14 +18,17 @@ import javax.inject.Inject
 data class ConfigUiState(
     val currentUser: User? = null,
     val isAdmin: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val applicationVersion: String = "",
+    val databaseVersion: String = ""
 )
 
 @HiltViewModel
 class ConfigViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val sessionManager: SessionManager,
-    private val permissionProvider: PermissionProvider
+    private val permissionProvider: PermissionProvider,
+    private val systemInfoProvider: SystemInfoProvider
 ) : ViewModel() {
 
     companion object {
@@ -40,7 +44,9 @@ class ConfigViewModel @Inject constructor(
                 val user = userRepository.findByUsername(username)
                 _uiState.value = _uiState.value.copy(
                     currentUser = user,
-                    isAdmin = user?.role == "ADMIN"
+                    isAdmin = user?.role == "ADMIN",
+                    applicationVersion = systemInfoProvider.getApplicationVersion(),
+                    databaseVersion = systemInfoProvider.getDatabaseVersion()
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(

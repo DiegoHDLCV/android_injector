@@ -93,7 +93,10 @@ fun ConfigScreen(
             }
 
             // Información del sistema
-            SystemInfoCard()
+            SystemInfoCard(
+                applicationVersion = uiState.applicationVersion,
+                databaseVersion = uiState.databaseVersion
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -247,7 +250,10 @@ fun ConfigOptionCard(
 }
 
 @Composable
-fun SystemInfoCard() {
+fun SystemInfoCard(
+    applicationVersion: String = "",
+    databaseVersion: String = ""
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -263,8 +269,8 @@ fun SystemInfoCard() {
                 style = MaterialTheme.typography.titleMedium
             )
             Divider()
-            SystemInfoRow(label = "Versión", value = "1.0.0")
-            SystemInfoRow(label = "Base de datos", value = "v2")
+            SystemInfoRow(label = "Versión", value = applicationVersion.ifEmpty { "Cargando..." })
+            SystemInfoRow(label = "Base de datos", value = databaseVersion.ifEmpty { "Cargando..." })
         }
     }
 }
