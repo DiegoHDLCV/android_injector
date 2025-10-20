@@ -101,6 +101,55 @@ fun LogDetailScreen(
                     }
                 }
 
+                // Sección de error destacada (solo para errores)
+                if (log.operationStatus == "ERROR" && log.notes.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Error,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Text(
+                                    text = "Detalles del Error",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = MaterialTheme.colorScheme.surface,
+                                shape = MaterialTheme.shapes.medium
+                            ) {
+                                Text(
+                                    text = log.notes,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Información general
                 Card(
                     modifier = Modifier.fillMaxWidth()
@@ -116,31 +165,16 @@ fun LogDetailScreen(
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary
                         )
-                        
+
                         LogDetailRow(label = "Usuario", value = log.username, icon = Icons.Default.Person)
                         LogDetailRow(label = "Perfil", value = log.profileName, icon = Icons.Default.Folder)
-                        
-                        if (log.keyType.isNotEmpty()) {
+
+                        if (log.keyType.isNotEmpty() && log.keyType != "N/A") {
                             LogDetailRow(label = "Tipo de Llave", value = log.keyType, icon = Icons.Default.Key)
                         }
-                        
+
                         if (log.keySlot >= 0) {
                             LogDetailRow(label = "Slot", value = log.keySlot.toString(), icon = Icons.Default.Storage)
-                        }
-                        
-                        if (log.notes.isNotEmpty()) {
-                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(
-                                    text = "Notas:",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = log.notes,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
                         }
                     }
                 }
