@@ -497,8 +497,10 @@ class KeyInjectionViewModel @Inject constructor(
         }
 
         val keyLengthBytes = selectedKey.keyData.length / 2
-        if (keyLengthBytes !in listOf(16, 32, 48)) {
-            throw Exception("Longitud de llave inválida: $keyLengthBytes bytes. Debe ser 16, 32 o 48 bytes.")
+        // Validación de longitud: Soportar 3DES (8, 16, 24 bytes) y AES (16, 24, 32, 48 bytes)
+        val validLengths = listOf(8, 16, 24, 32, 48)
+        if (keyLengthBytes !in validLengths) {
+            throw Exception("Longitud de llave inválida: $keyLengthBytes bytes. Longitudes válidas: $validLengths")
         }
 
         // === INTEGRACIÓN CON KEK ===
@@ -948,12 +950,28 @@ class KeyInjectionViewModel @Inject constructor(
 
         // Verificar longitud de la llave
         val keyLengthBytes = selectedKey.keyData.length / 2
-        val validLengths = when (keyConfig.keyType.uppercase()) {
-            "TDES", "3DES", "DUKPT_TDES", "DUKPT_3DES" -> listOf(16, 32, 48) // 128, 256, 384 bits
-            "AES", "DUKPT_AES" -> listOf(16, 24, 32) // 128, 192, 256 bits
-            "PIN", "MAC", "DATA" -> listOf(16, 24, 32) // 128, 192, 256 bits
-            "DUKPT" -> listOf(16, 32, 48) // 128, 256, 384 bits (genérico)
-            else -> listOf(16, 32, 48) // Longitudes por defecto
+
+        // Usar contains() para detectar el tipo de llave en lugar de comparación exacta
+        val keyTypeUpper = keyConfig.keyType.uppercase()
+        val validLengths = when {
+            // PIN, MAC, DATA: Soportan 3DES (16, 24 bytes) y AES (16, 24, 32 bytes)
+            keyTypeUpper.contains("PIN") || keyTypeUpper.contains("MAC") || keyTypeUpper.contains("DATA") -> {
+                listOf(16, 24, 32) // 128, 192, 256 bits - Incluye 3DES de 24 bytes
+            }
+            // 3DES/TDES: Soportan Single (8), Double (16), Triple (24) y variantes extendidas
+            keyTypeUpper.contains("TDES") || keyTypeUpper.contains("3DES") -> {
+                listOf(8, 16, 24, 32, 48) // Todas las variantes 3DES
+            }
+            // AES: Soportan AES-128, AES-192, AES-256
+            keyTypeUpper.contains("AES") -> {
+                listOf(16, 24, 32) // 128, 192, 256 bits
+            }
+            // DUKPT: Soportan múltiples longitudes
+            keyTypeUpper.contains("DUKPT") -> {
+                listOf(16, 24, 32, 48) // Todas las longitudes comunes
+            }
+            // Por defecto: Permisivo con todas las longitudes estándar
+            else -> listOf(8, 16, 24, 32, 48)
         }
 
         if (keyLengthBytes !in validLengths) {
