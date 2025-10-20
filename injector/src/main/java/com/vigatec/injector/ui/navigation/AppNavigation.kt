@@ -18,6 +18,7 @@ import com.vigatec.injector.ui.events.UiEvent
 import com.vigatec.injector.ui.screens.MainScaffold
 import com.vigatec.injector.ui.screens.ConfigScreen
 import com.vigatec.injector.ui.screens.LogsScreen
+import com.vigatec.injector.ui.screens.LogDetailScreen
 import com.vigatec.injector.ui.screens.UserManagementScreen
 import com.vigatec.injector.ui.screens.TmsConfigScreen
 import com.vigatec.injector.ui.screens.ExportImportScreen
@@ -129,6 +130,19 @@ fun AppNavigation() {
 
         composable(Screen.Logs.route) {
             LogsScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onLogClick = { logId ->
+                    navController.navigate(Screen.LogDetail.createRoute(logId))
+                }
+            )
+        }
+
+        composable(Screen.LogDetail.route) { backStackEntry ->
+            val logId = backStackEntry.arguments?.getString("logId")?.toLongOrNull() ?: 0L
+            LogDetailScreen(
+                logId = logId,
                 onBack = {
                     navController.popBackStack()
                 }
