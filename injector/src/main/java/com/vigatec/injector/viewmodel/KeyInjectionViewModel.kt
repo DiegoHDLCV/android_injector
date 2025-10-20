@@ -323,6 +323,23 @@ class KeyInjectionViewModel @Inject constructor(
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error durante la inyección de llaves", e)
+
+                // Registrar el error en los logs de inyección
+                try {
+                    injectionLogger.logError(
+                        commandSent = "N/A - Error antes de enviar comando",
+                        responseReceived = "N/A - Error en validación o preparación",
+                        username = currentUsername,
+                        profileName = profile?.name ?: "Desconocido",
+                        keyType = "N/A",
+                        keySlot = -1,
+                        notes = "Error durante la inyección: ${e.message}\nStackTrace: ${e.stackTraceToString().take(500)}"
+                    )
+                    Log.i(TAG, "✓ Error registrado en logs de inyección")
+                } catch (logError: Exception) {
+                    Log.e(TAG, "Error al registrar log de fallo", logError)
+                }
+
                 _state.value = _state.value.copy(
                     status = InjectionStatus.ERROR,
                     error = e.message ?: "Error desconocido",
@@ -404,42 +421,73 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - Slot: ${keyConfig.slot}")
         Log.i(TAG, "  - Tipo: ${keyConfig.keyType}")
         Log.i(TAG, "  - Llave seleccionada: ${keyConfig.selectedKey}")
-        
-        val selectedKey = injectedKeyRepository.getKeyByKcv(keyConfig.selectedKey)
-            ?: throw Exception("Llave con KCV ${keyConfig.selectedKey} no encontrada")
 
-        Log.i(TAG, "Llave encontrada en base de datos:")
-        Log.i(TAG, "  - KCV: ${selectedKey.kcv}")
-        Log.i(TAG, "  - Longitud de datos: ${selectedKey.keyData.length / 2} bytes")
-        Log.i(TAG, "  - Datos (primeros 32 bytes): ${selectedKey.keyData.take(64)}")
+        try {
+            val selectedKey = injectedKeyRepository.getKeyByKcv(keyConfig.selectedKey)
+                ?: throw Exception("Llave con KCV ${keyConfig.selectedKey} no encontrada")
 
-        // Validar integridad de la llave
-        validateKeyIntegrity(selectedKey, keyConfig)
+            Log.i(TAG, "Llave encontrada en base de datos:")
+            Log.i(TAG, "  - KCV: ${selectedKey.kcv}")
+            Log.i(TAG, "  - Longitud de datos: ${selectedKey.keyData.length / 2} bytes")
+            Log.i(TAG, "  - Datos (primeros 32 bytes): ${selectedKey.keyData.take(64)}")
 
-        // Mostrar detalles completos de la llave
-        logKeyDetails(selectedKey, keyConfig)
+            // Validar integridad de la llave
+            validateKeyIntegrity(selectedKey, keyConfig)
 
-        // Construir el comando de inyección según el protocolo Futurex
-        Log.i(TAG, "Construyendo comando Futurex...")
-        val injectionCommand = buildInjectionCommand(keyConfig, selectedKey)
-        
-        Log.i(TAG, "Comando construido exitosamente:")
-        Log.i(TAG, "  - Tamaño: ${injectionCommand.size} bytes")
-        Log.i(TAG, "  - Datos (hex): ${injectionCommand.toHexString()}")
-        
-        // Enviar comando
-        Log.i(TAG, "Enviando comando al dispositivo...")
-        sendData(injectionCommand)
-        
-        // Esperar respuesta
-        Log.i(TAG, "Esperando respuesta del dispositivo...")
-        val response = waitForResponse()
-        
-        // Procesar respuesta y registrar en logs
-        Log.i(TAG, "Procesando respuesta del dispositivo...")
-        processInjectionResponse(response, keyConfig, injectionCommand)
-        
-        Log.i(TAG, "=== INYECCIÓN DE LLAVE FUTUREX COMPLETADA ===")
+            // Mostrar detalles completos de la llave
+            logKeyDetails(selectedKey, keyConfig)
+
+            // Construir el comando de inyección según el protocolo Futurex
+            Log.i(TAG, "Construyendo comando Futurex...")
+            val injectionCommand = buildInjectionCommand(keyConfig, selectedKey)
+
+            Log.i(TAG, "Comando construido exitosamente:")
+            Log.i(TAG, "  - Tamaño: ${injectionCommand.size} bytes")
+            Log.i(TAG, "  - Datos (hex): ${injectionCommand.toHexString()}")
+
+            // Enviar comando
+            Log.i(TAG, "Enviando comando al dispositivo...")
+            sendData(injectionCommand)
+
+            // Esperar respuesta
+            Log.i(TAG, "Esperando respuesta del dispositivo...")
+            val response = waitForResponse()
+
+            // Procesar respuesta y registrar en logs
+            Log.i(TAG, "Procesando respuesta del dispositivo...")
+            processInjectionResponse(response, keyConfig, injectionCommand)
+
+            Log.i(TAG, "=== INYECCIÓN DE LLAVE FUTUREX COMPLETADA ===")
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error durante inyección de llave individual", e)
+
+            // Registrar el error específico en los logs de inyección
+            try {
+                injectionLogger.logError(
+                    commandSent = "Error antes de enviar comando",
+                    responseReceived = "Error en validación",
+                    username = currentUsername,
+                    profileName = _state.value.currentProfile?.name ?: "Desconocido",
+                    keyType = keyConfig.keyType,
+                    keySlot = keyConfig.slot.toIntOrNull() ?: -1,
+                    notes = """
+                        Error al inyectar ${keyConfig.usage}:
+                        - Slot: ${keyConfig.slot}
+                        - Tipo: ${keyConfig.keyType}
+                        - KCV seleccionada: ${keyConfig.selectedKey}
+                        - Error: ${e.message}
+                        - Causa: ${e.cause?.message ?: "N/A"}
+                    """.trimIndent()
+                )
+                Log.i(TAG, "✓ Error específico registrado en logs de inyección")
+            } catch (logError: Exception) {
+                Log.e(TAG, "Error al registrar log específico de fallo", logError)
+            }
+
+            // Re-lanzar la excepción para que sea capturada por el catch principal
+            throw e
+        }
     }
 
     private fun buildInjectionCommand(keyConfig: KeyConfiguration, selectedKey: InjectedKeyEntity): ByteArray {
