@@ -373,10 +373,10 @@ object TripleDESCrypto {
             Log.d(TAG, "=== CIFRANDO LLAVE PARA TRANSMISIÓN ===")
             Log.d(TAG, "KCV de la llave: $keyKcv")
 
-            // Validar que la llave sea de longitud válida
+            // Validar que la llave sea de longitud válida (3DES y AES)
             val keyBytes = KcvCalculator.hexStringToByteArray(keyData)
-            if (keyBytes.size != 8 && keyBytes.size != 16 && keyBytes.size != 24) {
-                throw IllegalArgumentException("Llave debe ser de 8, 16 o 24 bytes, recibido: ${keyBytes.size}")
+            if (keyBytes.size !in listOf(8, 16, 24, 32, 48)) {
+                throw IllegalArgumentException("Llave debe ser de 8, 16, 24, 32 o 48 bytes (3DES/AES), recibido: ${keyBytes.size}")
             }
 
             // Cifrar

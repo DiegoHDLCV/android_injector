@@ -830,9 +830,11 @@ class MainViewModel @Inject constructor(
         return when (futurexKeyType) {
             "01", "0F" -> GenericKeyType.MASTER_KEY
             "06" -> GenericKeyType.TRANSPORT_KEY
-            "05" -> GenericKeyType.WORKING_PIN_KEY
-            "04" -> GenericKeyType.WORKING_MAC_KEY
-            "0C" -> GenericKeyType.WORKING_DATA_ENCRYPTION_KEY
+            // PIN, MAC y DATA se consideran MASTER_KEY en el PED
+            // (Son llaves maestras funcionales, no llaves de trabajo derivadas)
+            "05" -> GenericKeyType.MASTER_KEY  // PIN Encryption Key
+            "04" -> GenericKeyType.MASTER_KEY  // MAC Key
+            "0C" -> GenericKeyType.MASTER_KEY  // Data Encryption Key
             "02" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT Initial Key (solo pruebas)
             "03" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT 3DES IPEK
             "08" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT 3DES BDK

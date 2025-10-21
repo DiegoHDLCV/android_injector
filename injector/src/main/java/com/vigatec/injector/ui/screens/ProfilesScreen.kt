@@ -863,7 +863,7 @@ fun getUsageIcon(usage: String): String {
         "PIN" -> "🔐"
         "MAC" -> "🔒"
         "DATA" -> "📄"
-        "KEK" -> "🗝️"
+        "KTK" -> "🗝️"
         else -> "🔑"
     }
 }
@@ -1034,7 +1034,7 @@ fun CreateProfileModal(
                         }
                     }
 
-                    // --- Configuración de Cifrado KEK ---
+                    // --- Configuración de Cifrado KTK ---
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
                             text = "🔐 Configuración de Cifrado",
@@ -1052,7 +1052,7 @@ fun CreateProfileModal(
                                 modifier = Modifier.padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // Toggle para activar KEK
+                                // Toggle para activar KTK
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1060,7 +1060,7 @@ fun CreateProfileModal(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "Usar cifrado KEK",
+                                            text = "Usar cifrado KTK",
                                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
                                         )
                                         Text(
@@ -1070,15 +1070,15 @@ fun CreateProfileModal(
                                         )
                                     }
                                     Switch(
-                                        checked = formData.useKEK,
-                                        onCheckedChange = { onFormDataChange(formData.copy(useKEK = it)) }
+                                        checked = formData.useKTK,
+                                        onCheckedChange = { onFormDataChange(formData.copy(useKTK = it)) }
                                     )
                                 }
 
-                                // Mostrar KEK activa (solo lectura si useKEK está activado)
-                                if (formData.useKEK) {
-                                    if (formData.currentKEK == null) {
-                                        // No hay KEK activa
+                                // Mostrar KTK activa (solo lectura si useKTK está activado)
+                                if (formData.useKTK) {
+                                    if (formData.currentKTK == null) {
+                                        // No hay KTK activa
                                         Card(
                                             colors = CardDefaults.cardColors(
                                                 containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
@@ -1097,12 +1097,12 @@ fun CreateProfileModal(
                                                 )
                                                 Column(modifier = Modifier.weight(1f)) {
                                                     Text(
-                                                        text = "No hay KEK activa en el almacén",
+                                                        text = "No hay KTK activa en el almacén",
                                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                                         color = MaterialTheme.colorScheme.onSurface
                                                     )
                                                     Text(
-                                                        text = "Ve al almacén de llaves y selecciona una llave AES-256 como KEK activa.",
+                                                        text = "Ve al almacén de llaves y selecciona una llave AES-256 como KTK activa.",
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                                     )
@@ -1110,10 +1110,10 @@ fun CreateProfileModal(
                                             }
                                         }
                                     } else {
-                                        // Mostrar KEK activa (solo lectura)
+                                        // Mostrar KTK activa (solo lectura)
                                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                             Text(
-                                                text = "KEK activa seleccionada del almacén:",
+                                                text = "KTK activa seleccionada del almacén:",
                                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
                                             )
 
@@ -1138,18 +1138,18 @@ fun CreateProfileModal(
                                                         modifier = Modifier.size(32.dp)
                                                     )
                                                     Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = formData.currentKTK.customName.ifEmpty { "KTK ${formData.currentKTK.kcv.take(6)}" },
+                                                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                                                    )
                                                         Text(
-                                                            text = formData.currentKEK.customName.ifEmpty { "KEK ${formData.currentKEK.kcv.take(6)}" },
-                                                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
-                                                        )
-                                                        Text(
-                                                            text = "KCV: ${formData.currentKEK.kcv}",
+                                                            text = "KCV: ${formData.currentKTK.kcv}",
                                                             style = MaterialTheme.typography.bodySmall,
                                                             fontFamily = FontFamily.Monospace,
                                                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                                         )
                                                         Text(
-                                                            text = "Creada: ${java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date(formData.currentKEK.injectionTimestamp))}",
+                                                            text = "Creada: ${java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date(formData.currentKTK.injectionTimestamp))}",
                                                             style = MaterialTheme.typography.labelSmall,
                                                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                                         )
@@ -1162,7 +1162,7 @@ fun CreateProfileModal(
                                                 }
                                             }
 
-                                            // Info sobre el uso de KEK
+                                            // Info sobre el uso de KTK
                                             Card(
                                                 colors = CardDefaults.cardColors(
                                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
@@ -1180,7 +1180,7 @@ fun CreateProfileModal(
                                                         tint = MaterialTheme.colorScheme.tertiary
                                                     )
                                                     Text(
-                                                        text = "Esta KEK se usará para cifrar las llaves antes de enviarlas al SubPOS.",
+                                                        text = "Esta KTK se usará para cifrar las llaves antes de enviarlas al SubPOS.",
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurface
                                                     )

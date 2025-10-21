@@ -33,9 +33,9 @@ data class ProfileFormData(
     val description: String = "",
     val appType: String = "",
     val keyConfigurations: List<KeyConfiguration> = emptyList(),
-    val useKEK: Boolean = false,
-    val selectedKEKKcv: String = "",
-    val currentKEK: InjectedKeyEntity? = null // KEK activa del almacén
+    val useKTK: Boolean = false,
+    val selectedKTKKcv: String = "",
+    val currentKTK: InjectedKeyEntity? = null // KTK activa del almacén
 )
 
 @HiltViewModel
@@ -100,7 +100,7 @@ class ProfileViewModel @Inject constructor(
     fun onShowCreateModal(profile: ProfileEntity? = null) {
         viewModelScope.launch {
             // Obtener la KEK activa del almacén
-            val currentKEK = injectedKeyRepository.getCurrentKEK()
+            val currentKTK = injectedKeyRepository.getCurrentKEK()
             
             val formData = if (profile != null) {
                 ProfileFormData(
@@ -109,14 +109,14 @@ class ProfileViewModel @Inject constructor(
                     description = profile.description,
                     appType = profile.applicationType,
                     keyConfigurations = profile.keyConfigurations,
-                    useKEK = profile.useKEK,
-                    selectedKEKKcv = currentKEK?.kcv ?: profile.selectedKEKKcv, // Usar la KEK activa si existe
-                    currentKEK = currentKEK
+                    useKTK = profile.useKEK,
+                    selectedKTKKcv = currentKTK?.kcv ?: profile.selectedKEKKcv, // Usar la KTK activa si existe
+                    currentKTK = currentKTK
                 )
             } else {
                 ProfileFormData(
-                    currentKEK = currentKEK,
-                    selectedKEKKcv = currentKEK?.kcv ?: "" // Auto-seleccionar KEK activa si existe
+                    currentKTK = currentKTK,
+                    selectedKTKKcv = currentKTK?.kcv ?: "" // Auto-seleccionar KTK activa si existe
                 )
             }
             _state.value = _state.value.copy(showCreateModal = true, selectedProfile = profile, formData = formData)
@@ -147,8 +147,8 @@ class ProfileViewModel @Inject constructor(
                 description = formData.description,
                 applicationType = formData.appType,
                 keyConfigurations = formData.keyConfigurations,
-                useKEK = formData.useKEK,
-                selectedKEKKcv = formData.selectedKEKKcv
+                useKEK = formData.useKTK,
+                selectedKEKKcv = formData.selectedKTKKcv
             )
             
             try {

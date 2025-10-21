@@ -191,9 +191,9 @@ class KeyInjectionViewModel @Inject constructor(
 
             Log.i(TAG, "=== INICIANDO PROCESO DE INYECCIÓN FUTUREX ===")
             Log.i(TAG, "Perfil: ${profile.name}")
-            Log.i(TAG, "¿Usa KEK?: ${profile.useKEK}")
+            Log.i(TAG, "¿Usa KTK?: ${profile.useKEK}")
             if (profile.useKEK) {
-                Log.i(TAG, "KEK seleccionada (KCV): ${profile.selectedKEKKcv}")
+                Log.i(TAG, "KTK seleccionada (KCV): ${profile.selectedKEKKcv}")
             }
             Log.i(TAG, "Configuraciones de llave: ${keyConfigs.size}")
             keyConfigs.forEachIndexed { index, config ->
@@ -242,12 +242,12 @@ class KeyInjectionViewModel @Inject constructor(
                         log = _state.value.log + "Inyectando KTK seleccionada para cifrado...\n"
                     )
 
-                    // Obtener la KEK de la base de datos
+                    // Obtener la KTK de la base de datos
                     val kek = injectedKeyRepository.getKeyByKcv(profile.selectedKEKKcv)
 
                     if (kek == null) {
-                        Log.e(TAG, "KEK no encontrada con KCV: ${profile.selectedKEKKcv}")
-                        throw Exception("KEK seleccionada no encontrada en la base de datos")
+                        Log.e(TAG, "KTK no encontrada con KCV: ${profile.selectedKEKKcv}")
+                        throw Exception("KTK seleccionada no encontrada en la base de datos")
                     }
 
                     // NUEVA VALIDACIÓN: Verificar que coincida con la KTK activa
@@ -544,6 +544,44 @@ class KeyInjectionViewModel @Inject constructor(
         // Ahora enviamos la llave cifrada con encryptionType "02"
         Log.i(TAG, "=== MODO CIFRADO CON KTK (YA INYECTADA) ===")
         Log.i(TAG, "Cifrando llave con KTK antes de enviar...")
+
+        // Detectar algoritmo de la KTK basado en su longitud
+        val ktkLengthBytes = ktkData.length / 2
+        val ktkAlgorithm = when (ktkLengthBytes) {
+            8 -> "3DES (Single DES - 8 bytes)"
+            16 -> "3DES (Double length - 16 bytes) o AES-128"
+            24 -> "3DES (Triple length - 24 bytes)"
+            32 -> "AES-256"
+            48 -> "AES-256 (Triple length - 48 bytes)"
+            else -> "Desconocido ($ktkLengthBytes bytes)"
+        }
+
+        // Detectar algoritmo de la llave operacional (usando variable existente)
+        val operationalKeyAlgorithm = when (keyLengthBytes) {
+            8 -> "3DES (Single DES - 8 bytes)"
+            16 -> "3DES (Double length - 16 bytes) o AES-128"
+            24 -> "3DES (Triple length - 24 bytes)"
+            32 -> "AES-256"
+            48 -> "AES-256 (Triple length - 48 bytes)"
+            else -> "Desconocido ($keyLengthBytes bytes)"
+        }
+
+        Log.i(TAG, "=== INFORMACIÓN DE KTK ===")
+        Log.i(TAG, "  - Algoritmo KTK: $ktkAlgorithm")
+        Log.i(TAG, "  - Longitud KTK: $ktkLengthBytes bytes (${ktkData.length} caracteres hex)")
+        Log.i(TAG, "  - KCV de KTK: $ktkKcv")
+        Log.i(TAG, "  - Primeros 32 caracteres: ${ktkData.take(32)}...")
+        Log.i(TAG, "")
+        Log.i(TAG, "=== INFORMACIÓN DE LLAVE OPERACIONAL ===")
+        Log.i(TAG, "  - Algoritmo llave: $operationalKeyAlgorithm")
+        Log.i(TAG, "  - Longitud llave: $keyLengthBytes bytes (${selectedKey.keyData.length} caracteres hex)")
+        Log.i(TAG, "  - KCV de llave: ${selectedKey.kcv}")
+        Log.i(TAG, "  - Tipo de llave: ${keyConfig.keyType}")
+        Log.i(TAG, "  - Slot destino: ${keyConfig.slot}")
+        Log.i(TAG, "  - Primeros 32 caracteres: ${selectedKey.keyData.take(32)}...")
+        Log.i(TAG, "")
+        Log.i(TAG, "=== INICIANDO CIFRADO ===")
+        Log.i(TAG, "Llamando a TripleDESCrypto.encryptKeyForTransmission()...")
 
         try {
             // Cifrar la llave con la KTK usando TripleDESCrypto
