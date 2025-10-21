@@ -61,6 +61,7 @@ data class InjectSymmetricKeyCommand(
     val ktkSlot: Int,
     val keyType: String,
     val encryptionType: String,
+    val keyAlgorithm: String,  // NUEVO: 00=3DES-112, 01=3DES-168, 02=AES-128, 03=AES-192, 04=AES-256
     val keyChecksum: String,
     val ktkChecksum: String,
     val ksn: String,

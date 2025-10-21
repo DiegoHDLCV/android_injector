@@ -120,6 +120,7 @@ class FuturexMessageParser : IMessageParser {
         val ktkSlot = reader.read(2).also { Log.i(TAG, "  - KtkSlot: '$it' (${it.toInt(16)})") }.toInt(16)
         val keyType = reader.read(2).also { Log.i(TAG, "  - KeyType: '$it'") }
         val encryptionType = reader.read(2).also { Log.i(TAG, "  - EncryptionType: '$it'") }
+        val keyAlgorithm = reader.read(2).also { Log.i(TAG, "  - KeyAlgorithm: '$it'") }  // NUEVO CAMPO
         val keyChecksum = reader.read(4).also { Log.i(TAG, "  - KeyChecksum: '$it'") }
         val ktkChecksum = reader.read(4).also { Log.i(TAG, "  - KtkChecksum: '$it'") }
 
@@ -153,6 +154,7 @@ class FuturexMessageParser : IMessageParser {
         Log.i(TAG, "  - KtkSlot: $ktkSlot")
         Log.i(TAG, "  - KeyType: $keyType")
         Log.i(TAG, "  - EncryptionType: $encryptionType")
+        Log.i(TAG, "  - KeyAlgorithm: $keyAlgorithm")
         Log.i(TAG, "  - KeyChecksum: $keyChecksum")
         Log.i(TAG, "  - KtkChecksum: $ktkChecksum")
         Log.i(TAG, "  - KSN: $ksn")
@@ -161,7 +163,7 @@ class FuturexMessageParser : IMessageParser {
         Log.i(TAG, "✓ Parseo de comando '02' completado exitosamente")
         Log.i(TAG, "================================================")
         
-        return InjectSymmetricKeyCommand(fullPayload, version, keySlot, ktkSlot, keyType, encryptionType, keyChecksum, ktkChecksum, ksn, keyHex, ktkHex)
+        return InjectSymmetricKeyCommand(fullPayload, version, keySlot, ktkSlot, keyType, encryptionType, keyAlgorithm, keyChecksum, ktkChecksum, ksn, keyHex, ktkHex)
     }
 
     private fun parseLegacyCommands(fullPayload: String, commandCode: String): InjectSymmetricKeyCommand {
@@ -178,6 +180,7 @@ class FuturexMessageParser : IMessageParser {
         return InjectSymmetricKeyCommand(
             rawPayload = fullPayload, version = "LG", keySlot = keySlot, ktkSlot = 0,
             keyType = if (commandCode == "00") "02" else "01", encryptionType = "00",
+            keyAlgorithm = "00",  // Legacy: default 3DES
             keyChecksum = "0000", ktkChecksum = "0000", ksn = ksn, keyHex = keyHex, ktkHex = null
         )
     }

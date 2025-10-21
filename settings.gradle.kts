@@ -30,7 +30,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "android_injector"
-include(":app")
+include(":keyreceiver")
 include(":utils")
 include(":persistence")
 include(":manufacturer")

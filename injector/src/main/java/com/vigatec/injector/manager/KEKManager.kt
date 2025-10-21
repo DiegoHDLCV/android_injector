@@ -221,9 +221,12 @@ class KEKManager @Inject constructor(
             val allKeys = injectedKeyRepository.getAllInjectedKeys().first()
             Log.d(TAG, "getActiveKEKEntity: Se encontraron ${allKeys.size} llaves en total")
 
-            // Filtrar por tipo KEK
-            val kekKeys = allKeys.filter { it.keyType == "KEK" }
-            Log.d(TAG, "getActiveKEKEntity: ${kekKeys.size} llaves de tipo KEK encontradas")
+            // Filtrar por el flag isKEK (no por keyType, ya que keyType contiene el nombre real como "DUKPT BDK 3DES")
+            val kekKeys = allKeys.filter { it.isKEK == true }
+            Log.d(TAG, "getActiveKEKEntity: ${kekKeys.size} llaves marcadas como KEK/KTK encontradas (isKEK=true)")
+            kekKeys.forEach { kek ->
+                Log.d(TAG, "  - KCV: ${kek.kcv}, Tipo: ${kek.keyType}, Estado: ${kek.status}, isKEK: ${kek.isKEK}")
+            }
 
             // Filtrar por estado ACTIVE o EXPORTED
             val activeKeks = kekKeys.filter { it.status == "ACTIVE" || it.status == "EXPORTED" }

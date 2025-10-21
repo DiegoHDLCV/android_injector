@@ -84,9 +84,6 @@ fun AppNavigation() {
                 username = currentUsername,
                 onNavigateToConfig = {
                     navController.navigate(Screen.Config.route)
-                },
-                onNavigateToExportImport = {
-                    navController.navigate(Screen.ExportImport.route)
                 }
             )
         }

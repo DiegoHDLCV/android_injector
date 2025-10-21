@@ -563,6 +563,9 @@ class KeyInjectionViewModel @Inject constructor(
             ktkChecksum = "0000"
         }
 
+        // Detectar algoritmo basado en longitud y tipo
+        val keyAlgorithm = detectKeyAlgorithm(keyLengthBytes, keyConfig.keyType)
+
         // Construir comando "02" de Futurex para inyección de llave simétrica
         val command = "02" // Comando de inyección simétrica
         val version = "01" // Versión del comando
@@ -597,6 +600,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "Slot KTK: $ktkSlotStr")
         Log.i(TAG, "Tipo de llave: $keyType (${keyConfig.keyType})")
         Log.i(TAG, "Tipo de encriptación: $encryptionType (${if (encryptionType == "00") "Carga en claro" else "Cifrado bajo KTK"})")
+        Log.i(TAG, "Algoritmo de llave: $keyAlgorithm (${getAlgorithmDescription(keyAlgorithm)})")
         Log.i(TAG, "Checksum de llave: $keyChecksum (KCV: ${selectedKey.kcv})")
         Log.i(TAG, "Checksum KTK: $ktkChecksum")
         Log.i(TAG, "KSN: $ksn (20 caracteres)")
@@ -619,7 +623,7 @@ class KeyInjectionViewModel @Inject constructor(
         }
         
         // Para el protocolo Futurex, concatenamos todo en un solo string
-        val payload = command + version + keySlot + ktkSlotStr + keyType + encryptionType +
+        val payload = command + version + keySlot + ktkSlotStr + keyType + encryptionType + keyAlgorithm +
                      keyChecksum + ktkChecksum + ksn + keyLength + keyHex
 
         Log.i(TAG, "=== PAYLOAD FINAL FUTUREX ===")
@@ -631,6 +635,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - KTK Slot: $ktkSlotStr")
         Log.i(TAG, "  - Tipo: $keyType")
         Log.i(TAG, "  - Encriptación: $encryptionType")
+        Log.i(TAG, "  - Algoritmo: $keyAlgorithm")
         Log.i(TAG, "  - Checksum: $keyChecksum")
         Log.i(TAG, "  - KTK Checksum: $ktkChecksum")
         Log.i(TAG, "  - KSN: $ksn")
@@ -639,7 +644,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "================================================")
 
         // Construir el payload manualmente para Futurex
-        val payloadString = command + version + keySlot + ktkSlotStr + keyType + encryptionType +
+        val payloadString = command + version + keySlot + ktkSlotStr + keyType + encryptionType + keyAlgorithm +
                            keyChecksum + ktkChecksum + ksn + keyLength + keyHex
 
         Log.i(TAG, "=== PAYLOAD MANUAL FUTUREX ===")
@@ -648,7 +653,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "================================================")
 
         // DEBUG: Verificar cálculo del LRC
-        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType,
+        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm,
                            keyChecksum, ktkChecksum, ksn, keyLength, keyHex)
         debugLrcCalculation(command, fields)
         
@@ -694,21 +699,36 @@ class KeyInjectionViewModel @Inject constructor(
 
     private fun mapKeyTypeToFuturex(keyType: String): String {
         Log.d(TAG, "Mapeando tipo de llave: '$keyType' -> Futurex")
-        
-        val mappedType = when (keyType.uppercase()) {
-            "PIN" -> "05" // PIN Encryption Key
-            "MAC" -> "04" // MAC Key
-            "TDES", "3DES" -> "01" // Master Session Key
-            "AES" -> "01" // Master Session Key (AES)
-            "DUKPT", "DUKPT_TDES", "DUKPT_3DES" -> "08" // DUKPT 3DES BDK Key
-            "DUKPT_AES" -> "10" // DUKPT AES BDK Key
-            "DUKPT_INITIAL", "IPEK" -> "03" // DUKPT 3DES IPEK
-            "DUKPT_AES_INITIAL", "AES_IPEK" -> "0B" // DUKPT AES IPEK
-            "DATA" -> "0C" // Data Encryption Key
+
+        // Usar .contains() para detectar el tipo de llave en lugar de comparación exacta
+        val keyTypeUpper = keyType.uppercase()
+        val mappedType = when {
+            // PIN, MAC, DATA: Tipos de llaves operacionales
+            keyTypeUpper.contains("PIN") -> "05"    // PIN Encryption Key
+            keyTypeUpper.contains("MAC") -> "04"    // MAC Key
+            keyTypeUpper.contains("DATA") -> "0C"   // Data Encryption Key
+
+            // DUKPT: Llaves derivadas con KSN
+            keyTypeUpper.contains("DUKPT") && keyTypeUpper.contains("AES") && keyTypeUpper.contains("IPEK") -> "0B"   // DUKPT AES IPEK
+            keyTypeUpper.contains("DUKPT") && keyTypeUpper.contains("IPEK") -> "03"   // DUKPT 3DES IPEK
+            keyTypeUpper.contains("DUKPT") && keyTypeUpper.contains("AES") -> "10"  // DUKPT AES BDK
+            keyTypeUpper.contains("DUKPT") -> "08"  // DUKPT 3DES BDK
+
+            // IPEK standalone (sin DUKPT en el nombre)
+            keyTypeUpper.contains("IPEK") && keyTypeUpper.contains("AES") -> "0B"   // AES IPEK
+            keyTypeUpper.contains("IPEK") -> "03"   // 3DES IPEK
+
+            // Master/Transport Keys
+            keyTypeUpper.contains("TDES") || keyTypeUpper.contains("3DES") -> "01"  // Master Session Key (3DES)
+            keyTypeUpper.contains("AES") -> "01"    // Master Session Key (AES)
+
+            // Default
             else -> "01" // Default to Master Session Key
         }
-        
+
         Log.d(TAG, "Tipo mapeado: '$keyType' -> '$mappedType'")
+        Log.d(TAG, "  - Detección: keyTypeUpper='$keyTypeUpper'")
+        Log.d(TAG, "  - Descripción: ${getKeyTypeDescription(mappedType)}")
         return mappedType
     }
 
@@ -772,6 +792,51 @@ class KeyInjectionViewModel @Inject constructor(
             "0C" -> "Data Encryption Key"
             "10" -> "DUKPT AES BDK (Base Derivation Key AES)"
             else -> "Tipo desconocido ($keyType)"
+        }
+    }
+
+    /**
+     * Detecta el algoritmo de la llave basado en su longitud y tipo
+     * Códigos:
+     * - 00 = 3DES-112 (16 bytes, 2 keys)
+     * - 01 = 3DES-168 (24 bytes, 3 keys)
+     * - 02 = AES-128 (16 bytes)
+     * - 03 = AES-192 (24 bytes)
+     * - 04 = AES-256 (32 bytes)
+     */
+    private fun detectKeyAlgorithm(keyLengthBytes: Int, keyType: String): String {
+        val keyTypeUpper = keyType.uppercase()
+
+        // Si el tipo contiene AES explícitamente, usar algoritmo AES
+        if (keyTypeUpper.contains("AES")) {
+            return when (keyLengthBytes) {
+                16 -> "02" // AES-128
+                24 -> "03" // AES-192
+                32 -> "04" // AES-256
+                else -> "02" // Default AES-128
+            }
+        }
+
+        // Si el tipo contiene TDES o 3DES explícitamente, o es tipo genérico, usar 3DES
+        return when (keyLengthBytes) {
+            16 -> "00" // 3DES-112 (2 keys)
+            24 -> "01" // 3DES-168 (3 keys)
+            32 -> "04" // Si es 32 bytes y no es AES, asumir AES-256
+            else -> "01" // Default 3DES-168
+        }
+    }
+
+    /**
+     * Retorna la descripción legible del código de algoritmo
+     */
+    private fun getAlgorithmDescription(algorithmCode: String): String {
+        return when (algorithmCode) {
+            "00" -> "3DES-112 (16 bytes, 2 keys)"
+            "01" -> "3DES-168 (24 bytes, 3 keys)"
+            "02" -> "AES-128 (16 bytes)"
+            "03" -> "AES-192 (24 bytes)"
+            "04" -> "AES-256 (32 bytes)"
+            else -> "Desconocido ($algorithmCode)"
         }
     }
 
