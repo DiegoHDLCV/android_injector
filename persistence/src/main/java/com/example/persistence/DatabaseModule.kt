@@ -46,6 +46,22 @@ object DatabaseModule {
         }
     }
 
+    /**
+     * Migración de versión 12 a 13: Cambia índice único de KCV a KCV + kekType
+     * - Elimina el índice único en KCV
+     * - Agrega índice único en KCV + kekType
+     * - Permite que la misma llave física (mismo KCV) se use para diferentes propósitos
+     */
+    private val MIGRATION_12_13 = object : Migration(12, 13) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            // Eliminar el índice único en KCV
+            database.execSQL("DROP INDEX IF EXISTS index_injected_keys_kcv")
+            
+            // Crear el nuevo índice único en KCV + kekType
+            database.execSQL("CREATE UNIQUE INDEX index_injected_keys_kcv_kekType ON injected_keys (kcv, kekType)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
@@ -54,7 +70,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "pos_database"
         )
-            .addMigrations(MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .build()
     }
 

@@ -22,13 +22,14 @@ enum class KEKType {
  * Estrategia de índices:
  * - Para llaves de ceremonia (keySlot < 0): KCV único (no puede haber 2 llaves de ceremonia con el mismo KCV)
  * - Para llaves en hardware (keySlot >= 0): slot/tipo único (solo una llave por slot/tipo)
- * - El índice compuesto permite flexibilidad para ambos casos
+ * - KCV + kekType único: permite que la misma llave física (mismo KCV) se use para diferentes propósitos
+ *   (ej: KTK y llave operacional con el mismo KCV)
  */
 @Entity(
     tableName = "injected_keys",
     indices = [
         Index(value = ["keySlot", "keyType"], unique = false), // Índice para búsquedas rápidas
-        Index(value = ["kcv"], unique = true) // KCV único - no puede haber dos llaves con el mismo KCV
+        Index(value = ["kcv", "kekType"], unique = true) // KCV + kekType único - permite KCV duplicado con diferentes propósitos
     ]
 )
 data class InjectedKeyEntity(

@@ -24,6 +24,12 @@ class InjectedKeyRepository @Inject constructor(
      */
     fun getAllInjectedKeys(): Flow<List<InjectedKeyEntity>> {
         return injectedKeyDao.getAllInjectedKeys().map { keys ->
+            Log.d(TAG, "=== CONSULTA BD - getAllInjectedKeys ===")
+            Log.d(TAG, "Total de llaves consultadas: ${keys.size}")
+            keys.forEachIndexed { index, key ->
+                Log.d(TAG, "BD Consulta $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', KCV=${key.kcv}")
+            }
+            Log.d(TAG, "=== FIN CONSULTA BD ===")
             keys.map { key -> decryptKeyIfNeeded(key) }
         }
     }
@@ -173,6 +179,15 @@ class InjectedKeyRepository @Inject constructor(
                 )
             }
 
+            // Log de la entidad antes de guardar
+            Log.i(TAG, "=== ENTIDAD A GUARDAR ===")
+            Log.i(TAG, "  - keySlot: ${injectedKey.keySlot}")
+            Log.i(TAG, "  - keyType: ${injectedKey.keyType}")
+            Log.i(TAG, "  - kekType: ${injectedKey.kekType}")
+            Log.i(TAG, "  - isKEK: ${injectedKey.isKEK}")
+            Log.i(TAG, "  - status: ${injectedKey.status}")
+            Log.i(TAG, "=========================")
+
             if (keyType == "CEREMONY_KEY") {
                 Log.i(TAG, "Llave de ceremonia detectada - usando insertIfNotExists para evitar sobrescritura")
                 val insertedId = injectedKeyDao.insertIfNotExists(injectedKey)
@@ -185,15 +200,16 @@ class InjectedKeyRepository @Inject constructor(
                     Log.w(TAG, "⚠️ Llave de ceremonia con KCV $kcv ya existe - no se sobrescribió")
                 }
             } else {
-                Log.i(TAG, "Llave regular detectada - usando insertOrUpdate para permitir actualizaciones")
+                Log.i(TAG, "Llave detectada - usando insertOrUpdate (KCVs duplicados permitidos por propósito)")
                 injectedKeyDao.insertOrUpdate(injectedKey)
                 Log.i(TAG, "✓ Llave registrada/actualizada exitosamente en base de datos")
+                
                 if (shouldEncrypt) {
                     Log.i(TAG, "✓ Llave cifrada y almacenada de forma segura")
                 } else {
                     Log.i(TAG, "✓ Datos de la llave guardados: ${keyData.length / 2} bytes (SIN CIFRAR)")
                 }
-                Log.i(TAG, "✓ KCV: $kcv")
+                Log.i(TAG, "✓ KCV: $kcv, kekType: ${injectedKey.kekType}")
             }
             Log.i(TAG, "================================================")
 

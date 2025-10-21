@@ -687,6 +687,18 @@ class MainViewModel @Inject constructor(
         if (injectionStatus != "SKIPPED") {
             // Para KTK (TRANSPORT_KEY), guardar con datos para poder descifrar posteriormente
             if (genericKeyType == GenericKeyType.TRANSPORT_KEY) {
+                Log.d(TAG, "=== GUARDANDO KTK EN BD ===")
+                Log.d(TAG, "Datos a guardar:")
+                Log.d(TAG, "  - keySlot: ${command.keySlot}")
+                Log.d(TAG, "  - keyType: ${genericKeyType.name}")
+                Log.d(TAG, "  - keyAlgorithm: ${genericAlgorithm.name}")
+                Log.d(TAG, "  - kcv: ${command.keyChecksum}")
+                Log.d(TAG, "  - keyData length: ${command.keyHex.length / 2} bytes")
+                Log.d(TAG, "  - status: $injectionStatus")
+                Log.d(TAG, "  - isKEK: true")
+                Log.d(TAG, "  - kekType: KEK_TRANSPORT")
+                Log.d(TAG, "  - customName: KTK Slot ${command.keySlot}")
+                
                 injectedKeyRepository.recordKeyInjectionWithData(
                     keySlot = command.keySlot,
                     keyType = genericKeyType.name,
@@ -695,7 +707,7 @@ class MainViewModel @Inject constructor(
                     keyData = command.keyHex, // Guardar los datos de la KTK
                     status = injectionStatus,
                     isKEK = true, // Marcar como KEK
-                    kekType = "KTK",
+                    kekType = "KEK_TRANSPORT",
                     customName = "KTK Slot ${command.keySlot}"
                 )
                 Log.i(TAG, "KTK guardada con datos completos para descifrado posterior")

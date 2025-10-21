@@ -61,13 +61,31 @@ class InjectedKeysViewModel @Inject constructor(
         viewModelScope.launch {
             _loading.value = true
             try {
+                Log.d(TAG, "=== CARGANDO LLAVES DESDE BD ===")
                 injectedKeyRepository.getAllInjectedKeys()
                     .collect { keys ->
+                        Log.d(TAG, "Llaves cargadas desde BD: ${keys.size}")
+                        keys.forEachIndexed { index, key ->
+                            Log.d(TAG, "BD Llave $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', Art=${key.keyAlgorithm}, KCV=${key.kcv}, Status=${key.status}")
+                        }
+                        
+                        // Log especial para KTKs
+                        val ktks = keys.filter { it.isKEK && it.kekType == "KEK_TRANSPORT" }
+                        Log.d(TAG, "=== ANÁLISIS ESPECIAL DE KTKs ===")
+                        Log.d(TAG, "Total de llaves: ${keys.size}")
+                        Log.d(TAG, "KTKs encontradas: ${ktks.size}")
+                        ktks.forEachIndexed { index, ktk ->
+                            Log.d(TAG, "KTK $index: Slot=${ktk.keySlot}, KCV=${ktk.kcv}, kekType='${ktk.kekType}', isKEK=${ktk.isKEK}")
+                        }
+                        Log.d(TAG, "=== FIN ANÁLISIS KTKs ===")
+                        
                         _keys.value = keys
                         applyFilters() // Aplicar filtros cuando se cargan las llaves
                         _loading.value = false
+                        Log.d(TAG, "=== FIN CARGA DE LLAVES ===")
                     }
             } catch (e: Exception) {
+                Log.e(TAG, "Error al cargar las llaves", e)
                 _snackbarMessage.emit("Error al cargar las llaves: ${e.message}")
                 _loading.value = false
             }
@@ -264,9 +282,23 @@ class InjectedKeysViewModel @Inject constructor(
     private fun applyFilters() {
         val allKeys = _keys.value
         var filtered = allKeys
+        
+        Log.d(TAG, "=== APLICANDO FILTROS ===")
+        Log.d(TAG, "Total de llaves antes de filtrar: ${filtered.size}")
+        Log.d(TAG, "Filtros activos:")
+        Log.d(TAG, "  - Algoritmo: ${_filterAlgorithm.value}")
+        Log.d(TAG, "  - Estado: ${_filterStatus.value}")
+        Log.d(TAG, "  - Tipo KEK: ${_filterKEKType.value}")
+        Log.d(TAG, "  - Búsqueda: '${_searchText.value}'")
+        
+        // Log detallado de todas las llaves antes de filtrar
+        filtered.forEachIndexed { index, key ->
+            Log.d(TAG, "Llave $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', Art=${key.keyAlgorithm}, KCV=${key.kcv}")
+        }
 
         // Filtro por algoritmo
         if (_filterAlgorithm.value != "Todos") {
+            val beforeCount = filtered.size
             filtered = filtered.filter { key ->
                 when (_filterAlgorithm.value) {
                     "3DES" -> key.keyAlgorithm.contains("3DES", ignoreCase = true)
@@ -276,29 +308,76 @@ class InjectedKeysViewModel @Inject constructor(
                     else -> true
                 }
             }
+            Log.d(TAG, "Filtro algoritmo '${_filterAlgorithm.value}': $beforeCount → ${filtered.size}")
         }
 
         // Filtro por estado
         if (_filterStatus.value != "Todos") {
+            val beforeCount = filtered.size
             filtered = filtered.filter { it.status == _filterStatus.value }
+            Log.d(TAG, "Filtro estado '${_filterStatus.value}': $beforeCount → ${filtered.size}")
         }
 
         // Filtro por tipo KEK
         when (_filterKEKType.value) {
-            "Solo KEK" -> filtered = filtered.filter { it.isKEK }
-            "Solo Operacionales" -> filtered = filtered.filter { !it.isKEK }
-            "Todas" -> { /* No filtrar */ }
+            "Solo KEK" -> {
+                val beforeCount = filtered.size
+                filtered = filtered.filter { it.isKEK }
+                Log.d(TAG, "Filtro 'Solo KEK': $beforeCount → ${filtered.size}")
+                Log.d(TAG, "Llaves KEK encontradas:")
+                filtered.forEach { key ->
+                    Log.d(TAG, "  - Slot=${key.keySlot}, kekType='${key.kekType}', KCV=${key.kcv}")
+                }
+            }
+            "Solo Operacionales" -> {
+                val beforeCount = filtered.size
+                filtered = filtered.filter { !it.isKEK }
+                Log.d(TAG, "Filtro 'Solo Operacionales': $beforeCount → ${filtered.size}")
+            }
+            "Todas" -> { 
+                Log.d(TAG, "Filtro 'Todas': No se aplica filtro de KEK")
+                Log.d(TAG, "Desglose por tipo KEK:")
+                val ktkCount = filtered.count { it.isKEK && it.kekType == "KEK_TRANSPORT" }
+                val kekCount = filtered.count { it.isKEK && it.kekType == "KEK_STORAGE" }
+                val otherKekCount = filtered.count { it.isKEK && it.kekType !in listOf("KEK_TRANSPORT", "KEK_STORAGE") }
+                val operationalCount = filtered.count { !it.isKEK }
+                Log.d(TAG, "  - KTK (KEK_TRANSPORT): $ktkCount")
+                Log.d(TAG, "  - KEK Storage (KEK_STORAGE): $kekCount")
+                Log.d(TAG, "  - Otros KEK: $otherKekCount")
+                Log.d(TAG, "  - Operacionales: $operationalCount")
+                
+                // Log especial si se detectan KTKs
+                if (ktkCount > 0) {
+                    Log.d(TAG, "🚨 SE DETECTARON KTKs EN FILTRO 'TODAS' - DEBERÍAN SER VISIBLES")
+                    filtered.filter { it.isKEK && it.kekType == "KEK_TRANSPORT" }.forEach { ktk ->
+                        Log.d(TAG, "  🎯 KTK Detectada: Slot=${ktk.keySlot}, KCV=${ktk.kcv}, kekType='${ktk.kekType}', isKEK=${ktk.isKEK}")
+                    }
+                }
+            }
         }
 
         // Filtro por búsqueda de texto
         if (_searchText.value.isNotEmpty()) {
+            val beforeCount = filtered.size
             val searchLower = _searchText.value.lowercase()
             filtered = filtered.filter { key ->
                 key.kcv.lowercase().contains(searchLower) ||
                 key.customName.lowercase().contains(searchLower) ||
                 key.keyType.lowercase().contains(searchLower)
             }
+            Log.d(TAG, "Filtro búsqueda '${_searchText.value}': $beforeCount → ${filtered.size}")
         }
+
+        Log.d(TAG, "Total de llaves después de filtrar: ${filtered.size}")
+        
+        // Log especial para ver qué se está enviando a la UI
+        Log.d(TAG, "=== LLAVES ENVIADAS A LA UI ===")
+        filtered.forEachIndexed { index, key ->
+            Log.d(TAG, "UI Llave $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', KCV=${key.kcv}")
+        }
+        Log.d(TAG, "=== FIN LLAVES ENVIADAS A LA UI ===")
+        
+        Log.d(TAG, "=== FIN APLICACIÓN DE FILTROS ===")
 
         _filteredKeys.value = filtered
     }

@@ -25,7 +25,7 @@ import com.example.persistence.entities.ProfileEntity
         InjectedKeyEntity::class,
         ProfileEntity::class
     ],
-    version = 12, // Versión 12: Agrega campo kekType para diferenciar entre KEK_STORAGE y KEK_TRANSPORT (KTK)
+    version = 13, // Versión 13: Cambia índice único de KCV a KCV + kekType para permitir KCVs duplicados con diferentes propósitos
     exportSchema = true
 )
 @TypeConverters(Converters::class)
