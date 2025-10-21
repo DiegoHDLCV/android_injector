@@ -567,8 +567,16 @@ class MainViewModel @Inject constructor(
                 }
                 "01" -> {
                     Log.d(TAG, "Manejando EncryptionType 01: Cifrado bajo KTK pre-cargada")
-                    val ktkFromDb = injectedKeyRepository.getKeyBySlotAndType(command.ktkSlot, GenericKeyType.TRANSPORT_KEY.name) ?: injectedKeyRepository.getKeyBySlotAndType(command.ktkSlot, GenericKeyType.MASTER_KEY.name)
-                    if (ktkFromDb == null) throw PedKeyException("KTK pre-cargada en slot ${command.ktkSlot} no encontrada.")
+
+                    // DEFENSIVO: Validar slot de KTK
+                    var validKtkSlot = command.ktkSlot
+                    if (validKtkSlot < 0) {
+                        Log.w(TAG, "⚠️ Slot de KTK inválido: ${command.ktkSlot}. Usando slot 0 por defecto.")
+                        validKtkSlot = 0
+                    }
+
+                    val ktkFromDb = injectedKeyRepository.getKeyBySlotAndType(validKtkSlot, GenericKeyType.TRANSPORT_KEY.name) ?: injectedKeyRepository.getKeyBySlotAndType(validKtkSlot, GenericKeyType.MASTER_KEY.name)
+                    if (ktkFromDb == null) throw PedKeyException("KTK pre-cargada en slot $validKtkSlot no encontrada.")
                     if (!ktkFromDb.kcv.take(4).equals(command.ktkChecksum.take(4), ignoreCase = true)) throw PedKeyException("El KCV de la KTK en BD ('${ktkFromDb.kcv.take(4)}') no coincide con el del comando ('${command.ktkChecksum.take(4)}').")
 
                     val encryptedKeyBytes = command.keyHex.hexToByteArray()
@@ -576,7 +584,7 @@ class MainViewModel @Inject constructor(
                     when (genericKeyType) {
                         GenericKeyType.DUKPT_INITIAL_KEY -> {
                             Log.d(TAG, "Llamando a 'writeDukptInitialKeyEncrypted' para una llave DUKPT.")
-                            pedController!!.writeDukptInitialKeyEncrypted(command.keySlot, genericAlgorithm, encryptedKeyBytes, command.ksn.hexToByteArray(), command.ktkSlot, command.keyChecksum)
+                            pedController!!.writeDukptInitialKeyEncrypted(command.keySlot, genericAlgorithm, encryptedKeyBytes, command.ksn.hexToByteArray(), validKtkSlot, command.keyChecksum)
                         }
                         GenericKeyType.WORKING_PIN_KEY,
                         GenericKeyType.WORKING_MAC_KEY,
@@ -588,7 +596,7 @@ class MainViewModel @Inject constructor(
                                 keyType = genericKeyType,
                                 keyAlgorithm = genericAlgorithm,
                                 keyData = keyData,
-                                transportKeyIndex = command.ktkSlot,
+                                transportKeyIndex = validKtkSlot,
                                 transportKeyType = GenericKeyType.TRANSPORT_KEY
                             )
                         }
@@ -601,9 +609,16 @@ class MainViewModel @Inject constructor(
                     Log.d(TAG, "Manejando EncryptionType 02: Cifrado con KTK en claro")
                     if (command.ktkHex == null) throw PedKeyException("Falta la KTK en claro para el tipo de cifrado 02.")
 
-                    Log.d(TAG, "Paso 1/2: Inyectando KTK en claro en slot ${command.ktkSlot}")
+                    // DEFENSIVO: Validar slot de KTK
+                    var validKtkSlot02 = command.ktkSlot
+                    if (validKtkSlot02 < 0) {
+                        Log.w(TAG, "⚠️ Slot de KTK inválido: ${command.ktkSlot}. Usando slot 0 por defecto.")
+                        validKtkSlot02 = 0
+                    }
+
+                    Log.d(TAG, "Paso 1/2: Inyectando KTK en claro en slot $validKtkSlot02")
                     pedController!!.writeKeyPlain(
-                        command.ktkSlot,
+                        validKtkSlot02,
                         GenericKeyType.TRANSPORT_KEY,
                         genericAlgorithm,
                         command.ktkHex!!.hexToByteArray(),
@@ -614,7 +629,7 @@ class MainViewModel @Inject constructor(
                     val tr31Block = parseTr31Block(command.keyHex)
                     val encryptedKey = unwrapTr31Payload(tr31Block.encryptedPayload)
 
-                    pedController!!.writeDukptInitialKeyEncrypted(command.keySlot, genericAlgorithm, encryptedKey, command.ksn.hexToByteArray(), command.ktkSlot, command.keyChecksum)
+                    pedController!!.writeDukptInitialKeyEncrypted(command.keySlot, genericAlgorithm, encryptedKey, command.ksn.hexToByteArray(), validKtkSlot02, command.keyChecksum)
                 }
                 else -> throw PedKeyException("Tipo de encriptación '${command.encryptionType}' no soportado.")
             }

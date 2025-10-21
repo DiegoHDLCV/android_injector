@@ -508,12 +508,19 @@ class KeyInjectionViewModel @Inject constructor(
         val hasActiveKEK = kotlinx.coroutines.runBlocking { kekManager.hasActiveKEK() }
         val kekData = kotlinx.coroutines.runBlocking { kekManager.getActiveKEKData() }
         val kekKcv = kotlinx.coroutines.runBlocking { kekManager.getActiveKEKKcv() }
-        val kekSlot = kotlinx.coroutines.runBlocking { kekManager.getActiveKEKSlot() } ?: 0
+        var kekSlot = kotlinx.coroutines.runBlocking { kekManager.getActiveKEKSlot() } ?: 0
+
+        // CRÍTICO: Validar que el slot de KEK sea válido (>= 0)
+        // Si es negativo, establecer como 0 por defecto
+        if (kekSlot < 0) {
+            Log.w(TAG, "⚠️ Slot de KEK inválido: $kekSlot. Usando slot 0 por defecto.")
+            kekSlot = 0
+        }
 
         Log.i(TAG, "¿Hay KEK activa?: $hasActiveKEK")
         if (hasActiveKEK) {
             Log.i(TAG, "  - KCV de KEK: $kekKcv")
-            Log.i(TAG, "  - Slot de KEK: $kekSlot")
+            Log.i(TAG, "  - Slot de KEK: $kekSlot (validado)")
         }
 
         // Decidir tipo de encriptación y datos de llave
@@ -536,7 +543,7 @@ class KeyInjectionViewModel @Inject constructor(
                 )
 
                 encryptionType = "01" // Cifrado bajo KTK pre-cargada
-                ktkSlotStr = kekSlot.toString().padStart(2, '0')
+                ktkSlotStr = kekSlot.toString().padStart(2, '0') // Ahora garantizado >= 0
                 ktkChecksum = kekKcv.take(4)
 
                 Log.i(TAG, "✓ Llave cifrada exitosamente")
