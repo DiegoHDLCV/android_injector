@@ -137,15 +137,9 @@ class FuturexMessageParser : IMessageParser {
         val keyHex = reader.read(keyLengthChars)
         Log.i(TAG, "  - KeyHex: ${keyHex.take(64)}${if (keyHex.length > 64) "..." else ""}")
 
-        val ktkHex = if (encryptionType == "02") {
-            Log.d(TAG, "EncryptionType es '02', parseando KTK en claro.")
-            val ktkLengthStr = reader.read(3)
-            val ktkLengthBytes = ktkLengthStr.toInt(16)
-            val ktkLengthChars = ktkLengthBytes * 2
-            reader.read(ktkLengthChars)
-        } else {
-            null
-        }
+        // NOTA: Para encryptionType "02", la KTK ya fue enviada previamente con encryptionType "00"
+        // NO se parsea KTK del payload
+        val ktkHex: String? = null
 
         Log.i(TAG, "=== RESUMEN DEL COMANDO PARSEADO ===")
         Log.i(TAG, "  - Comando: 02 (Inyección de llave simétrica)")

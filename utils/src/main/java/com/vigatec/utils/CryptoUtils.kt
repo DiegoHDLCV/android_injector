@@ -397,6 +397,64 @@ object TripleDESCrypto {
     }
 
     /**
+     * Descifra una llave recibida cifrada desde el inyector
+     * Incluye validaciones y logs detallados
+     *
+     * @param encryptedKeyData Datos de la llave cifrada (hex)
+     * @param kekData KEK/KTK para descifrar (hex)
+     * @param expectedKcv KCV esperado de la llave descifrada
+     * @return Llave descifrada (hex)
+     */
+    fun decryptKeyAfterTransmission(encryptedKeyData: String, kekData: String, expectedKcv: String): String {
+        try {
+            Log.d(TAG, "=== DESCIFRANDO LLAVE RECIBIDA ===")
+            Log.d(TAG, "KCV esperado: $expectedKcv")
+
+            // Descifrar
+            val decryptedKey = decryptWithKEK(encryptedKeyData, kekData)
+
+            // El descifrado puede tener padding, necesitamos removerlo
+            // Probamos diferentes longitudes válidas: 8, 16, 24, 32, 48 bytes
+            val decryptedBytes = KcvCalculator.hexStringToByteArray(decryptedKey)
+            Log.d(TAG, "Longitud descifrada (con posible padding): ${decryptedBytes.size} bytes")
+
+            // Validar KCV para determinar la longitud real
+            val validLengths = listOf(8, 16, 24, 32, 48)
+            var actualKeyHex: String? = null
+
+            for (length in validLengths) {
+                if (length <= decryptedBytes.size) {
+                    val candidateKey = decryptedBytes.copyOfRange(0, length)
+                    val candidateKeyHex = candidateKey.joinToString("") { "%02X".format(it) }
+                    val candidateKcv = KcvCalculator.calculateKcv(candidateKeyHex)
+
+                    Log.d(TAG, "Probando longitud $length bytes: KCV = $candidateKcv")
+
+                    if (candidateKcv.startsWith(expectedKcv, ignoreCase = true)) {
+                        actualKeyHex = candidateKeyHex
+                        Log.d(TAG, "✓ KCV coincide con longitud $length bytes")
+                        break
+                    }
+                }
+            }
+
+            if (actualKeyHex == null) {
+                throw IllegalArgumentException("No se pudo validar la llave descifrada. KCV esperado: $expectedKcv")
+            }
+
+            Log.d(TAG, "✓ Llave descifrada y validada exitosamente")
+            Log.d(TAG, "  - Longitud real: ${actualKeyHex.length / 2} bytes")
+            Log.d(TAG, "  - KCV validado: $expectedKcv")
+
+            return actualKeyHex
+
+        } catch (e: Exception) {
+            Log.e(TAG, "✗ Error al descifrar llave recibida: ${e.message}", e)
+            throw e
+        }
+    }
+
+    /**
      * Prueba de cifrado/descifrado round-trip
      * Útil para validar que el cifrado y descifrado funcionan correctamente
      */

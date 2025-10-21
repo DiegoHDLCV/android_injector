@@ -533,10 +533,11 @@ class KeyInjectionViewModel @Inject constructor(
         val finalKeyData: String
         val ktkSlotStr: String
         val ktkChecksum: String
-        val ktkHexForCommand: String
 
-        // MODO CIFRADO: Usar KTK para cifrar la llave - KTK SIEMPRE EN CLARO
-        Log.i(TAG, "=== MODO CIFRADO CON KTK (EN CLARO) ===")
+        // MODO CIFRADO: Usar KTK para cifrar la llave
+        // La KTK ya fue enviada previamente con encryptionType "00" (en claro)
+        // Ahora enviamos la llave cifrada con encryptionType "02"
+        Log.i(TAG, "=== MODO CIFRADO CON KTK (YA INYECTADA) ===")
         Log.i(TAG, "Cifrando llave con KTK antes de enviar...")
 
         try {
@@ -547,18 +548,17 @@ class KeyInjectionViewModel @Inject constructor(
                 keyKcv = selectedKey.kcv
             )
 
-            encryptionType = "02" // Cifrado con KTK en claro
-            ktkSlotStr = ktkSlot.toString().padStart(2, '0') // Ahora garantizado >= 0
+            encryptionType = "02" // Llave cifrada (KTK ya fue inyectada previamente)
+            ktkSlotStr = ktkSlot.toString().padStart(2, '0') // Slot donde está la KTK
             ktkChecksum = ktkKcv.take(4)
-            ktkHexForCommand = ktkData // KTK EN CLARO (sin cifrar)
 
             Log.i(TAG, "✓ Llave cifrada exitosamente")
             Log.i(TAG, "  - Datos originales (primeros 32): ${selectedKey.keyData.take(32)}...")
             Log.i(TAG, "  - Datos cifrados (primeros 32): ${finalKeyData.take(32)}...")
-            Log.i(TAG, "  - Tipo de encriptación: $encryptionType (Cifrado con KTK en claro)")
+            Log.i(TAG, "  - Tipo de encriptación: $encryptionType (Cifrada con KTK en slot $ktkSlotStr)")
             Log.i(TAG, "  - Slot de KTK: $ktkSlotStr")
             Log.i(TAG, "  - Checksum de KTK: $ktkChecksum")
-            Log.i(TAG, "  - KTK será enviada en CLARO (sin cifrar) en el comando")
+            Log.i(TAG, "  - IMPORTANTE: La KTK ya debe estar inyectada en el dispositivo")
 
         } catch (e: Exception) {
             Log.e(TAG, "✗ Error al cifrar llave con KTK: ${e.message}", e)
@@ -657,19 +657,10 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "================================================")
 
         // DEBUG: Verificar cálculo del LRC
-        // IMPORTANTE: Para encryptionType 02, incluir ktkHexForCommand en los fields
-        val fields = if (encryptionType == "02") {
-            // Cuando se envía KTK en claro: version, keySlot, ktkSlotStr, keyType, encryptionType,
-            // keyAlgorithm, keyChecksum, ktkChecksum, ksn, ktkLength, ktkHex, keyLength, keyHex
-            listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm,
-                   keyChecksum, ktkChecksum, ksn,
-                   String.format("%03X", ktkData.length / 2), ktkHexForCommand,  // KTK length y data
-                   keyLength, keyHex)
-        } else {
-            // Fallback (no debería ocurrir, KTK es obligatoria)
-            listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm,
-                   keyChecksum, ktkChecksum, ksn, keyLength, keyHex)
-        }
+        // IMPORTANTE: Para encryptionType 02, la KTK NO va en el payload de este comando
+        // La KTK se envía en un comando separado ANTES de este
+        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm,
+                           keyChecksum, ktkChecksum, ksn, keyLength, keyHex)
         debugLrcCalculation(command, fields)
 
         // Usar el formateador Futurex directamente
@@ -1349,6 +1340,10 @@ class KeyInjectionViewModel @Inject constructor(
         val ktkSlotStr = "00" // No hay KTK superior (KEK se envía en claro)
         val keyType = "06" // Tipo 06 = Key Transfer Key (KTK/KEK)
         val encryptionType = "00" // EN CLARO (sin cifrar)
+
+        // Detectar algoritmo basado en longitud
+        val keyAlgorithm = detectKeyAlgorithm(keyLengthBytes, kek.customName)
+
         val keyChecksum = kek.kcv.take(4)
         val ktkChecksum = "0000" // No hay KTK superior
         val ksn = "00000000000000000000" // KEK no usa KSN
@@ -1362,6 +1357,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "Slot KTK: $ktkSlotStr (no aplica)")
         Log.i(TAG, "Tipo de llave: $keyType (KEK/KTK)")
         Log.i(TAG, "Tipo de encriptación: $encryptionType (EN CLARO)")
+        Log.i(TAG, "Algoritmo detectado: $keyAlgorithm (${getAlgorithmDescription(keyAlgorithm)})")
         Log.i(TAG, "Checksum de llave: $keyChecksum")
         Log.i(TAG, "Checksum KTK: $ktkChecksum (no aplica)")
         Log.i(TAG, "KSN: $ksn (no aplica)")
@@ -1369,7 +1365,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "Datos de KEK (primeros 32 bytes): ${keyHex.take(64)}...")
 
         // Formatear comando Futurex
-        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType,
+        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm,
                            keyChecksum, ktkChecksum, ksn, keyLength, keyHex)
         val formattedCommand = messageFormatter!!.format(command, fields)
 
