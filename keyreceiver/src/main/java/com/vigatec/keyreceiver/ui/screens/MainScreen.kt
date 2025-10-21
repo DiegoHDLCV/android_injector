@@ -100,7 +100,24 @@ fun MainScreen(navController: NavHostController) {
                 Text("Ver Todas las Llaves Inyectadas")
             }
 
-            // ========== 6. CONFIGURACIÓN AVANZADA (COLAPSABLE) ==========
+            // ========== 6. BOTÓN VERIFICAR LLAVES INSTALADAS ==========
+            Button(
+                onClick = { navController.navigate(Routes.KeyVerificationScreen.route) },
+                enabled = status == ConnectionStatus.DISCONNECTED ||
+                         status == ConnectionStatus.LISTENING ||
+                         status == ConnectionStatus.ERROR,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("🔍 Verificar Llaves Instaladas")
+            }
+
+            // ========== 7. CONFIGURACIÓN AVANZADA (COLAPSABLE) ==========
             AdvancedSettingsCard(
                 isExpanded = showAdvancedSettings,
                 onToggle = { showAdvancedSettings = !showAdvancedSettings },

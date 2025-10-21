@@ -10,12 +10,12 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/communication" />
             <option value="$PROJECT_DIR$/config" />
             <option value="$PROJECT_DIR$/dev_injector" />
             <option value="$PROJECT_DIR$/format" />
             <option value="$PROJECT_DIR$/injector" />
+            <option value="$PROJECT_DIR$/keyreceiver" />
             <option value="$PROJECT_DIR$/manufacturer" />
             <option value="$PROJECT_DIR$/persistence" />
             <option value="$PROJECT_DIR$/utils" />

@@ -28,8 +28,7 @@ class KEKManager @Inject constructor(
     suspend fun hasActiveKEK(): Boolean = withContext(Dispatchers.IO) {
         try {
             val activeKEK = getActiveKEKEntity()
-            val hasKEK = activeKEK != null &&
-                         (activeKEK.status == "ACTIVE" || activeKEK.status == "EXPORTED")
+            val hasKEK = activeKEK != null && activeKEK.status == "ACTIVE"
             Log.d(TAG, "¿Hay KEK activa?: $hasKEK")
             hasKEK
         } catch (e: Exception) {
@@ -188,31 +187,31 @@ class KEKManager @Inject constructor(
     }
 
     /**
-     * Marca la KEK como exportada
+     * Marca la KEK como inactiva (ya no se usa)
      */
-    suspend fun markKEKAsExported(): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun markKEKAsInactive(): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val activeKEK = getActiveKEKEntity()
             if (activeKEK == null) {
-                return@withContext Result.failure(Exception("No hay KEK activa para marcar como exportada"))
+                return@withContext Result.failure(Exception("No hay KEK activa para marcar como inactiva"))
             }
 
-            Log.i(TAG, "Marcando KEK como EXPORTED (KCV: ${activeKEK.kcv})")
-            injectedKeyRepository.updateKeyStatus(activeKEK.kcv, "EXPORTED")
-            Log.i(TAG, "✓ KEK marcada como EXPORTED")
+            Log.i(TAG, "Marcando KEK como INACTIVE (KCV: ${activeKEK.kcv})")
+            injectedKeyRepository.updateKeyStatus(activeKEK.kcv, "INACTIVE")
+            Log.i(TAG, "✓ KEK marcada como INACTIVE")
 
             Result.success(Unit)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error al marcar KEK como exportada", e)
+            Log.e(TAG, "Error al marcar KEK como inactiva", e)
             Result.failure(e)
         }
     }
 
     /**
-     * Obtiene la entidad de KEK activa (ACTIVE o EXPORTED)
+     * Obtiene la entidad de KEK activa (solo ACTIVE)
      */
-    private suspend fun getActiveKEKEntity() = withContext(Dispatchers.IO) {
+    suspend fun getActiveKEKEntity() = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "getActiveKEKEntity: Iniciando búsqueda de KEK activa...")
 
@@ -228,9 +227,9 @@ class KEKManager @Inject constructor(
                 Log.d(TAG, "  - KCV: ${kek.kcv}, Tipo: ${kek.keyType}, Estado: ${kek.status}, isKEK: ${kek.isKEK}")
             }
 
-            // Filtrar por estado ACTIVE o EXPORTED
-            val activeKeks = kekKeys.filter { it.status == "ACTIVE" || it.status == "EXPORTED" }
-            Log.d(TAG, "getActiveKEKEntity: ${activeKeks.size} KEKs activas/exportadas encontradas")
+            // Filtrar solo por estado ACTIVE (ya no se usa EXPORTED)
+            val activeKeks = kekKeys.filter { it.status == "ACTIVE" }
+            Log.d(TAG, "getActiveKEKEntity: ${activeKeks.size} KEKs activas encontradas")
 
             // Seleccionar la más reciente
             val activeKEK = activeKeks.maxByOrNull { it.injectionTimestamp }

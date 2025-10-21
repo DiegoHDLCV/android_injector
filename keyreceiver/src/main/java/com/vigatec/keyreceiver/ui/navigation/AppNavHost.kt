@@ -7,6 +7,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.vigatec.keyreceiver.ui.screens.InjectedKeysScreen
+import com.vigatec.keyreceiver.ui.screens.KeyVerificationScreen
 import com.vigatec.keyreceiver.ui.screens.LoginScreen
 import com.vigatec.keyreceiver.ui.screens.MainScreen
 import com.vigatec.keyreceiver.ui.screens.MasterKeyEntryScreen
@@ -42,6 +43,13 @@ fun AppNavHost(
         composable(Routes.InjectedKeysScreen.route) {
             // InjectedKeysScreen obtiene su propio ViewModel con hiltViewModel()
             InjectedKeysScreen(navController = navController)
+        }
+        composable(Routes.KeyVerificationScreen.route) {
+            // KeyVerificationScreen obtiene su propio ViewModel con hiltViewModel()
+            KeyVerificationScreen(
+                onNavigateBack = { navController.popBackStack() },
+                viewModel = hiltViewModel()
+            )
         }
 
         // Add other composables (like PrintingScreen) if they exist

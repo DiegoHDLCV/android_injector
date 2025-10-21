@@ -60,15 +60,26 @@ object StorageKeyManager {
      * Inicializa la KEK Storage desde una ceremonia de custodios.
      * La llave generada por XOR de componentes se almacena en Android Keystore.
      *
+     * IMPORTANTE: Si ya existe una KEK Storage, debes rotar las llaves antes de llamar a esta función.
+     * Esta función solo crea una nueva KEK, no maneja la rotación de llaves existentes.
+     *
      * @param ceremonyKeyHex Llave resultante de la ceremonia en formato hexadecimal
-     * @throws IllegalStateException Si ya existe una KEK Storage
+     * @param replaceIfExists Si es true, reemplaza la KEK existente (solo usar si ya rotaste las llaves)
+     * @throws IllegalStateException Si ya existe KEK Storage y replaceIfExists es false
      * @throws IllegalArgumentException Si el tamaño de llave es inválido
      */
-    fun initializeFromCeremony(ceremonyKeyHex: String) {
+    fun initializeFromCeremony(ceremonyKeyHex: String, replaceIfExists: Boolean = false) {
         Log.i(TAG, "=== INICIALIZANDO KEK STORAGE DESDE CEREMONIA ===")
 
         if (hasStorageKEK()) {
-            throw IllegalStateException("Ya existe una KEK Storage inicializada. Para reemplazarla, primero elimínala.")
+            if (replaceIfExists) {
+                Log.w(TAG, "⚠️ Reemplazando KEK Storage existente")
+                Log.w(TAG, "   Asumiendo que las llaves ya fueron rotadas previamente")
+                deleteStorageKEK()
+                Log.i(TAG, "✓ KEK Storage anterior eliminada")
+            } else {
+                throw IllegalStateException("Ya existe una KEK Storage inicializada. Debes rotar las llaves existentes primero o llamar con replaceIfExists=true.")
+            }
         }
 
         // Validar formato hexadecimal

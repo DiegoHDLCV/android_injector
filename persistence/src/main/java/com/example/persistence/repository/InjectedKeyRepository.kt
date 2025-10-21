@@ -118,13 +118,24 @@ class InjectedKeyRepository @Inject constructor(
             Log.i(TAG, "Nombre personalizado: ${if (customName.isEmpty()) "(Sin nombre)" else customName}")
 
             // Determinar si debemos cifrar la llave
-            val shouldEncrypt = StorageKeyManager.hasStorageKEK()
+            // IMPORTANTE: Las KEK Storage NO se cifran (se guardan en Android Keystore, no en BD cifradas)
+            val shouldEncrypt = StorageKeyManager.hasStorageKEK() && kekType != "KEK_STORAGE"
             Log.i(TAG, "¿Cifrar llave con KEK Storage?: $shouldEncrypt")
+            if (kekType == "KEK_STORAGE") {
+                Log.i(TAG, "Esta es una KEK Storage - NO se cifrará (se guarda en Android Keystore)")
+            }
 
             val injectedKey = if (shouldEncrypt) {
                 // Cifrar llave con KEK Storage
                 Log.i(TAG, "Cifrando llave con KEK Storage...")
                 val encryptedData = StorageKeyManager.encryptKey(keyData)
+
+                // Log de llave cifrada
+                Log.i(TAG, "✓ Llave cifrada exitosamente:")
+                Log.i(TAG, "  - Datos cifrados (primeros 64 bytes): ${encryptedData.encryptedData.take(128)}")
+                Log.i(TAG, "  - IV (${encryptedData.iv.length / 2} bytes): ${encryptedData.iv}")
+                Log.i(TAG, "  - AuthTag (${encryptedData.authTag.length / 2} bytes): ${encryptedData.authTag}")
+                Log.i(TAG, "  - Longitud total cifrada: ${encryptedData.encryptedData.length / 2} bytes")
 
                 InjectedKeyEntity(
                     keySlot = keySlot,
@@ -459,6 +470,28 @@ class InjectedKeyRepository @Inject constructor(
     suspend fun getLegacyKeysCount(): Int {
         val allKeys = injectedKeyDao.getAllInjectedKeysSync()
         return allKeys.count { it.isLegacy() }
+    }
+
+    /**
+     * Obtiene todas las llaves de forma síncrona.
+     * Útil para operaciones de rotación de KEK y migración.
+     */
+    suspend fun getAllInjectedKeysSync(): List<InjectedKeyEntity> {
+        return injectedKeyDao.getAllInjectedKeysSync()
+    }
+
+    /**
+     * Actualiza una llave existente en la base de datos.
+     * Útil para re-cifrar llaves durante rotación de KEK.
+     */
+    suspend fun updateInjectedKey(key: InjectedKeyEntity) {
+        try {
+            injectedKeyDao.update(key)
+            Log.d(TAG, "Key updated: ${key.id}, KCV=${key.kcv}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating key", e)
+            throw e
+        }
     }
 
 }

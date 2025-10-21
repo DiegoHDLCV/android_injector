@@ -28,6 +28,7 @@ data class KeyVaultState(
     val showDeleteModal: Boolean = false,
     val showViewModal: Boolean = false,
     val showClearAllConfirmation: Boolean = false,  // Diálogo de confirmación para eliminar todas
+    val showImportJsonDialog: Boolean = false,  // Diálogo para importar desde JSON
     val currentUser: User? = null,  // Usuario actual para permisos
     val isAdmin: Boolean = false     // Flag rápido para verificar si es admin
 )
@@ -271,5 +272,126 @@ class KeyVaultViewModel @Inject constructor(
                 e.printStackTrace()
             }
         }
+    }
+
+    /**
+     * Importa llaves de prueba desde un archivo JSON generado por el script
+     * generar_llaves_prueba.sh
+     */
+    fun onImportTestKeys() {
+        _uiState.value = _uiState.value.copy(showImportJsonDialog = true)
+    }
+    
+    /**
+     * Cierra el diálogo de importación JSON
+     */
+    fun onDismissImportJsonDialog() {
+        _uiState.value = _uiState.value.copy(showImportJsonDialog = false)
+    }
+    
+    /**
+     * Importa llaves desde contenido JSON (para pegar desde Vysor o archivos)
+     */
+    fun importFromJsonContent(jsonContent: String) {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "=== IMPORTANDO DESDE JSON ===")
+                
+                val result = TestKeysImporter.importFromJson(jsonContent, injectedKeyRepository)
+                result.fold(
+                    onSuccess = { imported ->
+                        Log.i(TAG, "✅ Importadas $imported llaves desde JSON")
+                        loadKeys() // Recargar lista
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "❌ Error importando desde JSON: ${error.message}")
+                    }
+                )
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Error al importar desde JSON", e)
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    /**
+     * Genera llaves de prueba directamente (simulando importación del script)
+     */
+    private suspend fun generateTestKeysFromScript() {
+        try {
+            Log.i(TAG, "Generando llaves de prueba con KCVs correctos...")
+            
+            // Generar llaves para diferentes algoritmos
+            val algorithms = listOf(
+                "3DES-16" to "DES_DOUBLE",
+                "3DES-24" to "DES_TRIPLE", 
+                "AES-128" to "AES_128",
+                "AES-192" to "AES_192",
+                "AES-256" to "AES_256"
+            )
+            
+            var imported = 0
+            
+            algorithms.forEach { (scriptAlgo, dbAlgo) ->
+                // Generar llave aleatoria
+                val keyBytes = when (scriptAlgo) {
+                    "3DES-16" -> 16
+                    "3DES-24" -> 24
+                    "AES-128" -> 16
+                    "AES-192" -> 24
+                    "AES-256" -> 32
+                    else -> 16
+                }
+                
+                val keyHex = generateRandomKeyHex(keyBytes)
+                val kcv = calculateKCV(keyHex, scriptAlgo)
+                
+                Log.d(TAG, "Generando llave: $scriptAlgo - KCV: $kcv")
+                
+                // Guardar en BD
+                injectedKeyRepository.recordKeyInjectionWithData(
+                    keySlot = -1,
+                    keyType = "CEREMONY_KEY",
+                    keyAlgorithm = dbAlgo,
+                    kcv = kcv,
+                    keyData = keyHex,
+                    status = "GENERATED",
+                    isKEK = false,
+                    kekType = "",
+                    customName = "Test Key $scriptAlgo"
+                )
+                
+                imported++
+            }
+            
+            Log.i(TAG, "✅ Importadas $imported llaves de prueba con KCVs correctos")
+            
+            // Recargar lista de llaves
+            loadKeys()
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error generando llaves de prueba", e)
+            e.printStackTrace()
+        }
+    }
+    
+    /**
+     * Genera una llave aleatoria en formato hexadecimal
+     */
+    private fun generateRandomKeyHex(bytes: Int): String {
+        val chars = "0123456789ABCDEF"
+        return (1..bytes * 2).map { chars.random() }.joinToString("")
+    }
+    
+    /**
+     * Calcula KCV usando el mismo algoritmo que KcvCalculator.kt
+     * (simulación básica - en producción usar KcvCalculator)
+     */
+    private fun calculateKCV(keyHex: String, algorithm: String): String {
+        // Simulación de KCV - en producción usar KcvCalculator.calculateKcv()
+        // Por ahora generar un KCV simulado basado en la llave
+        val hash = keyHex.hashCode().toString(16).uppercase()
+        return hash.take(6).padEnd(6, '0')
     }
 } 

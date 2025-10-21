@@ -40,18 +40,21 @@ class PermissionProvider @Inject constructor(
      * Si el usuario es ADMIN, obtiene todos los permisos automáticamente.
      */
     suspend fun loadPermissions(username: String) {
-        Log.d(TAG, "═══════════════════════════════════════════════════════════")
-        Log.d(TAG, "Cargando permisos para usuario: '$username'")
-        
         try {
+            Log.d(TAG, "═══════════════════════════════════════════════════════════")
+            Log.d(TAG, "Cargando permisos para usuario: '$username'")
+
             val user = userRepository.findByUsername(username)
-            
+
             if (user == null) {
-                Log.e(TAG, "✗ Usuario no encontrado, permisos vacíos")
+                Log.e(TAG, "✗ Usuario no encontrado: '$username', permisos vacíos")
                 _userPermissions.value = emptySet()
+                Log.d(TAG, "═══════════════════════════════════════════════════════════")
                 return
             }
-            
+
+            Log.d(TAG, "Usuario encontrado: id=${user.id}, username=${user.username}, role=${user.role}")
+
             if (user.role == "ADMIN") {
                 // Admin tiene TODOS los permisos
                 Log.d(TAG, "Usuario es ADMIN → asignando TODOS los permisos")
@@ -67,21 +70,23 @@ class PermissionProvider @Inject constructor(
                     RAW_DATA_LISTENER,
                     EXPORT_IMPORT_KEYS
                 )
+                Log.d(TAG, "Permisos asignados a ADMIN: ${_userPermissions.value.joinToString(", ")}")
             } else {
                 // Obtener permisos desde la BD
                 Log.d(TAG, "Usuario es USER → cargando permisos desde BD")
                 val permissions = userRepository.getUserPermissionsSync(user.id)
                 _userPermissions.value = permissions.map { it.id }.toSet()
-                
+
                 Log.d(TAG, "Permisos cargados: ${_userPermissions.value.joinToString(", ")}")
             }
-            
+
             Log.i(TAG, "✓ ${_userPermissions.value.size} permisos cargados para '$username'")
-            
+            Log.d(TAG, "═══════════════════════════════════════════════════════════")
+
         } catch (e: Exception) {
-            Log.e(TAG, "✗ Error al cargar permisos", e)
+            Log.e(TAG, "✗ Error al cargar permisos para '$username'", e)
+            Log.e(TAG, "Stack trace: ${e.stackTraceToString()}")
             _userPermissions.value = emptySet()
-        } finally {
             Log.d(TAG, "═══════════════════════════════════════════════════════════")
         }
     }

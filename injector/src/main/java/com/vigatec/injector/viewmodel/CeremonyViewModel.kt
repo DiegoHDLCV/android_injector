@@ -83,14 +83,25 @@ class CeremonyViewModel @Inject constructor(
                     val (userId, username, role) = session
                     val isAdmin = role == "ADMIN"
 
-                    // Cargar permisos del usuario
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario de sesión: username=$username, role=$role")
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - isAdmin determinado: $isAdmin")
+
+                    // CORRECCIÓN: Primero cargar los permisos del usuario
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - Cargando permisos del usuario...")
+                    try {
+                        permissionProvider.loadPermissions(username)
+                        android.util.Log.d("CeremonyViewModel", "Ceremony - Permisos cargados desde PermissionProvider")
+                    } catch (e: Exception) {
+                        android.util.Log.e("CeremonyViewModel", "Ceremony - Error al cargar permisos", e)
+                    }
+
+                    // Ahora verificar permisos (después de cargarlos)
                     val canCreateKEK = permissionProvider.hasPermission(PermissionProvider.CEREMONY_KEK)
                     val canCreateOperational = permissionProvider.hasPermission(PermissionProvider.CEREMONY_OPERATIONAL)
 
-                    android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario de sesión: username=$username, role=$role")
-                    android.util.Log.d("CeremonyViewModel", "Ceremony - isAdmin determinado: $isAdmin")
                     android.util.Log.d("CeremonyViewModel", "Ceremony - Permiso CEREMONY_KEK: $canCreateKEK")
                     android.util.Log.d("CeremonyViewModel", "Ceremony - Permiso CEREMONY_OPERATIONAL: $canCreateOperational")
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - Todos los permisos: ${permissionProvider.userPermissions.value}")
 
                     _uiState.value = _uiState.value.copy(
                         isAdmin = isAdmin,
@@ -98,7 +109,7 @@ class CeremonyViewModel @Inject constructor(
                         canCreateOperational = canCreateOperational
                     )
 
-                    android.util.Log.d("CeremonyViewModel", "Ceremony - Estado actualizado: isAdmin=${_uiState.value.isAdmin}")
+                    android.util.Log.d("CeremonyViewModel", "Ceremony - Estado actualizado: isAdmin=${_uiState.value.isAdmin}, canCreateKEK=${_uiState.value.canCreateKEK}")
                 } else {
                     android.util.Log.w("CeremonyViewModel", "Ceremony - ⚠️ No hay sesión activa")
                     _uiState.value = _uiState.value.copy(
@@ -351,21 +362,140 @@ class CeremonyViewModel @Inject constructor(
                             throw IllegalStateException("KEK Storage debe ser AES-256")
                         }
 
-                        // Inicializar KEK Storage en Android Keystore
-                        StorageKeyManager.initializeFromCeremony(finalKeyHex)
-                        addToLog("✓ KEK Storage inicializada en Android Keystore")
-                        addToLog("✓ Protección hardware: Activa")
+                        // Si ya existe una KEK Storage, rotar las llaves
+                        if (_uiState.value.hasKEKStorage) {
+                            addToLog("")
+                            addToLog("=== ROTACIÓN DE KEK STORAGE ===")
+                            addToLog("Se detectó una KEK Storage existente")
+                            addToLog("Iniciando proceso de rotación...")
+                            addToLog("")
+
+                            // Obtener todas las llaves cifradas que necesitan re-cifrarse
+                            val allKeys = injectedKeyRepository.getAllInjectedKeysSync()
+                            val encryptedKeys = allKeys.filter { it.isEncrypted() && !it.isKEKStorage() }
+
+                            addToLog("Llaves operacionales cifradas encontradas: ${encryptedKeys.size}")
+
+                            if (encryptedKeys.isNotEmpty()) {
+                                addToLog("")
+                                addToLog("Paso 1/5: Descifrando llaves operacionales con KEK antigua...")
+
+                                // Descifrar todas las llaves con la KEK antigua (ANTES de eliminarla)
+                                val decryptedKeys = encryptedKeys.map { key ->
+                                    try {
+                                        val encryptedData = com.vigatec.utils.security.EncryptedKeyData(
+                                            encryptedData = key.encryptedKeyData,
+                                            iv = key.encryptionIV,
+                                            authTag = key.encryptionAuthTag
+                                        )
+                                        val decryptedKeyHex = StorageKeyManager.decryptKey(encryptedData)
+                                        addToLog("  ✓ Llave descifrada: KCV ${key.kcv}")
+                                        key to decryptedKeyHex
+                                    } catch (e: Exception) {
+                                        addToLog("  ✗ Error al descifrar llave KCV ${key.kcv}: ${e.message}")
+                                        throw e
+                                    }
+                                }.toMap()
+
+                                addToLog("✓ ${decryptedKeys.size} llaves descifradas exitosamente")
+                                addToLog("")
+                                addToLog("Paso 2/5: Eliminando KEK Storage antigua de BD...")
+
+                                // Eliminar la KEK Storage antigua de la base de datos
+                                val oldKEKStorageKeys = allKeys.filter { it.isKEKStorage() }
+                                oldKEKStorageKeys.forEach { oldKEK ->
+                                    injectedKeyRepository.deleteKey(oldKEK.id)
+                                    addToLog("  ✓ KEK Storage antigua eliminada de BD: KCV ${oldKEK.kcv}")
+                                }
+
+                                addToLog("")
+                                addToLog("Paso 3/5: Eliminando KEK Storage antigua del Keystore...")
+
+                                // Eliminar la KEK antigua del Android Keystore
+                                StorageKeyManager.deleteStorageKEK()
+                                addToLog("✓ KEK Storage antigua eliminada del Keystore")
+                                addToLog("")
+                                addToLog("Paso 4/5: Instalando nueva KEK Storage...")
+
+                                // Instalar la nueva KEK
+                                StorageKeyManager.initializeFromCeremony(finalKeyHex, replaceIfExists = false)
+                                addToLog("✓ Nueva KEK Storage instalada")
+                                addToLog("")
+                                addToLog("Paso 5/5: Re-cifrando llaves operacionales con nueva KEK...")
+
+                                // Re-cifrar todas las llaves con la nueva KEK
+                                decryptedKeys.forEach { (key, decryptedKeyHex) ->
+                                    try {
+                                        val reEncryptedData = StorageKeyManager.encryptKey(decryptedKeyHex)
+
+                                        // Actualizar la llave en la base de datos
+                                        val updatedKey = key.copy(
+                                            encryptedKeyData = reEncryptedData.encryptedData,
+                                            encryptionIV = reEncryptedData.iv,
+                                            encryptionAuthTag = reEncryptedData.authTag
+                                        )
+
+                                        injectedKeyRepository.updateInjectedKey(updatedKey)
+                                        addToLog("  ✓ Llave re-cifrada: KCV ${key.kcv}")
+                                    } catch (e: Exception) {
+                                        addToLog("  ✗ Error al re-cifrar llave KCV ${key.kcv}: ${e.message}")
+                                        throw e
+                                    }
+                                }
+
+                                addToLog("✓ ${decryptedKeys.size} llaves operacionales re-cifradas exitosamente")
+                                addToLog("")
+                                addToLog("=== ROTACIÓN COMPLETADA EXITOSAMENTE ===")
+                            } else {
+                                addToLog("No hay llaves operacionales cifradas para rotar")
+                                addToLog("")
+                                addToLog("Eliminando KEK Storage antigua de BD...")
+
+                                // Eliminar la KEK Storage antigua de la base de datos
+                                val oldKEKStorageKeys = allKeys.filter { it.isKEKStorage() }
+                                oldKEKStorageKeys.forEach { oldKEK ->
+                                    injectedKeyRepository.deleteKey(oldKEK.id)
+                                    addToLog("  ✓ KEK Storage antigua eliminada de BD: KCV ${oldKEK.kcv}")
+                                }
+
+                                addToLog("Reemplazando KEK Storage en Keystore...")
+
+                                // Si no hay llaves cifradas, simplemente reemplazar
+                                StorageKeyManager.initializeFromCeremony(finalKeyHex, replaceIfExists = true)
+                                addToLog("✓ KEK Storage reemplazada")
+                            }
+                        } else {
+                            // No existe KEK Storage, crear una nueva
+                            addToLog("No existe KEK Storage previa")
+                            StorageKeyManager.initializeFromCeremony(finalKeyHex, replaceIfExists = false)
+                            addToLog("✓ KEK Storage inicializada en Android Keystore")
+                        }
+
+                        addToLog("✓ Protección hardware: Activa (Android Keystore)")
+                        addToLog("")
+                        addToLog("=== KEK STORAGE CONFIGURADA EXITOSAMENTE ===")
+                        addToLog("✓ KEK Storage almacenada en Android Keystore")
+                        addToLog("✓ La KEK Storage está lista para cifrar/descifrar llaves operacionales")
+                        addToLog("")
+                        addToLog("NOTA: Slot 0 del PED Aisino disponible para otras llaves maestras")
                         addToLog("================================================")
                     } catch (e: Exception) {
                         addToLog("✗ Error al inicializar KEK Storage: ${e.message}")
+                        e.printStackTrace()
                         throw e
                     }
                 }
 
                 // CRÍTICO: Guardar la llave con su algoritmo detectado
-                // El slot se asignará cuando se use la llave en un perfil (por ahora -1)
+                // KEK Storage se guarda en slot 0, operacionales en slot -1 (se asignará en el perfil)
+                val keySlotToSave = if (_uiState.value.selectedKEKType == KEKType.KEK_STORAGE) {
+                    0 // KEK Storage siempre en slot 0 del PED del inyector
+                } else {
+                    -1 // Operacionales sin slot asignado aún
+                }
+
                 injectedKeyRepository.recordKeyInjectionWithData(
-                    keySlot = -1, // -1 indica que no hay slot asignado (se asignará en el perfil)
+                    keySlot = keySlotToSave,
                     keyType = keyType, // Siempre CEREMONY_KEY (operacional)
                     keyAlgorithm = detectedAlgorithm, // Guardar el algoritmo detectado
                     kcv = finalKcv,

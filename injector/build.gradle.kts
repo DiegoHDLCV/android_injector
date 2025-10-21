@@ -90,6 +90,9 @@ dependencies {
 
     implementation(project(":persistence"))
     implementation(project(":manufacturer"))
+    
+    // Gson para importar llaves de prueba
+    implementation(libs.gson)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

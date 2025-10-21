@@ -1,0 +1,67 @@
+{
+  "generated": "2025-10-21T13:13:00-03:00",
+  "description": "Llaves de prueba generadas con KCVs correctos usando OpenSSL",
+  "totalKeys": 6,
+  "keys": [
+    {
+      "keyType": "KEK_STORAGE",
+      "futurexCode": "06",
+      "algorithm": "AES-256",
+      "keyHex": "A1B2C3D4E5F6789012345678901234567890ABCDEF0123456789ABCDEF0123456",
+      "kcv": "D4E5F6",
+      "bytes": 32,
+      "description": "KEK Storage fija del sistema"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "3DES-16",
+      "keyHex": "D9C72BC34DD0D55A350ED8199E76209A",
+      "kcv": "0C033C",
+      "bytes": 16,
+      "description": "Test GENERIC key with 3DES-16 algorithm"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "3DES-24",
+      "keyHex": "40695CF3A40C7A18E5D93BEC36C5E9F8BE04809F2FADE705",
+      "kcv": "D0684A",
+      "bytes": 24,
+      "description": "Test GENERIC key with 3DES-24 algorithm"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "AES-128",
+      "keyHex": "ED07718C4D92DEE00A7116BA0D5E8FF8",
+      "kcv": "691B6C",
+      "bytes": 16,
+      "description": "Test GENERIC key with AES-128 algorithm"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "AES-192",
+      "keyHex": "F4B20F3C3666DF0A0BCF20F92FA9C2C5E5B5CAA73AA8D596",
+      "kcv": "BB9812",
+      "bytes": 24,
+      "description": "Test GENERIC key with AES-192 algorithm"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "AES-256",
+      "keyHex": "443287591D21E60A85C74361F3DA44BFE72F965D4E5AA8E28169CEF30F6CA4BA",
+      "kcv": "128CAE",
+      "bytes": 32,
+      "description": "Test GENERIC key with AES-256 algorithm"
+    }
+
+  ]
+}

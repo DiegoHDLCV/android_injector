@@ -235,11 +235,11 @@ class KeyInjectionViewModel @Inject constructor(
                     log = _state.value.log + "Conexión establecida. Iniciando inyección...\n"
                 )
 
-                // === PASO 1: VERIFICAR Y EXPORTAR KEK SI ES NECESARIO ===
+                // === PASO 1: SIEMPRE INYECTAR KTK SELECCIONADA ===
                 if (profile.useKEK && profile.selectedKEKKcv.isNotEmpty()) {
-                    Log.i(TAG, "=== VERIFICANDO EXPORTACIÓN DE KEK ===")
+                    Log.i(TAG, "=== INYECTANDO KTK SELECCIONADA ===")
                     _state.value = _state.value.copy(
-                        log = _state.value.log + "Verificando KEK para cifrado...\n"
+                        log = _state.value.log + "Inyectando KTK seleccionada para cifrado...\n"
                     )
 
                     // Obtener la KEK de la base de datos
@@ -250,40 +250,45 @@ class KeyInjectionViewModel @Inject constructor(
                         throw Exception("KEK seleccionada no encontrada en la base de datos")
                     }
 
-                    Log.i(TAG, "KEK encontrada:")
+                    // NUEVA VALIDACIÓN: Verificar que coincida con la KTK activa
+                    val activeKTK = kekManager.getActiveKEKEntity()
+                    if (activeKTK != null && activeKTK.kcv != kek.kcv) {
+                        val errorMsg = """
+                            Inconsistencia detectada:
+                            - KEK seleccionada en perfil: ${kek.kcv} (${kek.customName})
+                            - KTK activa en el sistema: ${activeKTK.kcv} (${activeKTK.customName})
+                            
+                            La KEK del perfil debe coincidir con la KTK activa.
+                            Por favor, selecciona la KTK correcta en el perfil o activa la KEK apropiada.
+                        """.trimIndent()
+                        
+                        Log.e(TAG, errorMsg)
+                        throw Exception(errorMsg)
+                    }
+
+                    Log.i(TAG, "KTK encontrada:")
                     Log.i(TAG, "  - KCV: ${kek.kcv}")
                     Log.i(TAG, "  - Nombre: ${kek.customName.ifEmpty { "Sin nombre" }}")
                     Log.i(TAG, "  - Estado: ${kek.status}")
                     Log.i(TAG, "  - Es KEK: ${kek.isKEK}")
 
-                    // Verificar si la KEK ya fue exportada
-                    if (kek.status != "EXPORTED") {
-                        Log.i(TAG, "KEK aún no exportada. Exportando KEK al SubPOS...")
+                    // SIEMPRE inyectar la KTK seleccionada (sin verificar estado exported)
+                    Log.i(TAG, "Inyectando KTK al SubPOS (siempre requerida)...")
+                    _state.value = _state.value.copy(
+                        log = _state.value.log + "Inyectando KTK al SubPOS (requerida para cada inyección)...\n"
+                    )
+
+                    // Exportar la KEK (slot fijo 00 para KEK, en claro)
+                    try {
+                        exportKEKToDevice(kek)
+
+                        Log.i(TAG, "✓ KTK inyectada exitosamente")
                         _state.value = _state.value.copy(
-                            log = _state.value.log + "Exportando KEK al SubPOS (en claro, solo una vez)...\n"
+                            log = _state.value.log + "✓ KTK inyectada exitosamente al slot 00\n"
                         )
-
-                        // Exportar la KEK (slot fijo 00 para KEK, en claro)
-                        try {
-                            exportKEKToDevice(kek)
-
-                            // Actualizar estado de KEK a EXPORTED
-                            Log.i(TAG, "Actualizando estado de KEK a EXPORTED...")
-                            injectedKeyRepository.updateKeyStatus(kek.kcv, "EXPORTED")
-
-                            Log.i(TAG, "✓ KEK exportada y marcada como EXPORTED exitosamente")
-                            _state.value = _state.value.copy(
-                                log = _state.value.log + "✓ KEK exportada exitosamente al slot 00\n"
-                            )
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error al exportar KEK", e)
-                            throw Exception("Error al exportar KEK: ${e.message}")
-                        }
-                    } else {
-                        Log.i(TAG, "✓ KEK ya fue exportada previamente")
-                        _state.value = _state.value.copy(
-                            log = _state.value.log + "✓ KEK ya exportada previamente\n"
-                        )
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error al inyectar KTK", e)
+                        throw Exception("Error al inyectar KTK: ${e.message}")
                     }
 
                     Log.i(TAG, "================================================")
@@ -607,7 +612,6 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "Checksum KTK: $ktkChecksum")
         Log.i(TAG, "KSN: $ksn (20 caracteres)")
         Log.i(TAG, "Longitud KTK: ${String.format("%03X", ktkData.length / 2)} (${ktkData.length / 2} bytes)")
-        Log.i(TAG, "Datos KTK en CLARO (hex): ${ktkHexForCommand.take(64)}${if (ktkHexForCommand.length > 64) "..." else ""}")
         Log.i(TAG, "Longitud de llave: $keyLength ($keyLengthBytes bytes)")
         Log.i(TAG, "  - Formato: ASCII HEX (3 dígitos)")
         Log.i(TAG, "  - Valor: '$keyLength'")

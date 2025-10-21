@@ -110,6 +110,9 @@ class MainViewModel @Inject constructor(
 
         setupProtocolHandlers()
         startCableDetection()  // Iniciar detección de cable automáticamente
+        
+        // Verificación automática de llaves instaladas al iniciar
+        performAutomaticKeyVerification()
 
         Log.i(TAG, "✓ MainViewModel inicializado completamente")
         Log.i(TAG, "================================================")
@@ -629,6 +632,14 @@ class MainViewModel @Inject constructor(
                     Log.d(TAG, "  - Slot: ${ktkFromDb.keySlot}")
                     Log.d(TAG, "  - KCV: ${ktkFromDb.kcv}")
                     Log.d(TAG, "  - Algoritmo: ${ktkFromDb.keyAlgorithm}")
+                    
+                    Log.d(TAG, "=== DIAGNÓSTICO DE DESCIFRADO ===")
+                    Log.d(TAG, "KTK usada para descifrar:")
+                    Log.d(TAG, "  - Datos KTK: ${ktkFromDb.keyData.take(32)}...")
+                    Log.d(TAG, "Llave a descifrar:")
+                    Log.d(TAG, "  - Datos cifrados: ${command.keyHex}")
+                    Log.d(TAG, "  - KCV esperado: ${command.keyChecksum}")
+                    Log.d(TAG, "  - KtkChecksum: ${command.ktkChecksum}")
 
                     // Descifrar la llave con la KTK
                     val decryptedKeyHex = com.vigatec.utils.TripleDESCrypto.decryptKeyAfterTransmission(
@@ -674,13 +685,29 @@ class MainViewModel @Inject constructor(
         }
 
         if (injectionStatus != "SKIPPED") {
-            injectedKeyRepository.recordKeyInjection(
-                keySlot = command.keySlot,
-                keyType = genericKeyType.name,
-                keyAlgorithm = genericAlgorithm.name,
-                kcv = command.keyChecksum,
-                status = injectionStatus
-            )
+            // Para KTK (TRANSPORT_KEY), guardar con datos para poder descifrar posteriormente
+            if (genericKeyType == GenericKeyType.TRANSPORT_KEY) {
+                injectedKeyRepository.recordKeyInjectionWithData(
+                    keySlot = command.keySlot,
+                    keyType = genericKeyType.name,
+                    keyAlgorithm = genericAlgorithm.name,
+                    kcv = command.keyChecksum,
+                    keyData = command.keyHex, // Guardar los datos de la KTK
+                    status = injectionStatus,
+                    isKEK = true, // Marcar como KEK
+                    kekType = "KTK",
+                    customName = "KTK Slot ${command.keySlot}"
+                )
+                Log.i(TAG, "KTK guardada con datos completos para descifrado posterior")
+            } else {
+                injectedKeyRepository.recordKeyInjection(
+                    keySlot = command.keySlot,
+                    keyType = genericKeyType.name,
+                    keyAlgorithm = genericAlgorithm.name,
+                    kcv = command.keyChecksum,
+                    status = injectionStatus
+                )
+            }
             Log.i(TAG, "Resultado de inyección para slot ${command.keySlot} registrado en la BD como: $injectionStatus")
 
             // Agregar al feed visual con información detallada del algoritmo
@@ -1085,4 +1112,75 @@ class MainViewModel @Inject constructor(
         }
     }
     */
+
+    /**
+     * Realiza verificación automática de llaves instaladas al iniciar la aplicación
+     */
+    private fun performAutomaticKeyVerification() {
+        viewModelScope.launch {
+            try {
+                Log.i(TAG, "=== VERIFICACIÓN AUTOMÁTICA DE LLAVES ===")
+                
+                // Esperar un poco para que el dispositivo esté listo
+                kotlinx.coroutines.delay(2000)
+                
+                val pedController = KeySDKManager.getPedController()
+                if (pedController == null) {
+                    Log.w(TAG, "PED Controller no disponible para verificación automática")
+                    return@launch
+                }
+                
+                Log.i(TAG, "Iniciando verificación automática de llaves instaladas...")
+                
+                val installedKeys = mutableListOf<String>()
+                val maxSlots = 16
+                
+                for (slot in 0 until maxSlots) {
+                    try {
+                        // Intentar verificar si hay llave en este slot
+                        val hasKey = checkSlotForKey(pedController, slot)
+                        if (hasKey) {
+                            installedKeys.add("Slot $slot")
+                            Log.d(TAG, "✓ Llave encontrada en slot $slot")
+                        }
+                    } catch (e: Exception) {
+                        Log.d(TAG, "Slot $slot vacío o error: ${e.message}")
+                    }
+                }
+                
+                if (installedKeys.isNotEmpty()) {
+                    Log.i(TAG, "Llaves instaladas encontradas: ${installedKeys.joinToString(", ")}")
+                    _snackbarEvent.emit("🔍 Verificación automática: ${installedKeys.size} llaves encontradas")
+                } else {
+                    Log.i(TAG, "No se encontraron llaves instaladas")
+                }
+                
+                Log.i(TAG, "=== VERIFICACIÓN AUTOMÁTICA COMPLETADA ===")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en verificación automática de llaves", e)
+            }
+        }
+    }
+    
+    /**
+     * Verifica si hay una llave en un slot específico
+     * NOTA: Implementación simplificada que no puede verificar llaves reales
+     */
+    private suspend fun checkSlotForKey(pedController: IPedController, slot: Int): Boolean {
+        return try {
+            // IMPLEMENTACIÓN SIMPLIFICADA:
+            // En un dispositivo real, aquí deberías usar métodos específicos del PED
+            // para verificar si hay llaves instaladas sin crearlas
+            
+            // Por ahora, simulamos que NO hay llaves instaladas
+            // Esto evita que se detecten llaves falsas
+            Log.d(TAG, "Verificación de slot $slot: No implementado (simulando vacío)")
+            false
+            
+        } catch (e: Exception) {
+            Log.d(TAG, "Error verificando slot $slot: ${e.message}")
+            false
+        }
+    }
 }

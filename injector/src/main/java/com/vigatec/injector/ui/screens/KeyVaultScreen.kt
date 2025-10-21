@@ -11,11 +11,15 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,6 +46,7 @@ fun KeyVaultScreen(
                 onRefresh = { viewModel.loadKeys() },
                 onClearAll = { viewModel.onShowClearAllConfirmation() },
                 onGenerateTestKeys = { viewModel.generateTestKeys() },
+                onImportTestKeys = { viewModel.onImportTestKeys() },
                 onNavigateToExportImport = onNavigateToExportImport,
                 loading = state.loading,
                 isAdmin = state.isAdmin
@@ -121,6 +126,16 @@ fun KeyVaultScreen(
             onDismiss = { viewModel.onDismissClearAllConfirmation() }
         )
     }
+
+    if (state.showImportJsonDialog) {
+        ImportJsonDialog(
+            onImport = { jsonContent -> 
+                viewModel.importFromJsonContent(jsonContent)
+                viewModel.onDismissImportJsonDialog()
+            },
+            onDismiss = { viewModel.onDismissImportJsonDialog() }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,6 +144,7 @@ fun KeyVaultTopBar(
     onRefresh: () -> Unit,
     onClearAll: () -> Unit,
     onGenerateTestKeys: () -> Unit,
+    onImportTestKeys: () -> Unit,
     onNavigateToExportImport: () -> Unit,
     loading: Boolean,
     isAdmin: Boolean
@@ -146,6 +162,12 @@ fun KeyVaultTopBar(
                     enabled = !loading
                 ) {
                     Icon(Icons.Default.ImportExport, contentDescription = "Exportar/Importar")
+                }
+                IconButton(
+                    onClick = onImportTestKeys,
+                    enabled = !loading
+                ) {
+                    Icon(Icons.Default.Upload, contentDescription = "Importar Llaves de Prueba")
                 }
                 IconButton(
                     onClick = onGenerateTestKeys,
@@ -360,6 +382,80 @@ fun KeyCard(
             }
         }
     }
+}
+
+@Composable
+fun ImportJsonDialog(
+    onImport: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var jsonContent by remember { mutableStateOf("") }
+    var showError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("📥 Importar Llaves desde JSON") },
+        text = {
+            Column {
+                Text(
+                    "Pega el contenido del archivo JSON generado por el script:",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                OutlinedTextField(
+                    value = jsonContent,
+                    onValueChange = { 
+                        jsonContent = it
+                        showError = false
+                    },
+                    label = { Text("Contenido JSON") },
+                    placeholder = { Text("Pega aquí el contenido del archivo...") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 8,
+                    maxLines = 12,
+                    isError = showError
+                )
+                
+                if (showError) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (jsonContent.isBlank()) {
+                        showError = true
+                        errorMessage = "El contenido JSON no puede estar vacío"
+                    } else {
+                        try {
+                            // Validar que sea JSON válido
+                            val gson = com.google.gson.Gson()
+                            gson.fromJson(jsonContent, com.google.gson.JsonObject::class.java)
+                            onImport(jsonContent)
+                        } catch (e: Exception) {
+                            showError = true
+                            errorMessage = "JSON inválido: ${e.message}"
+                        }
+                    }
+                }
+            ) {
+                Text("Importar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 @Composable

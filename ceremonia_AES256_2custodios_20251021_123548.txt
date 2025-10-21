@@ -1,0 +1,38 @@
+════════════════════════════════════════════════════════════
+  CEREMONIA DE LLAVES - 2025-10-21 12:35:48
+════════════════════════════════════════════════════════════
+
+CONFIGURACIÓN:
+  • Algoritmo: AES-256 (256 bits / 32 bytes)
+  • Número de custodios: 2
+  • Longitud de componente: 64 caracteres hex
+
+════════════════════════════════════════════════════════════
+  COMPONENTES (Entregar a cada custodio)
+════════════════════════════════════════════════════════════
+
+CUSTODIO 1:
+F6C797E5FB740E7F0011465D54037BEF297EDEC3D71938C1409A275B01E2D42B
+
+CUSTODIO 2:
+C2E3FAD86E90800BF93988D7E3A7DD9B371F54C9A1BBCB36803BB9F6B88EE8A0
+
+════════════════════════════════════════════════════════════
+  VERIFICACIÓN
+════════════════════════════════════════════════════════════
+
+KCV esperado: FF66CD
+
+INSTRUCCIONES:
+1. Ingresa los componentes en la app
+2. Verifica que el KCV final coincida con: FF66CD
+3. Si coincide: ✓ Ceremonia exitosa
+
+════════════════════════════════════════════════════════════
+  IMPORTANTE
+════════════════════════════════════════════════════════════
+
+• Guarda este archivo en un lugar seguro
+• NO compartas por medios electrónicos inseguros
+• Elimina este archivo después de completar la ceremonia
+

@@ -25,6 +25,13 @@ interface InjectedKeyDao {
     suspend fun insertIfNotExists(key: InjectedKeyEntity): Long
 
     /**
+     * Actualiza una llave existente en la base de datos.
+     * Útil para re-cifrar llaves durante rotación de KEK.
+     */
+    @Update
+    suspend fun update(key: InjectedKeyEntity)
+
+    /**
      * Obtiene todas las llaves inyectadas de la base de datos, ordenadas por
      * fecha de inyección descendente, y las emite como un Flow para que la UI
      * se actualice automáticamente cuando cambien los datos.

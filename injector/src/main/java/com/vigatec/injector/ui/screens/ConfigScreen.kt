@@ -31,6 +31,8 @@ fun ConfigScreen(
 
     LaunchedEffect(currentUsername) {
         viewModel.loadCurrentUser(currentUsername)
+        // Cargar permisos del usuario para mostrar opciones de configuración
+        permissionProvider.loadPermissions(currentUsername)
     }
 
     Scaffold(
