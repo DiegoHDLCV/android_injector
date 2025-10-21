@@ -6,8 +6,10 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.persistence.dao.InjectionLogDao
+import com.vigatec.injector.data.local.dao.PermissionDao
 import com.vigatec.injector.data.local.database.AppDatabase
 import com.vigatec.injector.data.local.entity.User
+import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.injector.data.local.preferences.UserPreferencesManager
 import dagger.Module
 import dagger.Provides
@@ -125,5 +127,17 @@ object AppModule {
     @Singleton
     fun provideUserPreferencesManager(@ApplicationContext context: Context): UserPreferencesManager {
         return UserPreferencesManager(context)
+    }
+
+    @Provides
+    @Singleton
+    fun providePermissionDao(appDatabase: AppDatabase): PermissionDao {
+        return appDatabase.permissionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSessionManager(@ApplicationContext context: Context): SessionManager {
+        return SessionManager(context)
     }
 } 
