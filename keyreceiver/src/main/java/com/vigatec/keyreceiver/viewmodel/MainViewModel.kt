@@ -626,14 +626,14 @@ class MainViewModel @Inject constructor(
                     }
 
                     Log.d(TAG, "KTK encontrada en BD:")
-                    Log.d(TAG, "  - Slot: ${ktkFromDb.slot}")
+                    Log.d(TAG, "  - Slot: ${ktkFromDb.keySlot}")
                     Log.d(TAG, "  - KCV: ${ktkFromDb.kcv}")
-                    Log.d(TAG, "  - Algoritmo: ${ktkFromDb.algorithm}")
+                    Log.d(TAG, "  - Algoritmo: ${ktkFromDb.keyAlgorithm}")
 
                     // Descifrar la llave con la KTK
                     val decryptedKeyHex = com.vigatec.utils.TripleDESCrypto.decryptKeyAfterTransmission(
                         encryptedKeyData = command.keyHex,
-                        kekData = ktkFromDb.keyMaterial,
+                        kekData = ktkFromDb.keyData,
                         expectedKcv = command.keyChecksum
                     )
 
