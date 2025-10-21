@@ -229,33 +229,54 @@ object TripleDESCrypto {
      */
     fun encryptWithKEK(plainData: String, kekData: String): String {
         try {
-            Log.d(TAG, "=== CIFRANDO CON KEK ===")
+            Log.d(TAG, "=== CIFRANDO CON KEK/KTK ===")
             Log.d(TAG, "Datos en claro (hex): ${plainData.take(32)}... (${plainData.length / 2} bytes)")
-            Log.d(TAG, "KEK (hex): ${kekData.take(32)}... (${kekData.length / 2} bytes)")
+            Log.d(TAG, "KEK/KTK (hex): ${kekData.take(32)}... (${kekData.length / 2} bytes)")
 
             val plainBytes = KcvCalculator.hexStringToByteArray(plainData)
             val kekBytes = KcvCalculator.hexStringToByteArray(kekData)
 
             Log.d(TAG, "Longitud datos: ${plainBytes.size} bytes")
-            Log.d(TAG, "Longitud KEK: ${kekBytes.size} bytes")
+            Log.d(TAG, "Longitud KEK/KTK: ${kekBytes.size} bytes")
 
-            // Validar longitud de KEK
-            if (kekBytes.size != 16 && kekBytes.size != 24) {
-                throw IllegalArgumentException("KEK debe ser de 16 o 24 bytes, recibido: ${kekBytes.size}")
+            // Validar longitud de KEK/KTK - soportar tanto 3DES como AES
+            if (kekBytes.size != 16 && kekBytes.size != 24 && kekBytes.size != 32) {
+                throw IllegalArgumentException("KEK/KTK debe ser de 16, 24 o 32 bytes, recibido: ${kekBytes.size}")
             }
 
-            // Validar que los datos sean múltiplo de 8 (bloque 3DES)
-            if (plainBytes.size % 8 != 0) {
-                throw IllegalArgumentException("Los datos deben ser múltiplo de 8 bytes, recibido: ${plainBytes.size}")
+            // Determinar algoritmo según longitud
+            val (algorithm, algorithmName, blockSize) = when (kekBytes.size) {
+                16, 24 -> {
+                    Log.d(TAG, "Detectado: 3DES (${kekBytes.size} bytes)")
+                    Triple("DESede/ECB/NoPadding", "DESede", 8)
+                }
+                32 -> {
+                    Log.d(TAG, "Detectado: AES-256 (32 bytes)")
+                    Triple("AES/ECB/NoPadding", "AES", 16)
+                }
+                else -> throw IllegalArgumentException("Longitud inesperada: ${kekBytes.size}")
             }
 
-            // Crear cipher 3DES en modo ECB sin padding
-            val keySpec = SecretKeySpec(kekBytes, "DESede")
-            val cipher = Cipher.getInstance("DESede/ECB/NoPadding")
+            Log.d(TAG, "Algoritmo: $algorithmName (bloque de $blockSize bytes)")
+
+            // Ajustar datos al tamaño de bloque si es necesario (padding con ceros)
+            val paddedBytes = if (plainBytes.size % blockSize != 0) {
+                val paddedSize = ((plainBytes.size / blockSize) + 1) * blockSize
+                Log.d(TAG, "Aplicando padding: ${plainBytes.size} -> $paddedSize bytes")
+                plainBytes.copyOf(paddedSize) // Padding con ceros
+            } else {
+                plainBytes
+            }
+
+            Log.d(TAG, "Datos a cifrar: ${paddedBytes.size} bytes (después de padding)")
+
+            // Crear cipher con el algoritmo apropiado
+            val keySpec = SecretKeySpec(kekBytes, algorithmName)
+            val cipher = Cipher.getInstance(algorithm)
             cipher.init(Cipher.ENCRYPT_MODE, keySpec)
 
             // Cifrar
-            val encryptedBytes = cipher.doFinal(plainBytes)
+            val encryptedBytes = cipher.doFinal(paddedBytes)
             val encryptedHex = encryptedBytes.joinToString("") { "%02X".format(it) }
 
             Log.d(TAG, "Datos cifrados (hex): ${encryptedHex.take(32)}...")
@@ -279,33 +300,51 @@ object TripleDESCrypto {
      */
     fun decryptWithKEK(encryptedData: String, kekData: String): String {
         try {
-            Log.d(TAG, "=== DESCIFRANDO CON KEK ===")
+            Log.d(TAG, "=== DESCIFRANDO CON KEK/KTK ===")
             Log.d(TAG, "Datos cifrados (hex): ${encryptedData.take(32)}... (${encryptedData.length / 2} bytes)")
-            Log.d(TAG, "KEK (hex): ${kekData.take(32)}... (${kekData.length / 2} bytes)")
+            Log.d(TAG, "KEK/KTK (hex): ${kekData.take(32)}... (${kekData.length / 2} bytes)")
 
             val encryptedBytes = KcvCalculator.hexStringToByteArray(encryptedData)
             val kekBytes = KcvCalculator.hexStringToByteArray(kekData)
 
             Log.d(TAG, "Longitud cifrada: ${encryptedBytes.size} bytes")
-            Log.d(TAG, "Longitud KEK: ${kekBytes.size} bytes")
+            Log.d(TAG, "Longitud KEK/KTK: ${kekBytes.size} bytes")
 
-            // Validar longitud de KEK
-            if (kekBytes.size != 16 && kekBytes.size != 24) {
-                throw IllegalArgumentException("KEK debe ser de 16 o 24 bytes, recibido: ${kekBytes.size}")
+            // Validar longitud de KEK/KTK - soportar tanto 3DES como AES
+            if (kekBytes.size != 16 && kekBytes.size != 24 && kekBytes.size != 32) {
+                throw IllegalArgumentException("KEK/KTK debe ser de 16, 24 o 32 bytes, recibido: ${kekBytes.size}")
             }
 
-            // Validar que los datos sean múltiplo de 8 (bloque 3DES)
-            if (encryptedBytes.size % 8 != 0) {
-                throw IllegalArgumentException("Los datos cifrados deben ser múltiplo de 8 bytes, recibido: ${encryptedBytes.size}")
+            // Determinar algoritmo según longitud
+            val (algorithm, algorithmName, blockSize) = when (kekBytes.size) {
+                16, 24 -> {
+                    Log.d(TAG, "Detectado: 3DES (${kekBytes.size} bytes)")
+                    Triple("DESede/ECB/NoPadding", "DESede", 8)
+                }
+                32 -> {
+                    Log.d(TAG, "Detectado: AES-256 (32 bytes)")
+                    Triple("AES/ECB/NoPadding", "AES", 16)
+                }
+                else -> throw IllegalArgumentException("Longitud inesperada: ${kekBytes.size}")
             }
 
-            // Crear cipher 3DES en modo ECB sin padding
-            val keySpec = SecretKeySpec(kekBytes, "DESede")
-            val cipher = Cipher.getInstance("DESede/ECB/NoPadding")
+            // Validar que los datos sean múltiplo del tamaño de bloque
+            if (encryptedBytes.size % blockSize != 0) {
+                throw IllegalArgumentException("Los datos cifrados deben ser múltiplo de $blockSize bytes, recibido: ${encryptedBytes.size}")
+            }
+
+            Log.d(TAG, "Algoritmo: $algorithmName (bloque de $blockSize bytes)")
+
+            // Crear cipher con el algoritmo apropiado
+            val keySpec = SecretKeySpec(kekBytes, algorithmName)
+            val cipher = Cipher.getInstance(algorithm)
             cipher.init(Cipher.DECRYPT_MODE, keySpec)
 
             // Descifrar
             val decryptedBytes = cipher.doFinal(encryptedBytes)
+
+            // Remover padding de ceros si es necesario
+            // (el dispositivo debe saber la longitud original de la llave)
             val decryptedHex = decryptedBytes.joinToString("") { "%02X".format(it) }
 
             Log.d(TAG, "Datos descifrados (hex): ${decryptedHex.take(32)}...")
