@@ -111,29 +111,30 @@ fun InjectedKeysScreen(
             )
         }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (loading) {
-                InjectedKeysSkeletonScreen()
-            } else if (keys.isEmpty()) {
-                EmptyKeysScreen()
-            } else {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Barra de filtros
-                    FiltersBar(
-                        filterAlgorithm = filterAlgorithm,
-                        filterStatus = filterStatus,
-                        filterKEKType = filterKEKType,
-                        searchText = searchText,
-                        onFilterAlgorithmChange = { viewModel.updateFilterAlgorithm(it) },
-                        onFilterStatusChange = { viewModel.updateFilterStatus(it) },
-                        onFilterKEKTypeChange = { viewModel.updateFilterKEKType(it) },
-                        onSearchTextChange = { viewModel.updateSearchText(it) }
-                    )
-                    
+            // Barra de filtros - SIEMPRE VISIBLE
+            FiltersBar(
+                filterAlgorithm = filterAlgorithm,
+                filterStatus = filterStatus,
+                filterKEKType = filterKEKType,
+                searchText = searchText,
+                onFilterAlgorithmChange = { viewModel.updateFilterAlgorithm(it) },
+                onFilterStatusChange = { viewModel.updateFilterStatus(it) },
+                onFilterKEKTypeChange = { viewModel.updateFilterKEKType(it) },
+                onSearchTextChange = { viewModel.updateSearchText(it) }
+            )
+            
+            // Contenido principal
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (loading) {
+                    InjectedKeysSkeletonScreen()
+                } else if (keys.isEmpty()) {
+                    EmptyKeysScreen()
+                } else {
                     // Lista de llaves
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),

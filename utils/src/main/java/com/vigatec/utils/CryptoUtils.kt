@@ -85,6 +85,32 @@ object KcvCalculator {
         }
     }
 
+    /**
+     * Calcula KCV específicamente con algoritmo 3DES (DESede)
+     */
+    fun calculateKcvWith3DES(keyHex: String): String {
+        val keyBytes = hexStringToByteArray(keyHex)
+        val keySpec = SecretKeySpec(keyBytes, "DESede")
+        val cipher = Cipher.getInstance("DESede/ECB/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, keySpec)
+        val data = ByteArray(8) { 0x00 }
+        val encrypted = cipher.doFinal(data)
+        return encrypted.copyOfRange(0, 3).joinToString("") { "%02X".format(it) }
+    }
+
+    /**
+     * Calcula KCV específicamente con algoritmo AES
+     */
+    fun calculateKcvWithAES(keyHex: String): String {
+        val keyBytes = hexStringToByteArray(keyHex)
+        val keySpec = SecretKeySpec(keyBytes, "AES")
+        val cipher = Cipher.getInstance("AES/ECB/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, keySpec)
+        val data = ByteArray(16) { 0x00 }
+        val encrypted = cipher.doFinal(data)
+        return encrypted.copyOfRange(0, 3).joinToString("") { "%02X".format(it) }
+    }
+
     // Función alternativa que prueba diferentes métodos para comparar
     fun calculateKcvComparison(keyHex: String): Map<String, String> {
         Log.d(TAG, "=== COMPARANDO MÉTODOS KCV ===")
@@ -426,14 +452,35 @@ object TripleDESCrypto {
                 if (length <= decryptedBytes.size) {
                     val candidateKey = decryptedBytes.copyOfRange(0, length)
                     val candidateKeyHex = candidateKey.joinToString("") { "%02X".format(it) }
-                    val candidateKcv = KcvCalculator.calculateKcv(candidateKeyHex)
-
-                    Log.d(TAG, "Probando longitud $length bytes: KCV = $candidateKcv")
-
-                    if (candidateKcv.startsWith(expectedKcv, ignoreCase = true)) {
-                        actualKeyHex = candidateKeyHex
-                        Log.d(TAG, "✓ KCV coincide con longitud $length bytes")
-                        break
+                    
+                    // Para llaves de 16 bytes, probar tanto 3DES como AES
+                    if (length == 16) {
+                        val kcv3DES = KcvCalculator.calculateKcvWith3DES(candidateKeyHex)
+                        val kcvAES = KcvCalculator.calculateKcvWithAES(candidateKeyHex)
+                        
+                        Log.d(TAG, "Probando longitud 16 bytes:")
+                        Log.d(TAG, "  - KCV con 3DES: $kcv3DES")
+                        Log.d(TAG, "  - KCV con AES: $kcvAES")
+                        
+                        if (kcv3DES.startsWith(expectedKcv, ignoreCase = true)) {
+                            actualKeyHex = candidateKeyHex
+                            Log.d(TAG, "✓ KCV coincide con 3DES")
+                            break
+                        } else if (kcvAES.startsWith(expectedKcv, ignoreCase = true)) {
+                            actualKeyHex = candidateKeyHex
+                            Log.d(TAG, "✓ KCV coincide con AES-128")
+                            break
+                        }
+                    } else {
+                        // Para otras longitudes, usar método estándar
+                        val candidateKcv = KcvCalculator.calculateKcv(candidateKeyHex)
+                        Log.d(TAG, "Probando longitud $length bytes: KCV = $candidateKcv")
+                        
+                        if (candidateKcv.startsWith(expectedKcv, ignoreCase = true)) {
+                            actualKeyHex = candidateKeyHex
+                            Log.d(TAG, "✓ KCV coincide con longitud $length bytes")
+                            break
+                        }
                     }
                 }
             }

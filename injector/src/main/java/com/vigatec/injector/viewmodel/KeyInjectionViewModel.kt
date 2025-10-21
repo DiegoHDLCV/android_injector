@@ -608,6 +608,18 @@ class KeyInjectionViewModel @Inject constructor(
             throw Exception("Error al cifrar llave con KTK: ${e.message}")
         }
 
+        // NUEVO: Recalcular longitud basándose en datos cifrados
+        val actualKeyLengthBytes = finalKeyData.length / 2
+        Log.i(TAG, "✓ Llave cifrada exitosamente")
+        Log.i(TAG, "  - Longitud original: $keyLengthBytes bytes")
+        Log.i(TAG, "  - Longitud cifrada (con padding): $actualKeyLengthBytes bytes")
+        
+        Log.i(TAG, "=== ANÁLISIS DE LONGITUDES ===")
+        Log.i(TAG, "  - Llave original: $keyLengthBytes bytes (${keyLengthBytes * 2} caracteres hex)")
+        Log.i(TAG, "  - Llave cifrada: ${finalKeyData.length / 2} bytes (${finalKeyData.length} caracteres hex)")
+        Log.i(TAG, "  - Padding aplicado: ${(finalKeyData.length / 2) - keyLengthBytes} bytes")
+        Log.i(TAG, "  - KeyLength que se enviará: ${String.format("%03X", finalKeyData.length / 2)} (${finalKeyData.length / 2} bytes)")
+
         // Detectar algoritmo basado en longitud y tipo
         val keyAlgorithm = detectKeyAlgorithm(keyLengthBytes, keyConfig.keyType)
 
@@ -633,7 +645,9 @@ class KeyInjectionViewModel @Inject constructor(
         
         // CRÍTICO: La longitud debe ser en formato ASCII HEX según documentación Futurex
         // Ejemplo: 16 bytes = "010", 32 bytes = "020", 48 bytes = "030"
-        val keyLength = String.format("%03X", keyLengthBytes) // Longitud en ASCII HEX (3 dígitos)
+        // IMPORTANTE: Usar la longitud ACTUAL (cifrada) en lugar de la original
+        val keyLengthForProtocol = finalKeyData.length / 2
+        val keyLength = String.format("%03X", keyLengthForProtocol) // Longitud en ASCII HEX (3 dígitos)
         // IMPORTANTE: Usar finalKeyData (que puede estar cifrado o en claro según KEK)
         val keyHex = finalKeyData // Datos de la llave (cifrados con KEK o en claro)
 
