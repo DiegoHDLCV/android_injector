@@ -60,6 +60,7 @@ data class InjectionEvent(
     val keyType: String,           // "KEK", "KTK", "Operacional", etc.
     val slot: String,              // Número de slot donde se inyectó
     val success: Boolean,          // true = éxito, false = fallo
+    val kcv: String,               // KCV de la llave inyectada
     val algorithm: String = ""     // TDES, AES, etc. (opcional)
 )
 
@@ -642,12 +643,21 @@ class MainViewModel @Inject constructor(
                     Log.d(TAG, "  - KtkChecksum: ${command.ktkChecksum}")
 
                     // Descifrar la llave con la KTK
+                    val originalKeyLengthBytes = when (genericAlgorithm) {
+                        KeyAlgorithm.AES_192 -> 24
+                        KeyAlgorithm.AES_256 -> 32
+                        KeyAlgorithm.DES_TRIPLE -> 24
+                        KeyAlgorithm.DES_DOUBLE -> 16
+                        else -> 16 // Fallback seguro
+                    }
+
                     val decryptedKeyHex = com.vigatec.utils.TripleDESCrypto.decryptKeyAfterTransmission(
                         encryptedKeyData = command.keyHex,
                         kekData = ktkFromDb.keyData,
-                        expectedKcv = command.keyChecksum
+                        expectedKcv = command.keyChecksum,
+                        originalKeyLengthBytes = originalKeyLengthBytes,
+                        algorithmType = genericAlgorithm.name
                     )
-
                     Log.d(TAG, "Llave descifrada exitosamente")
                     Log.d(TAG, "  - Longitud: ${decryptedKeyHex.length / 2} bytes")
                     Log.d(TAG, "  - KCV esperado: ${command.keyChecksum}")
@@ -729,6 +739,7 @@ class MainViewModel @Inject constructor(
                     keyType = genericKeyType.name,
                     slot = command.keySlot.toString(),
                     success = injectionStatus == "SUCCESSFUL",
+                    kcv = command.keyChecksum, // AÑADIDO
                     algorithm = algorithmDetail
                 )
             )

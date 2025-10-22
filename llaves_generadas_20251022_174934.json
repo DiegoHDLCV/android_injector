@@ -1,0 +1,135 @@
+{
+  "generated": "2025-10-22T17:49:34.611283",
+  "description": "Archivo de llaves completo con KEK y llaves de trabajo encriptadas.",
+  "totalKeys": 13,
+  "keys": [
+    {
+      "keyType": "KEK_STORAGE",
+      "algorithm": "AES-256",
+      "keyHex": "489BBC102AFCB3AF88BCE01960B01DB7CE572F5A59ED074540344EF855118DD7",
+      "kcv": "660052",
+      "bytes": 32,
+      "description": "KEK de almacenamiento generada din\u00e1micamente para encriptar otras llaves."
+    },
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "algorithm": "3DES-16",
+      "description": "Llave de PIN (3DES-128)",
+      "kcv": "000000",
+      "bytes": 16,
+      "encryptedKeyHex": "5E91281680F64A9F3A0B916344DAAAE5",
+      "nonce": "01F890CACEE26C354825F07077240777",
+      "tag": "793112CE15DF4D81406AFC59794A9CCC"
+    },
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "algorithm": "AES-128",
+      "description": "Llave de PIN (AES-128)",
+      "kcv": "6BDEA5",
+      "bytes": 16,
+      "encryptedKeyHex": "CF2E40E273E9664417C493BC5AEAA393",
+      "nonce": "5647F89F3A5316CD18405CD08D3992C6",
+      "tag": "19762CF4A42154FEB2A99DC446958CE4"
+    },
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "algorithm": "AES-256",
+      "description": "Llave de PIN (AES-256)",
+      "kcv": "659C94",
+      "bytes": 32,
+      "encryptedKeyHex": "6523D335A82C84E71134F612F6EC78A80DC26682A71AE425AF1867AE534AA656",
+      "nonce": "84C4DFA9F5A2787BCD360A5FC4E4C33F",
+      "tag": "96073F01457C52D2612853FE8C7D5C13"
+    },
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "algorithm": "3DES-16",
+      "description": "Llave de MAC (3DES-128)",
+      "kcv": "000000",
+      "bytes": 16,
+      "encryptedKeyHex": "E461A75ACB6FE639016E91A13BCF6867",
+      "nonce": "865830F353D36F2B089240CE88BBA882",
+      "tag": "A6B88C1F853FBFB48E774AA8142C08D0"
+    },
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "algorithm": "AES-128",
+      "description": "Llave de MAC (AES-128)",
+      "kcv": "7DB086",
+      "bytes": 16,
+      "encryptedKeyHex": "7893F84C6B078E3E66BE032EF9734795",
+      "nonce": "65E7A7B11E1832BCFB78AFCCA063BD3A",
+      "tag": "68EB684D3DBCE74461CCA6EF1C930C3F"
+    },
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "algorithm": "AES-256",
+      "description": "Llave de MAC (AES-256)",
+      "kcv": "2440E3",
+      "bytes": 32,
+      "encryptedKeyHex": "7C47CEC6F6BBAD3ED3C5264CF5EA3866FB2CF03FEB2899360AC6F636E2F2590B",
+      "nonce": "ECE243C5BB320855C5496543D9A60EAC",
+      "tag": "FDE6A5F889E4D5B4197CA0B08ED62F0B"
+    },
+    {
+      "keyType": "WORKING_DATA_KEY",
+      "algorithm": "3DES-24",
+      "description": "Llave de Datos (3DES-192)",
+      "kcv": "000000",
+      "bytes": 24,
+      "encryptedKeyHex": "1470ACCCC56A57F6143D0A924CD480B2A202433B916C40C9",
+      "nonce": "F2BE74AD900CC576F5D0500B6D17A2AC",
+      "tag": "7690CE4AB8A657AFA96A31340FA8569F"
+    },
+    {
+      "keyType": "WORKING_DATA_KEY",
+      "algorithm": "AES-192",
+      "description": "Llave de Datos (AES-192)",
+      "kcv": "96DE9E",
+      "bytes": 24,
+      "encryptedKeyHex": "7135038E67915CC3BFBD95219D921771AB78B42F95342522",
+      "nonce": "4B74EB6CC69E7809C4E1FD30509BF675",
+      "tag": "21A115B2D5D5AFB324DF5351E4635A08"
+    },
+    {
+      "keyType": "WORKING_DATA_KEY",
+      "algorithm": "AES-256",
+      "description": "Llave de Datos (AES-256)",
+      "kcv": "D98382",
+      "bytes": 32,
+      "encryptedKeyHex": "F099EC5DA9366ACF5564A22B31D72A05E067D2B91992BC532E6C5078A8FC04C8",
+      "nonce": "7E7DA1C8D88DA36A5641DDD38D356F6D",
+      "tag": "4BFF014815D4D9E5D241A0C544290F2C"
+    },
+    {
+      "keyType": "DUKPT_BDK",
+      "algorithm": "3DES-16",
+      "description": "BDK para derivaci\u00f3n de llaves DUKPT",
+      "kcv": "000000",
+      "bytes": 16,
+      "encryptedKeyHex": "0E5C1CD6B23ED570131B3520E5876BB2",
+      "nonce": "1AFD30C2C699C061790137F8FA07C43F",
+      "tag": "F4F2CF147F9EC4B4065BDCC2E21A43D4"
+    },
+    {
+      "keyType": "GENERIC",
+      "algorithm": "3DES-16",
+      "description": "Llave gen\u00e9rica 3DES-128",
+      "kcv": "000000",
+      "bytes": 16,
+      "encryptedKeyHex": "AC89DE4FE0F51A089A985F73AD105F1C",
+      "nonce": "35D144EBC18194100F6EF110AD0B929D",
+      "tag": "5EC883422EEF200EED565A1057340067"
+    },
+    {
+      "keyType": "GENERIC",
+      "algorithm": "AES-256",
+      "description": "Llave gen\u00e9rica AES-256",
+      "kcv": "BC0FF3",
+      "bytes": 32,
+      "encryptedKeyHex": "3C7FD13D0542D754B00E2EAB5313A4349576CEC52BED9781435BC59AD01CD9C4",
+      "nonce": "EFC6F95EFC324B3D1BD6495125855E32",
+      "tag": "2DCFBF3CA3BAC0A33C90DC4138AEE72C"
+    }
+  ]
+}

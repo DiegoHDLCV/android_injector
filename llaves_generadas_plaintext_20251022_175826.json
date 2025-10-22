@@ -1,0 +1,79 @@
+{
+  "generated": "2025-10-22T17:58:26.647910",
+  "description": "Archivo de llaves de prueba (todas en texto plano) para importaci\u00f3n.",
+  "totalKeys": 8,
+  "keys": [
+    {
+      "keyType": "KEK_STORAGE",
+      "algorithm": "AES-256",
+      "description": "KEK de almacenamiento generada din\u00e1micamente.",
+      "futurexCode": "00",
+      "keyHex": "1AEC447FDEB549CCF174C60B962A4DEB82C574040E486873E26853D7775FBA36",
+      "kcv": "D16BEE",
+      "bytes": 32
+    },
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "algorithm": "3DES-16",
+      "description": "Llave de PIN (3DES-128)",
+      "futurexCode": "00",
+      "keyHex": "AB6D64A14C79A2DF4C8316C2A73B8CB5",
+      "kcv": "1A3513",
+      "bytes": 16
+    },
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "algorithm": "AES-128",
+      "description": "Llave de PIN (AES-128)",
+      "futurexCode": "00",
+      "keyHex": "9438C81794923FACBF336E6A4F8E732D",
+      "kcv": "C582F9",
+      "bytes": 16
+    },
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "algorithm": "3DES-16",
+      "description": "Llave de MAC (3DES-128)",
+      "futurexCode": "00",
+      "keyHex": "54F8A2E9C807F194B0807F51070B0B94",
+      "kcv": "F364F6",
+      "bytes": 16
+    },
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "algorithm": "AES-256",
+      "description": "Llave de MAC (AES-256)",
+      "futurexCode": "00",
+      "keyHex": "3D3D9E41A358F91141C45809643ABEEA3A00C4EE25FE29D82984776A89F5DE8C",
+      "kcv": "530485",
+      "bytes": 32
+    },
+    {
+      "keyType": "WORKING_DATA_KEY",
+      "algorithm": "3DES-24",
+      "description": "Llave de Datos (3DES-192)",
+      "futurexCode": "00",
+      "keyHex": "9E6D0468E53DFD80ADF22AC7C28F08C2797F9E13166D1526",
+      "kcv": "8ED161",
+      "bytes": 24
+    },
+    {
+      "keyType": "DUKPT_BDK",
+      "algorithm": "3DES-16",
+      "description": "BDK para derivaci\u00f3n de llaves DUKPT",
+      "futurexCode": "00",
+      "keyHex": "D5C4FB86317FA13B1501C776C28638EF",
+      "kcv": "324142",
+      "bytes": 16
+    },
+    {
+      "keyType": "GENERIC",
+      "algorithm": "AES-256",
+      "description": "Llave gen\u00e9rica AES-256",
+      "futurexCode": "00",
+      "keyHex": "B0D2619FC1E3443B188872465825E5F80069BC32BE4EF94E28448BF1CB693E26",
+      "kcv": "B32A97",
+      "bytes": 32
+    }
+  ]
+}

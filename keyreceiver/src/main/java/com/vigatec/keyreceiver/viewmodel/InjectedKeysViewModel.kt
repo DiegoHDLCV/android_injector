@@ -34,6 +34,9 @@ class InjectedKeysViewModel @Inject constructor(
     private val _selectedKeyForDeletion = MutableStateFlow<InjectedKeyEntity?>(null)
     val selectedKeyForDeletion: StateFlow<InjectedKeyEntity?> = _selectedKeyForDeletion.asStateFlow()
 
+    private val _showClearAllModal = MutableStateFlow(false)
+    val showClearAllModal: StateFlow<Boolean> = _showClearAllModal.asStateFlow()
+
     private val _snackbarMessage = MutableSharedFlow<String>()
     val snackbarMessage: SharedFlow<String> = _snackbarMessage.asSharedFlow()
 
@@ -128,6 +131,14 @@ class InjectedKeysViewModel @Inject constructor(
     fun dismissDeleteModal() {
         _showDeleteModal.value = false
         _selectedKeyForDeletion.value = null
+    }
+
+    fun onClearAllRequested() {
+        _showClearAllModal.value = true
+    }
+
+    fun dismissClearAllModal() {
+        _showClearAllModal.value = false
     }
 
     fun clearAllKeys() {

@@ -1,6 +1,3 @@
-// Archivo: com/vigatec/android_injector/ui/screens/InjectedKeysScreen.kt
-
-@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.vigatec.keyreceiver.ui.screens
 
@@ -102,7 +99,7 @@ fun InjectedKeysScreen(
                         )
                     }
                     IconButton(
-                        onClick = { viewModel.clearAllKeys() },
+                        onClick = { viewModel.onClearAllRequested() }, // MODIFICADO
                         enabled = !loading && keys.isNotEmpty()
                     ) {
                         Icon(
@@ -155,46 +152,22 @@ fun InjectedKeysScreen(
                         val kekStorage = keys.filter { it.isKEK && it.kekType == "KEK_STORAGE" }
                         val operational = keys.filter { !it.isKEK }
                         
-                        // Logs para debugging
-                        Log.d("InjectedKeysScreen", "=== SEPARACIÓN DE LLAVES EN UI ===")
-                        Log.d("InjectedKeysScreen", "Total de llaves recibidas: ${keys.size}")
-                        Log.d("InjectedKeysScreen", "KTKs encontradas: ${ktks.size}")
-                        Log.d("InjectedKeysScreen", "KEK Storage encontradas: ${kekStorage.size}")
-                        Log.d("InjectedKeysScreen", "Operacionales encontradas: ${operational.size}")
-                        keys.forEachIndexed { index, key ->
-                            Log.d("InjectedKeysScreen", "UI Llave $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', KCV=${key.kcv}")
-                        }
-                        
-                        // Log especial para KTKs
-                        if (ktks.isNotEmpty()) {
-                            Log.d("InjectedKeysScreen", "🎯 SECCIÓN KTK SERÁ RENDERIZADA CON ${ktks.size} LLAVES")
-                            ktks.forEachIndexed { index, ktk ->
-                                Log.d("InjectedKeysScreen", "🎯 KTK $index: Slot=${ktk.keySlot}, KCV=${ktk.kcv}, ID=${ktk.id}")
-                            }
-                        } else {
-                            Log.d("InjectedKeysScreen", "❌ NO HAY KTKs - SECCIÓN KTK NO SE RENDERIZARÁ")
-                        }
-                        
                         // Sección KTKs (Key Transfer Keys)
                         if (ktks.isNotEmpty()) {
                             item {
-                                Log.d("InjectedKeysScreen", "🎯 CREANDO SECCIÓN KTK")
                                 SectionHeader(title = "KTK (Key Transfer Key)")
                             }
                             items(
                                 items = ktks,
                                 key = { it.id }
                             ) { key ->
-                                Log.d("InjectedKeysScreen", "🎯 RENDERIZANDO ITEM KTK: Slot=${key.keySlot}, ID=${key.id}")
                                 CompactKeyCard(
                                     key = key,
                                     onDeleteClick = { viewModel.onDeleteKey(key) },
-onSetAsKTKClick = { viewModel.setAsKTK(key) },
-onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
+                                    onSetAsKTKClick = { viewModel.setAsKTK(key) },
+                                    onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
                                 )
                             }
-                        } else {
-                            Log.d("InjectedKeysScreen", "❌ NO SE RENDERIZA SECCIÓN KTK - LISTA VACÍA")
                         }
                         
                         // Sección KEK Storage (si existe)
@@ -209,8 +182,8 @@ onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
                                 CompactKeyCard(
                                     key = key,
                                     onDeleteClick = { viewModel.onDeleteKey(key) },
-onSetAsKTKClick = { viewModel.setAsKTK(key) },
-onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
+                                    onSetAsKTKClick = { viewModel.setAsKTK(key) },
+                                    onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
                                 )
                             }
                         }
@@ -227,8 +200,8 @@ onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
                                 CompactKeyCard(
                                     key = key,
                                     onDeleteClick = { viewModel.onDeleteKey(key) },
-onSetAsKTKClick = { viewModel.setAsKTK(key) },
-onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
+                                    onSetAsKTKClick = { viewModel.setAsKTK(key) },
+                                    onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
                                 )
                             }
                         }
@@ -238,7 +211,7 @@ onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
         }
     }
 
-    // Modal de confirmación de eliminación
+    // Modal de confirmación de eliminación individual
     if (showDeleteModal && selectedKeyForDeletion != null) {
         ConfirmationDialog(
             icon = Icons.Default.Delete,
@@ -250,6 +223,18 @@ onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
             onDismiss = {
                 viewModel.dismissDeleteModal()
             }
+        )
+    }
+
+    // Modal de confirmación para borrar todo
+    val showClearAllModal by viewModel.showClearAllModal.collectAsState()
+    if (showClearAllModal) {
+        ConfirmationDialog(
+            icon = Icons.Default.DeleteSweep,
+            title = "Limpiar Historial",
+            text = "¿Estás seguro de que quieres eliminar TODAS las llaves inyectadas? Esta acción es irreversible.",
+            onConfirm = { viewModel.clearAllKeys() },
+            onDismiss = { viewModel.dismissClearAllModal() }
         )
     }
 }
@@ -267,9 +252,6 @@ fun InjectedKeysSkeletonScreen() {
     }
 }
 
-/**
- * Componente de esqueleto con efecto shimmer para mostrar mientras se cargan datos
- */
 @Composable
 fun SkeletonBox(
     modifier: Modifier = Modifier,
@@ -312,9 +294,6 @@ fun SkeletonBox(
     )
 }
 
-/**
- * Esqueleto para las tarjetas de llaves inyectadas
- */
 @Composable
 fun InjectedKeyCardSkeleton(
     modifier: Modifier = Modifier
@@ -327,35 +306,28 @@ fun InjectedKeyCardSkeleton(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    // Tipo de llave esqueleto
                     SkeletonBox(
                         modifier = Modifier.width(100.dp),
                         height = 14.dp
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    // Algoritmo esqueleto
                     SkeletonBox(
                         modifier = Modifier.width(80.dp),
                         height = 12.dp
                     )
                 }
-
-                // Estado esqueleto
                 SkeletonBox(
                     modifier = Modifier.width(60.dp),
                     height = 24.dp,
                     shape = RoundedCornerShape(12.dp)
                 )
             }
-
-            // Detalles
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 repeat(3) {
                     Row(
@@ -415,278 +387,29 @@ fun EmptyKeysScreen() {
 }
 
 @Composable
-fun KeyInfoCard(
-    modifier: Modifier = Modifier, 
-    key: InjectedKeyEntity, 
-    onDeleteClick: () -> Unit,
-    onSetAsKTKClick: () -> Unit,
-    onRemoveAsKTKClick: () -> Unit
-) {
-    // Logs para tracking de KTK en KeyInfoCard original
-    LaunchedEffect(key.id) {
-        Log.d("KeyInfoCard", "=== RENDERIZANDO KEYINFOCARD ORIGINAL ===")
-        Log.d("KeyInfoCard", "ID: ${key.id}")
-        Log.d("KeyInfoCard", "Slot: ${key.keySlot}")
-        Log.d("KeyInfoCard", "Tipo: ${key.keyType}")
-        Log.d("KeyInfoCard", "isKEK: ${key.isKEK}")
-        Log.d("KeyInfoCard", "kekType: '${key.kekType}'")
-        Log.d("KeyInfoCard", "KCV: ${key.kcv}")
-        Log.d("KeyInfoCard", "Status: ${key.status}")
-        if (key.isKEK && key.kekType == "KEK_TRANSPORT") {
-            Log.d("KeyInfoCard", "🚨 KTK DETECTADA EN KEYINFOCARD ORIGINAL")
-        }
-        Log.d("KeyInfoCard", "=== FIN RENDERIZADO KEYINFOCARD ===")
-    }
-    
-    // Log cuando se destruye el KeyInfoCard
-    DisposableEffect(key.id) {
-        onDispose {
-            Log.d("KeyInfoCard", "=== DESTRUYENDO KEYINFOCARD ORIGINAL ===")
-            Log.d("KeyInfoCard", "ID: ${key.id}")
-            Log.d("KeyInfoCard", "Slot: ${key.keySlot}")
-            if (key.isKEK && key.kekType == "KEK_TRANSPORT") {
-                Log.d("KeyInfoCard", "🚨 KTK SE ESTÁ DESTRUYENDO EN KEYINFOCARD ORIGINAL")
-            }
-            Log.d("KeyInfoCard", "=== FIN DESTRUCCIÓN KEYINFOCARD ===")
-        }
-    }
-    
-    // --- INICIO DE CAMBIOS: Lógica de estado visual ---
-    val statusColor = when (key.status) {
-        "SUCCESSFUL" -> Color(0xFF388E3C)
-        "FAILED" -> MaterialTheme.colorScheme.error
-        "DELETING" -> Color(0xFF757575) // Gris para estado transitorio
-        else -> Color.DarkGray
-    }
-    val cardBorder = when(key.status) {
-        "FAILED" -> BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
-        "DELETING" -> BorderStroke(1.dp, Color.Gray)
-        else -> null
-    }
-    // Deshabilitar la tarjeta si se está borrando para evitar interacciones múltiples
-    val isEnabled = key.status != "DELETING"
-    // --- FIN DE CAMBIOS ---
-
-    Card(
-        modifier = modifier.fillMaxWidth().animateContentSize(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = cardBorder,
-        // --- CAMBIO: Aplicar estado deshabilitado visualmente ---
-        colors = CardDefaults.cardColors(
-            containerColor = if (isEnabled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Header con tipo de llave y estado
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = key.keyType,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        if (key.isKEK) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            KEKBadge(type = when(key.kekType) {
-                                "KEK_TRANSPORT" -> "KTK"
-                                "KEK_STORAGE" -> "KEK"
-                                else -> "KEK"
-                            })
-                        }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = key.keyAlgorithm,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                        if (key.isKEK) {
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "KEK",
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-                
-                StatusChip(
-                    text = if (key.isKEK) "KEK ACTIVA" else key.status,
-                    color = if (key.isKEK) Color(0xFF2196F3) else statusColor,
-                    isDeleting = key.status == "DELETING"
-                )
-            }
-            
-            // Detalles de la llave
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                KeyDetailRow(
-                    icon = Icons.Default.Numbers,
-                    label = "Slot",
-                    value = "#${key.keySlot}",
-                    isEnabled = isEnabled
-                )
-                
-                KeyDetailRow(
-                    icon = Icons.Default.Fingerprint,
-                    label = "KCV",
-                    value = key.kcv.uppercase(),
-                    isEnabled = isEnabled
-                )
-                
-                KeyDetailRow(
-                    icon = Icons.Default.CalendarToday,
-                    label = "Fecha",
-                    value = remember {
-                        SimpleDateFormat("dd/MM/yy HH:mm:ss", Locale.getDefault()).format(Date(key.injectionTimestamp))
-                    },
-                    isEnabled = isEnabled
-                )
-            }
-
-            // Mostrar nombre personalizado si existe
-            if (key.customName.isNotEmpty()) {
-                KeyDetailRow(
-                    icon = Icons.Default.Label,
-                    label = "Nombre",
-                    value = key.customName,
-                    isEnabled = isEnabled
-                )
-            }
-
-            // Botones de acción
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Botón de KEK (solo para AES-256)
-                if (key.keyAlgorithm.contains("AES", ignoreCase = true) && key.keyData.length == 64) {
-                    if (key.isKEK) {
-                        Button(
-                            onClick = onRemoveAsKTKClick,
-                            enabled = isEnabled,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LockOpen,
-                                contentDescription = "Quitar como KTK",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Quitar como KTK")
-                        }
-                    } else {
-                        Button(
-                            onClick = onSetAsKTKClick,
-                            enabled = isEnabled,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "Usar como KTK",
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Usar como KTK")
-                        }
-                    }
-                }
-                
-                // Botón de eliminar
-                IconButton(onClick = onDeleteClick, enabled = isEnabled) {
-                    Icon(
-                        Icons.Default.DeleteOutline,
-                        "Borrar Llave",
-                        tint = if (isEnabled) MaterialTheme.colorScheme.error else Color.Gray
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 fun CompactKeyCard(
     key: InjectedKeyEntity,
     onDeleteClick: () -> Unit,
     onSetAsKTKClick: () -> Unit,
     onRemoveAsKTKClick: () -> Unit
 ) {
-    // Logs para tracking de KTK
-    LaunchedEffect(key.id) {
-        Log.d("CompactKeyCard", "=== RENDERIZANDO CARD ===")
-        Log.d("CompactKeyCard", "ID: ${key.id}")
-        Log.d("CompactKeyCard", "Slot: ${key.keySlot}")
-        Log.d("CompactKeyCard", "Tipo: ${key.keyType}")
-        Log.d("CompactKeyCard", "isKEK: ${key.isKEK}")
-        Log.d("CompactKeyCard", "kekType: '${key.kekType}'")
-        Log.d("CompactKeyCard", "KCV: ${key.kcv}")
-        Log.d("CompactKeyCard", "Status: ${key.status}")
-        if (key.isKEK && key.kekType == "KEK_TRANSPORT") {
-            Log.d("CompactKeyCard", "🚨 KTK DETECTADA EN CARD - DEBERÍA SER VISIBLE")
-        }
-        Log.d("CompactKeyCard", "=== FIN RENDERIZADO CARD ===")
-    }
-    
-    // Log cuando se destruye la card
-    DisposableEffect(key.id) {
-        onDispose {
-            Log.d("CompactKeyCard", "=== DESTRUYENDO CARD ===")
-            Log.d("CompactKeyCard", "ID: ${key.id}")
-            Log.d("CompactKeyCard", "Slot: ${key.keySlot}")
-            if (key.isKEK && key.kekType == "KEK_TRANSPORT") {
-                Log.d("CompactKeyCard", "🚨 KTK SE ESTÁ DESTRUYENDO - DESAPARECE DE LA UI")
-            }
-            Log.d("CompactKeyCard", "=== FIN DESTRUCCIÓN CARD ===")
-        }
-    }
-    // Estado visual similar al KeyInfoCard original
-    val statusColor = when (key.status) {
-        "SUCCESSFUL" -> Color(0xFF388E3C)
-        "FAILED" -> MaterialTheme.colorScheme.error
-        "DELETING" -> Color(0xFF757575)
-        else -> Color.DarkGray
-    }
-    val cardBorder = when(key.status) {
-        "FAILED" -> BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
-        "DELETING" -> BorderStroke(1.dp, Color.Gray)
-        else -> null
-    }
     val isEnabled = key.status != "DELETING"
 
     Card(
         modifier = Modifier.fillMaxWidth().animateContentSize(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = cardBorder,
+        border = if (key.status == "FAILED") BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)) else null,
         colors = CardDefaults.cardColors(
             containerColor = if (isEnabled) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) { // Reducido de 16dp
-            // Fila 1: Tipo + Slot + Badge KEK
+        Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Ícono + Tipo
                     Icon(
                         imageVector = Icons.Default.VpnKey,
                         contentDescription = null,
@@ -710,7 +433,6 @@ fun CompactKeyCard(
                         })
                         Spacer(Modifier.width(4.dp))
                     }
-                    // Chip para el slot
                     Box(
                         modifier = Modifier
                             .background(
@@ -728,10 +450,33 @@ fun CompactKeyCard(
                 }
             }
             
-            // Fila 2: Algoritmo + KCV (en una línea)
+            // KCV Prominente
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Fingerprint,
+                    contentDescription = "KCV",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = "KCV: ${key.kcv.uppercase()}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Algoritmo y Fecha
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = key.keyAlgorithm,
@@ -739,28 +484,21 @@ fun CompactKeyCard(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
                 Text(
-                    text = "KCV: ${key.kcv.uppercase()}",
-                    fontSize = 12.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-            
-            // Fila 3: Fecha + Acciones (botones más pequeños)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
                     text = remember {
                         SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(key.injectionTimestamp))
                     },
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
+            }
+            
+            // Acciones
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    // Botones compactos
                     IconButton(
                         onClick = onDeleteClick,
                         enabled = isEnabled,
@@ -853,7 +591,6 @@ fun StatusChip(text: String, color: Color, isDeleting: Boolean = false) {
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Mostrar un indicador de progreso si se está borrando
             if (isDeleting) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(12.dp),
@@ -863,7 +600,6 @@ fun StatusChip(text: String, color: Color, isDeleting: Boolean = false) {
                 Spacer(modifier = Modifier.width(6.dp))
             }
             Text(
-                // Cambiar el texto para que sea más claro
                 text = if (isDeleting) "BORRANDO" else text,
                 color = Color.White,
                 style = MaterialTheme.typography.labelSmall,
@@ -909,9 +645,9 @@ fun KEKBadge(type: String = "KEK") {
         modifier = Modifier
             .background(
                 when(type) {
-                    "KTK" -> Color(0xFF4CAF50)  // Verde para KTK
-                    "KEK" -> Color(0xFF2196F3)  // Azul para KEK Storage
-                    else -> Color(0xFF9C27B0)   // Morado para otros
+                    "KTK" -> Color(0xFF4CAF50)
+                    "KEK" -> Color(0xFF2196F3)
+                    else -> Color(0xFF9C27B0)
                 },
                 shape = RoundedCornerShape(4.dp)
             )
@@ -967,7 +703,6 @@ fun FiltersBar(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Campo de búsqueda
             OutlinedTextField(
                 value = searchText,
                 onValueChange = onSearchTextChange,
@@ -981,13 +716,10 @@ fun FiltersBar(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
-
-            // Filtros
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Filtro por algoritmo
                 FilterDropdown(
                     label = "Algoritmo",
                     options = listOf("Todos", "3DES", "AES-128", "AES-192", "AES-256"),
@@ -995,8 +727,6 @@ fun FiltersBar(
                     onOptionSelected = onFilterAlgorithmChange,
                     modifier = Modifier.weight(1f)
                 )
-
-                // Filtro por estado
                 FilterDropdown(
                     label = "Estado",
                     options = listOf("Todos", "SUCCESSFUL", "GENERATED", "ACTIVE", "EXPORTED", "INACTIVE"),
@@ -1005,8 +735,6 @@ fun FiltersBar(
                     modifier = Modifier.weight(1f)
                 )
             }
-
-            // Filtro por tipo KTK
             FilterDropdown(
                 label = "Tipo",
                 options = listOf("Todas", "Solo KTK", "Solo Operacionales"),
@@ -1018,6 +746,7 @@ fun FiltersBar(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FilterDropdown(
     label: String,

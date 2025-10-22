@@ -650,7 +650,7 @@ class KeyInjectionViewModel @Inject constructor(
         // Ejemplo: 16 bytes = "010", 32 bytes = "020", 48 bytes = "030"
         // IMPORTANTE: Usar la longitud ACTUAL (cifrada) en lugar de la original
         val keyLengthForProtocol = finalKeyData.length / 2
-        val keyLength = String.format("%03X", keyLengthForProtocol) // Longitud en ASCII HEX (3 dígitos)
+        val keyLength = String.format("%03X", keyLengthForProtocol) // Longitud en ASCII HEX (3 dígitos)''
         // IMPORTANTE: Usar finalKeyData (que puede estar cifrado o en claro según KEK)
         val keyHex = finalKeyData // Datos de la llave (cifrados con KEK o en claro)
 

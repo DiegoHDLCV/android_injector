@@ -200,7 +200,13 @@ private fun InjectionItem(injection: InjectionEvent) {
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "KCV: ${injection.kcv}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Normal,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                    )                }
             }
 
             // Estado y hora

@@ -1,0 +1,57 @@
+{
+  "name": "Perfil de Inyecci\u00f3n - 20251022",
+  "description": "Perfil generado autom\u00e1ticamente desde llaves_maestras_plaintext_20251022_180615.json",
+  "applicationType": "Retail",
+  "useKEK": true,
+  "selectedKEKKcv": "4A0542",
+  "keyConfigurations": [
+    {
+      "usage": "UNKNOWN",
+      "keyType": "MASTER_KEY",
+      "slot": "01",
+      "selectedKey": "9ABBDA",
+      "injectionMethod": "auto",
+      "ksn": ""
+    },
+    {
+      "usage": "UNKNOWN",
+      "keyType": "MASTER_KEY",
+      "slot": "02",
+      "selectedKey": "D4D9B9",
+      "injectionMethod": "auto",
+      "ksn": ""
+    },
+    {
+      "usage": "UNKNOWN",
+      "keyType": "MASTER_KEY",
+      "slot": "03",
+      "selectedKey": "0660C7",
+      "injectionMethod": "auto",
+      "ksn": ""
+    },
+    {
+      "usage": "UNKNOWN",
+      "keyType": "MASTER_KEY",
+      "slot": "04",
+      "selectedKey": "1F8585",
+      "injectionMethod": "auto",
+      "ksn": ""
+    },
+    {
+      "usage": "UNKNOWN",
+      "keyType": "MASTER_KEY",
+      "slot": "05",
+      "selectedKey": "112A8B",
+      "injectionMethod": "auto",
+      "ksn": ""
+    },
+    {
+      "usage": "DUKPT",
+      "keyType": "DUKPT_BDK",
+      "slot": "06",
+      "selectedKey": "77102C",
+      "injectionMethod": "auto",
+      "ksn": "FFFF9876543210E00000"
+    }
+  ]
+}
