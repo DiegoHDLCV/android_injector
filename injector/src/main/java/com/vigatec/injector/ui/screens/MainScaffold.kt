@@ -57,7 +57,8 @@ val bottomBarDestinations = listOf(
 @Composable
 fun MainScaffold(
     username: String,
-    onNavigateToConfig: () -> Unit = {}
+    onNavigateToConfig: () -> Unit = {},
+    onNavigateToExportImport: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     Scaffold(
@@ -65,7 +66,11 @@ fun MainScaffold(
         bottomBar = { AppBottomBar(navController = navController) }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            MainNavGraph(navController = navController, username = username)
+            MainNavGraph(
+                navController = navController,
+                username = username,
+                onNavigateToExportImport = onNavigateToExportImport
+            )
         }
     }
 }

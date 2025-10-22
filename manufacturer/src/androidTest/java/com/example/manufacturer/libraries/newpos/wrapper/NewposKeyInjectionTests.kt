@@ -124,6 +124,258 @@ class NewposKeyInjectionTests {
     }
 
     // ========================================================================
+    // --- NUEVOS TESTS: INYECCIÓN DE WORKING KEYS Y VALIDACIÓN KCV ---
+    // ========================================================================
+
+    @Test
+    fun testInjectWorkingDataKeyPlainAndVerifyKcv() = runBlocking {
+        println("\n--- START TEST: NEWPOS - INJECT WORKING DATA KEY PLAIN + VERIFY KCV ---")
+
+        // Llave de prueba en texto plano (3DES - 24 bytes)
+        val testDataKeyBytes = "0123456789ABCDEFFEDCBA98765432100123456789ABCDEF".hexToBytes()
+        val testKeySlot = 5
+        val testKeyType = KeyType.WORKING_DATA_ENCRYPTION_KEY
+        val testAlgorithm = KeyAlgorithm.DES_TRIPLE
+
+        println("STEP 1: Injecting WORKING_DATA_ENCRYPTION_KEY in plain text.")
+        println("  -> Key Slot: $testKeySlot")
+        println("  -> Key Algorithm: $testAlgorithm")
+        println("  -> Key Value (Hex): ${testDataKeyBytes.toHexString()}")
+
+        // Inyectar la llave en texto plano
+        val writeSuccess = pedController.writeKeyPlain(testKeySlot, testKeyType, testAlgorithm, testDataKeyBytes, null)
+        assertTrue("Working key injection must succeed", writeSuccess)
+
+        println("STEP 2: Verifying the key is present in the PED.")
+        val isPresent = pedController.isKeyPresent(testKeySlot, testKeyType)
+        assertTrue("Working key must be present after injection", isPresent)
+
+        println("STEP 3: Calculating KCV by encrypting a block of zeros.")
+        // Crear bloque de ceros (8 bytes para DES/3DES)
+        val zeroBlock = ByteArray(8) { 0 }
+        println("  -> Zero Block (8 bytes): ${zeroBlock.toHexString()}")
+
+        // Cifrar bloque de ceros
+        val encryptRequest = PedCipherRequest(
+            keyIndex = testKeySlot,
+            keyType = testKeyType,
+            data = zeroBlock,
+            algorithm = testAlgorithm,
+            mode = BlockCipherMode.ECB,
+            iv = null,
+            encrypt = true
+        )
+
+        val encryptResult = pedController.encrypt(encryptRequest)
+        val encryptedZeros = encryptResult.resultData
+        println("  -> Encrypted Zeros (Hex): ${encryptedZeros.toHexString()}")
+
+        // Tomar primeros 3 bytes como KCV
+        val calculatedKcv = encryptedZeros.take(3).toByteArray()
+        println("  -> Calculated KCV (first 3 bytes): ${calculatedKcv.toHexString()}")
+
+        println("STEP 4: Calculating expected KCV using software crypto.")
+        val expectedKcv = softwareCalculateKcv(testDataKeyBytes, testAlgorithm)
+        println("  -> Expected KCV (software): ${expectedKcv.toHexString()}")
+
+        // Verificar que coincidan
+        assertArrayEquals("KCV calculated by PED must match software KCV", expectedKcv, calculatedKcv)
+        println("SUCCESS: Working key injected and KCV verified correctly.")
+    }
+
+    @Test
+    fun testInjectWorkingPinKeyPlainAndVerifyKcv() = runBlocking {
+        println("\n--- START TEST: NEWPOS - INJECT WORKING PIN KEY PLAIN + VERIFY KCV ---")
+
+        // Llave de prueba en texto plano (3DES - 24 bytes)
+        val testPinKeyBytes = "FEDCBA98765432100123456789ABCDEFFEDCBA9876543210".hexToBytes()
+        val testKeySlot = 6
+        val testKeyType = KeyType.WORKING_PIN_KEY
+        val testAlgorithm = KeyAlgorithm.DES_TRIPLE
+
+        println("STEP 1: Injecting WORKING_PIN_KEY in plain text.")
+        println("  -> Key Slot: $testKeySlot")
+        println("  -> Key Algorithm: $testAlgorithm")
+        println("  -> Key Value (Hex): ${testPinKeyBytes.toHexString()}")
+
+        // Inyectar la llave en texto plano
+        val writeSuccess = pedController.writeKeyPlain(testKeySlot, testKeyType, testAlgorithm, testPinKeyBytes, null)
+        assertTrue("Working PIN key injection must succeed", writeSuccess)
+
+        println("STEP 2: Verifying the key is present in the PED.")
+        val isPresent = pedController.isKeyPresent(testKeySlot, testKeyType)
+        assertTrue("Working PIN key must be present after injection", isPresent)
+
+        println("STEP 3: Calculating KCV by encrypting a block of zeros.")
+        val zeroBlock = ByteArray(8) { 0 }
+        println("  -> Zero Block (8 bytes): ${zeroBlock.toHexString()}")
+
+        // Cifrar bloque de ceros
+        val encryptRequest = PedCipherRequest(
+            keyIndex = testKeySlot,
+            keyType = testKeyType,
+            data = zeroBlock,
+            algorithm = testAlgorithm,
+            mode = BlockCipherMode.ECB,
+            iv = null,
+            encrypt = true
+        )
+
+        val encryptResult = pedController.encrypt(encryptRequest)
+        val encryptedZeros = encryptResult.resultData
+        println("  -> Encrypted Zeros (Hex): ${encryptedZeros.toHexString()}")
+
+        val calculatedKcv = encryptedZeros.take(3).toByteArray()
+        println("  -> Calculated KCV (first 3 bytes): ${calculatedKcv.toHexString()}")
+
+        println("STEP 4: Calculating expected KCV using software crypto.")
+        val expectedKcv = softwareCalculateKcv(testPinKeyBytes, testAlgorithm)
+        println("  -> Expected KCV (software): ${expectedKcv.toHexString()}")
+
+        assertArrayEquals("KCV calculated by PED must match software KCV", expectedKcv, calculatedKcv)
+        println("SUCCESS: Working PIN key injected and KCV verified correctly.")
+    }
+
+    @Test
+    fun testInjectWorkingMacKeyPlainAndVerifyKcv() = runBlocking {
+        println("\n--- START TEST: NEWPOS - INJECT WORKING MAC KEY PLAIN + VERIFY KCV ---")
+
+        // Llave de prueba en texto plano (3DES - 24 bytes)
+        val testMacKeyBytes = "AABBCCDDEEFF00112233445566778899AABBCCDDEEFF0011".hexToBytes()
+        val testKeySlot = 7
+        val testKeyType = KeyType.WORKING_MAC_KEY
+        val testAlgorithm = KeyAlgorithm.DES_TRIPLE
+
+        println("STEP 1: Injecting WORKING_MAC_KEY in plain text.")
+        println("  -> Key Slot: $testKeySlot")
+        println("  -> Key Algorithm: $testAlgorithm")
+        println("  -> Key Value (Hex): ${testMacKeyBytes.toHexString()}")
+
+        // Inyectar la llave en texto plano
+        val writeSuccess = pedController.writeKeyPlain(testKeySlot, testKeyType, testAlgorithm, testMacKeyBytes, null)
+        assertTrue("Working MAC key injection must succeed", writeSuccess)
+
+        println("STEP 2: Verifying the key is present in the PED.")
+        val isPresent = pedController.isKeyPresent(testKeySlot, testKeyType)
+        assertTrue("Working MAC key must be present after injection", isPresent)
+
+        println("STEP 3: Calculating KCV by encrypting a block of zeros.")
+        val zeroBlock = ByteArray(8) { 0 }
+        println("  -> Zero Block (8 bytes): ${zeroBlock.toHexString()}")
+
+        // Cifrar bloque de ceros
+        val encryptRequest = PedCipherRequest(
+            keyIndex = testKeySlot,
+            keyType = testKeyType,
+            data = zeroBlock,
+            algorithm = testAlgorithm,
+            mode = BlockCipherMode.ECB,
+            iv = null,
+            encrypt = true
+        )
+
+        val encryptResult = pedController.encrypt(encryptRequest)
+        val encryptedZeros = encryptResult.resultData
+        println("  -> Encrypted Zeros (Hex): ${encryptedZeros.toHexString()}")
+
+        val calculatedKcv = encryptedZeros.take(3).toByteArray()
+        println("  -> Calculated KCV (first 3 bytes): ${calculatedKcv.toHexString()}")
+
+        println("STEP 4: Calculating expected KCV using software crypto.")
+        val expectedKcv = softwareCalculateKcv(testMacKeyBytes, testAlgorithm)
+        println("  -> Expected KCV (software): ${expectedKcv.toHexString()}")
+
+        assertArrayEquals("KCV calculated by PED must match software KCV", expectedKcv, calculatedKcv)
+        println("SUCCESS: Working MAC key injected and KCV verified correctly.")
+    }
+
+    @Test
+    fun testInjectAesWorkingKeyPlainAndVerifyKcv() = runBlocking {
+        println("\n--- START TEST: NEWPOS - INJECT AES-256 WORKING KEY PLAIN + VERIFY KCV ---")
+
+        // Llave AES-256 de prueba (32 bytes)
+        val testAesKeyBytes = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF".hexToBytes()
+        val testKeySlot = 8
+        val testKeyType = KeyType.WORKING_DATA_ENCRYPTION_KEY
+        val testAlgorithm = KeyAlgorithm.AES_256
+
+        println("STEP 1: Injecting AES-256 WORKING_DATA_ENCRYPTION_KEY in plain text.")
+        println("  -> Key Slot: $testKeySlot")
+        println("  -> Key Algorithm: $testAlgorithm")
+        println("  -> Key Value (Hex): ${testAesKeyBytes.toHexString()}")
+
+        // Inyectar la llave en texto plano
+        val writeSuccess = pedController.writeKeyPlain(testKeySlot, testKeyType, testAlgorithm, testAesKeyBytes, null)
+        assertTrue("AES-256 working key injection must succeed", writeSuccess)
+
+        println("STEP 2: Verifying the key is present in the PED.")
+        val isPresent = pedController.isKeyPresent(testKeySlot, testKeyType)
+        assertTrue("AES-256 working key must be present after injection", isPresent)
+
+        println("STEP 3: Calculating KCV by encrypting a block of zeros.")
+        // AES usa bloques de 16 bytes
+        val zeroBlock = ByteArray(16) { 0 }
+        println("  -> Zero Block (16 bytes): ${zeroBlock.toHexString()}")
+
+        // Cifrar bloque de ceros
+        val encryptRequest = PedCipherRequest(
+            keyIndex = testKeySlot,
+            keyType = testKeyType,
+            data = zeroBlock,
+            algorithm = testAlgorithm,
+            mode = BlockCipherMode.ECB,
+            iv = null,
+            encrypt = true
+        )
+
+        val encryptResult = pedController.encrypt(encryptRequest)
+        val encryptedZeros = encryptResult.resultData
+        println("  -> Encrypted Zeros (Hex): ${encryptedZeros.toHexString()}")
+
+        val calculatedKcv = encryptedZeros.take(3).toByteArray()
+        println("  -> Calculated KCV (first 3 bytes): ${calculatedKcv.toHexString()}")
+
+        println("STEP 4: Calculating expected KCV using software crypto.")
+        val expectedKcv = softwareCalculateKcv(testAesKeyBytes, testAlgorithm)
+        println("  -> Expected KCV (software): ${expectedKcv.toHexString()}")
+
+        assertArrayEquals("KCV calculated by PED must match software KCV", expectedKcv, calculatedKcv)
+        println("SUCCESS: AES-256 working key injected and KCV verified correctly.")
+    }
+
+    // --- Utility para calcular KCV por software ---
+    private fun softwareCalculateKcv(keyBytes: ByteArray, algorithm: KeyAlgorithm): ByteArray {
+        val blockSize = when (algorithm) {
+            KeyAlgorithm.AES_128, KeyAlgorithm.AES_192, KeyAlgorithm.AES_256 -> 16
+            else -> 8 // DES/3DES
+        }
+
+        val zeroBlock = ByteArray(blockSize) { 0 }
+
+        val cipher = when (algorithm) {
+            KeyAlgorithm.DES_TRIPLE -> {
+                Cipher.getInstance("DESede/ECB/NoPadding")
+            }
+            KeyAlgorithm.AES_128, KeyAlgorithm.AES_192, KeyAlgorithm.AES_256 -> {
+                Cipher.getInstance("AES/ECB/NoPadding")
+            }
+            else -> throw IllegalArgumentException("Algorithm not supported for KCV calculation: $algorithm")
+        }
+
+        val keySpec = when (algorithm) {
+            KeyAlgorithm.DES_TRIPLE -> SecretKeySpec(keyBytes, "DESede")
+            KeyAlgorithm.AES_128, KeyAlgorithm.AES_192, KeyAlgorithm.AES_256 -> SecretKeySpec(keyBytes, "AES")
+            else -> throw IllegalArgumentException("Algorithm not supported for KCV calculation: $algorithm")
+        }
+
+        cipher.init(Cipher.ENCRYPT_MODE, keySpec)
+        val encrypted = cipher.doFinal(zeroBlock)
+
+        // Retornar primeros 3 bytes
+        return encrypted.take(3).toByteArray()
+    }
+
+    // ========================================================================
     // --- TESTS DE INYECCIÓN (Verifican solo la llamada) ---
     // ========================================================================
 

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.vigatec.keyreceiver.ui.screens.CryptoTestScreen
 import com.vigatec.keyreceiver.ui.screens.InjectedKeysScreen
 import com.vigatec.keyreceiver.ui.screens.KeyVerificationScreen
 import com.vigatec.keyreceiver.ui.screens.LoginScreen
@@ -50,6 +51,9 @@ fun AppNavHost(
                 onNavigateBack = { navController.popBackStack() },
                 viewModel = hiltViewModel()
             )
+        }
+        composable(Routes.CryptoTestScreen.route) {
+            CryptoTestScreen(navController = navController)
         }
 
         // Add other composables (like PrintingScreen) if they exist

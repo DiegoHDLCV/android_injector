@@ -11,4 +11,5 @@ sealed class Routes(val route: String) {
     object ConfigScreen : Routes("config_screen")
     object LogsScreen : Routes("logs_screen")
     object UserManagementScreen : Routes("user_management_screen")
+    object CryptoTestScreen : Routes("crypto_test_screen")
 }

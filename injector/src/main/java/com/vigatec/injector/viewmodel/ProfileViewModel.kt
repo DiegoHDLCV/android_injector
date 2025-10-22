@@ -99,8 +99,8 @@ class ProfileViewModel @Inject constructor(
     
     fun onShowCreateModal(profile: ProfileEntity? = null) {
         viewModelScope.launch {
-            // Obtener la KEK activa del almacén
-            val currentKTK = injectedKeyRepository.getCurrentKEK()
+            // Obtener la KTK activa del almacén (KEK_TRANSPORT, no KEK_STORAGE)
+            val currentKTK = injectedKeyRepository.getCurrentKTK()
             
             val formData = if (profile != null) {
                 ProfileFormData(

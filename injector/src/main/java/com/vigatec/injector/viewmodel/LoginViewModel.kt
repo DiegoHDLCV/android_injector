@@ -17,7 +17,8 @@ import javax.inject.Inject
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val userRepository: UserRepository,
-    private val userPreferencesManager: UserPreferencesManager
+    private val userPreferencesManager: UserPreferencesManager,
+    private val sessionManager: com.vigatec.injector.data.local.preferences.SessionManager
 ) : ViewModel() {
 
     companion object {
@@ -118,6 +119,11 @@ class LoginViewModel @Inject constructor(
                 loggedInUser = user
                 loginSuccess = true
 
+                // Guardar la sesión activa
+                Log.d(TAG, "Guardando sesión del usuario...")
+                sessionManager.saveSession(userId = user.id, username = user.username, role = user.role)
+                Log.d(TAG, "✓ Sesión guardada en SessionManager")
+
                 // Guardar preferencias si se marcó "recordar usuario"
                 if (rememberUser) {
                     Log.d(TAG, "Guardando preferencias de usuario...")
@@ -129,7 +135,7 @@ class LoginViewModel @Inject constructor(
                     userPreferencesManager.clearUserPreferences()
                     Log.d(TAG, "✓ Preferencias limpiadas")
                 }
-                
+
                 Log.i(TAG, "✓✓✓ LOGIN EXITOSO ✓✓✓")
             } else {
                 Log.e(TAG, "✗ Autenticación FALLIDA")

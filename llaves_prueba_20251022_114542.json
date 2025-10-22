@@ -1,0 +1,217 @@
+{
+  "generated": "2025-10-22T11:45:42-03:00",
+  "description": "Llaves de prueba generadas con KCVs correctos usando OpenSSL",
+  "totalKeys": 21,
+  "keys": [
+    {
+      "keyType": "KEK_STORAGE",
+      "futurexCode": "06",
+      "algorithm": "AES-256",
+      "keyHex": "A1B2C3D4E5F6789012345678901234567890ABCDEF0123456789ABCDEF0123456",
+      "kcv": "D4E5F6",
+      "bytes": 32,
+      "description": "KEK Storage fija del sistema"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "3DES-16",
+      "keyHex": "AF927B97D6653DAA1C27726244F9C82C",
+      "kcv": "38808D",
+      "bytes": 16,
+      "description": "Test GENERIC key with 3DES-16 algorithm"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "3DES-24",
+      "keyHex": "04B8E90F18CE935C08AFDD3D6953184DFCFE949676FB5C9C",
+      "kcv": "4D287E",
+      "bytes": 24,
+      "description": "Test GENERIC key with 3DES-24 algorithm"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "AES-128",
+      "keyHex": "959AE3A35665C138C10E86D6ABDD9B61",
+      "kcv": "8FD7B9",
+      "bytes": 16,
+      "description": "Test GENERIC key with AES-128 algorithm"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "AES-192",
+      "keyHex": "4FBAB79D284DE87905AD75701A488BF74740BE59C8D1595D",
+      "kcv": "99DA18",
+      "bytes": 24,
+      "description": "Test GENERIC key with AES-192 algorithm"
+    }
+,
+    {
+      "keyType": "GENERIC",
+      "futurexCode": "00",
+      "algorithm": "AES-256",
+      "keyHex": "76C79C31E57F59A8810EEFB5BC2AF123CEE9326346663A4E8EF03AC29B3D91D8",
+      "kcv": "2A24A0",
+      "bytes": 32,
+      "description": "Test GENERIC key with AES-256 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "futurexCode": "00",
+      "algorithm": "3DES-16",
+      "keyHex": "71BC2CFCA916FB1E93C10113FA6EB2D4",
+      "kcv": "B47475",
+      "bytes": 16,
+      "description": "Test WORKING_PIN_KEY key with 3DES-16 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "futurexCode": "00",
+      "algorithm": "3DES-24",
+      "keyHex": "734B42E8213599F857B48FD4316A8BEB6984EF566E8682C3",
+      "kcv": "2EB338",
+      "bytes": 24,
+      "description": "Test WORKING_PIN_KEY key with 3DES-24 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "futurexCode": "00",
+      "algorithm": "AES-128",
+      "keyHex": "74B4196CAE6DE656C268EDD097F3A1E4",
+      "kcv": "051E37",
+      "bytes": 16,
+      "description": "Test WORKING_PIN_KEY key with AES-128 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "futurexCode": "00",
+      "algorithm": "AES-192",
+      "keyHex": "C4AB19DECCF146212EB287DB29BC4A7B5C6D9C7DCA7DB8A7",
+      "kcv": "7F09C8",
+      "bytes": 24,
+      "description": "Test WORKING_PIN_KEY key with AES-192 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_PIN_KEY",
+      "futurexCode": "00",
+      "algorithm": "AES-256",
+      "keyHex": "30E56F949E196E4834358B02D57B9AB95DBD71D3B9A021721CE9DD726688BAA6",
+      "kcv": "1AE2B4",
+      "bytes": 32,
+      "description": "Test WORKING_PIN_KEY key with AES-256 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "futurexCode": "00",
+      "algorithm": "3DES-16",
+      "keyHex": "0754EB2F9A0E9457E43DAC0B177E566F",
+      "kcv": "AA3968",
+      "bytes": 16,
+      "description": "Test WORKING_MAC_KEY key with 3DES-16 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "futurexCode": "00",
+      "algorithm": "3DES-24",
+      "keyHex": "E74F137BCC1D7DABE45A433DEC9B046D1BAC9FBC76A4AE1E",
+      "kcv": "97B00C",
+      "bytes": 24,
+      "description": "Test WORKING_MAC_KEY key with 3DES-24 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "futurexCode": "00",
+      "algorithm": "AES-128",
+      "keyHex": "580F9A60D7C621FA09C22442C822BDB6",
+      "kcv": "0528CF",
+      "bytes": 16,
+      "description": "Test WORKING_MAC_KEY key with AES-128 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "futurexCode": "00",
+      "algorithm": "AES-192",
+      "keyHex": "99F1D2FD46B05103B974EE86610EDFF7522B9158365EF0A5",
+      "kcv": "91C730",
+      "bytes": 24,
+      "description": "Test WORKING_MAC_KEY key with AES-192 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_MAC_KEY",
+      "futurexCode": "00",
+      "algorithm": "AES-256",
+      "keyHex": "82B17A1E1FC93D656636E76B86548CEC0D7EADDB8FBC26E71856314DAD5E6C08",
+      "kcv": "1D61D9",
+      "bytes": 32,
+      "description": "Test WORKING_MAC_KEY key with AES-256 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "futurexCode": "00",
+      "algorithm": "3DES-16",
+      "keyHex": "F9416CFD767CC8205311A3CD93ED22CB",
+      "kcv": "7E52D4",
+      "bytes": 16,
+      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with 3DES-16 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "futurexCode": "00",
+      "algorithm": "3DES-24",
+      "keyHex": "926D19DB257278C8015434F06E04531786E8FD37A0D77797",
+      "kcv": "D5E2D7",
+      "bytes": 24,
+      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with 3DES-24 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "futurexCode": "00",
+      "algorithm": "AES-128",
+      "keyHex": "5998F1D3F152B053B9F58E2F92B2A7CE",
+      "kcv": "BBBC6E",
+      "bytes": 16,
+      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with AES-128 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "futurexCode": "00",
+      "algorithm": "AES-192",
+      "keyHex": "25A0E42CE7915DA5A2372F681BC8C153417EAFC5AE99D012",
+      "kcv": "BD041F",
+      "bytes": 24,
+      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with AES-192 algorithm"
+    }
+,
+    {
+      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "futurexCode": "00",
+      "algorithm": "AES-256",
+      "keyHex": "091BDD8D79DD52616E273657387D90FB47FBDB85D59429B8B739C9E552D23E44",
+      "kcv": "3B71F8",
+      "bytes": 32,
+      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with AES-256 algorithm"
+    }
+
+  ]
+}

@@ -28,8 +28,13 @@ fi
 KEK_STORAGE_KEY="A1B2C3D4E5F6789012345678901234567890ABCDEF0123456789ABCDEF0123456"
 KEK_STORAGE_KCV="D4E5F6"
 
-# Tipos de llaves genéricas (el perfil determina el uso específico)
-KEY_TYPES=("GENERIC:00")
+# Tipos de llaves (incluye working keys para pruebas)
+KEY_TYPES=(
+    "GENERIC:00"                        # Llave genérica/master
+    "WORKING_PIN_KEY:00"                # Working key para PIN
+    "WORKING_MAC_KEY:00"                # Working key para MAC
+    "WORKING_DATA_ENCRYPTION_KEY:00"    # Working key para cifrado de datos
+)
 
 # Algoritmos soportados
 ALGORITHMS=("3DES-16:16" "3DES-24:24" "AES-128:16" "AES-192:24" "AES-256:32")
@@ -160,7 +165,7 @@ sed -i '' "s/\"totalKeys\": 0/\"totalKeys\": $total_keys/" "$OUTPUT_FILE"
 echo -e "${GREEN}✅ Generación completada exitosamente${NC}"
 echo -e "${BLUE}📊 Estadísticas:${NC}"
 echo -e "   • Total de llaves generadas: ${GREEN}$total_keys${NC}"
-echo -e "   • Tipos de llaves: ${GREEN}${#KEY_TYPES[@]}${NC} (PIN, MAC, DATA, MASTER, KEK)"
+echo -e "   • Tipos de llaves: ${GREEN}${#KEY_TYPES[@]}${NC} (GENERIC, WORKING_PIN_KEY, WORKING_MAC_KEY, WORKING_DATA_ENCRYPTION_KEY)"
 echo -e "   • Algoritmos: ${GREEN}${#ALGORITHMS[@]}${NC} (3DES-16, 3DES-24, AES-128, AES-192, AES-256)"
 echo -e "   • Archivo generado: ${GREEN}$OUTPUT_FILE${NC}"
 

@@ -84,6 +84,15 @@ fun InjectedKeysScreen(
                 },
                 actions = {
                     IconButton(
+                        onClick = { navController.navigate("crypto_test_screen") },
+                        enabled = !loading && keys.isNotEmpty()
+                    ) {
+                        Icon(
+                            Icons.Default.Science,
+                            contentDescription = "Pruebas de Cifrado"
+                        )
+                    }
+                    IconButton(
                         onClick = { viewModel.refreshKeys() },
                         enabled = !loading
                     ) {
