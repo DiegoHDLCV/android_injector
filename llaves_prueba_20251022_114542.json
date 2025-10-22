@@ -164,53 +164,53 @@
     }
 ,
     {
-      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "keyType": "WORKING_DATA_KEY",
       "futurexCode": "00",
       "algorithm": "3DES-16",
       "keyHex": "F9416CFD767CC8205311A3CD93ED22CB",
       "kcv": "7E52D4",
       "bytes": 16,
-      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with 3DES-16 algorithm"
+      "description": "Test WORKING_DATA_KEY key with 3DES-16 algorithm"
     }
 ,
     {
-      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "keyType": "WORKING_DATA_KEY",
       "futurexCode": "00",
       "algorithm": "3DES-24",
       "keyHex": "926D19DB257278C8015434F06E04531786E8FD37A0D77797",
       "kcv": "D5E2D7",
       "bytes": 24,
-      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with 3DES-24 algorithm"
+      "description": "Test WORKING_DATA_KEY key with 3DES-24 algorithm"
     }
 ,
     {
-      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "keyType": "WORKING_DATA_KEY",
       "futurexCode": "00",
       "algorithm": "AES-128",
       "keyHex": "5998F1D3F152B053B9F58E2F92B2A7CE",
       "kcv": "BBBC6E",
       "bytes": 16,
-      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with AES-128 algorithm"
+      "description": "Test WORKING_DATA_KEY key with AES-128 algorithm"
     }
 ,
     {
-      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "keyType": "WORKING_DATA_KEY",
       "futurexCode": "00",
       "algorithm": "AES-192",
       "keyHex": "25A0E42CE7915DA5A2372F681BC8C153417EAFC5AE99D012",
       "kcv": "BD041F",
       "bytes": 24,
-      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with AES-192 algorithm"
+      "description": "Test WORKING_DATA_KEY key with AES-192 algorithm"
     }
 ,
     {
-      "keyType": "WORKING_DATA_ENCRYPTION_KEY",
+      "keyType": "WORKING_DATA_KEY",
       "futurexCode": "00",
       "algorithm": "AES-256",
       "keyHex": "091BDD8D79DD52616E273657387D90FB47FBDB85D59429B8B739C9E552D23E44",
       "kcv": "3B71F8",
       "bytes": 32,
-      "description": "Test WORKING_DATA_ENCRYPTION_KEY key with AES-256 algorithm"
+      "description": "Test WORKING_DATA_KEY key with AES-256 algorithm"
     }
 
   ]

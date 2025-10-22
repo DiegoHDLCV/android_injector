@@ -1,0 +1,117 @@
+{
+  "name": "Perfil Completo Test System",
+  "description": "Perfil completo de prueba con llaves maestras y working para configuración completa del sistema",
+  "applicationType": "Retail",
+  "useKEK": false,
+  "selectedKEKKcv": "",
+  "keyConfigurations": [
+    {
+      "usage": "MASTER",
+      "keyType": "Master Session Key",
+      "slot": "01",
+      "selectedKey": "38808D",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "MASTER",
+      "keyType": "Master Session Key",
+      "slot": "02",
+      "selectedKey": "4D287E",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "MASTER",
+      "keyType": "Master Session Key",
+      "slot": "03",
+      "selectedKey": "8FD7B9",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "MASTER",
+      "keyType": "Master Session Key",
+      "slot": "04",
+      "selectedKey": "99DA18",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "MASTER",
+      "keyType": "Master Session Key",
+      "slot": "05",
+      "selectedKey": "2A24A0",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "PIN",
+      "keyType": "WORKING_PIN_KEY",
+      "slot": "06",
+      "selectedKey": "B47475",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "PIN",
+      "keyType": "WORKING_PIN_KEY",
+      "slot": "07",
+      "selectedKey": "2EB338",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "PIN",
+      "keyType": "WORKING_PIN_KEY",
+      "slot": "08",
+      "selectedKey": "051E37",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "MAC",
+      "keyType": "WORKING_MAC_KEY",
+      "slot": "09",
+      "selectedKey": "AA3968",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "MAC",
+      "keyType": "WORKING_MAC_KEY",
+      "slot": "0A",
+      "selectedKey": "97B00C",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "DATA",
+      "keyType": "WORKING_DATA_KEY",
+      "slot": "0B",
+      "selectedKey": "7E52D4",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "DATA",
+      "keyType": "WORKING_DATA_KEY",
+      "slot": "0C",
+      "selectedKey": "D5E2D7",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+
+  ]
+}

@@ -499,7 +499,7 @@ class MainViewModel @Inject constructor(
         try {
             Log.i(TAG, "handleDeleteSingleKey: Solicitud para borrar llave en slot ${command.keySlot} tipo ${command.keyTypeHex}.")
 
-            val genericKeyType = mapFuturexKeyTypeToGeneric(command.keyTypeHex)
+            val genericKeyType = mapFuturexKeyTypeToGeneric(command.keyTypeHex, "00") // Default subtipo para comando de eliminación
 
             val keyInDb = injectedKeyRepository.getKeyBySlotAndType(command.keySlot, genericKeyType.name)
                 ?: throw PedKeyException("No se encontró registro en BD para la llave en slot ${command.keySlot} tipo ${genericKeyType.name}.")
@@ -541,7 +541,7 @@ class MainViewModel @Inject constructor(
         var responseCode = FuturexErrorCode.SUCCESSFUL.code
         var logMessage = ""
         var injectionStatus = "UNKNOWN"
-        val genericKeyType = mapFuturexKeyTypeToGeneric(command.keyType)
+        val genericKeyType = mapFuturexKeyTypeToGeneric(command.keyType, command.keySubType)
         val genericAlgorithm = mapAlgorithmCodeToGeneric(command.keyAlgorithm)
 
         val injectionResult = try {
@@ -591,7 +591,7 @@ class MainViewModel @Inject constructor(
                         }
                         GenericKeyType.WORKING_PIN_KEY,
                         GenericKeyType.WORKING_MAC_KEY,
-                        GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> {
+                        GenericKeyType.WORKING_DATA_KEY -> {
                             Log.d(TAG, "Llamando a 'writeKey' para una llave de trabajo cifrada.")
                             val keyData = PedKeyData(keyBytes = encryptedKeyBytes, kcv = command.keyChecksum.hexToByteArray())
                             pedController!!.writeKey(
@@ -838,20 +838,39 @@ class MainViewModel @Inject constructor(
         return pureEncryptedKey
     }
 
-    private fun mapFuturexKeyTypeToGeneric(futurexKeyType: String): GenericKeyType {
+    private fun mapFuturexKeyTypeToGeneric(futurexKeyType: String, keySubType: String): GenericKeyType {
+        Log.i(TAG, "Mapeando tipo Futurex '$futurexKeyType' con subtipo '$keySubType'")
+        
         return when (futurexKeyType) {
             "01", "0F" -> GenericKeyType.MASTER_KEY
             "06" -> GenericKeyType.TRANSPORT_KEY
-            // PIN, MAC y DATA se consideran MASTER_KEY en el PED
-            // (Son llaves maestras funcionales, no llaves de trabajo derivadas)
-            "05" -> GenericKeyType.MASTER_KEY  // PIN Encryption Key
-            "04" -> GenericKeyType.MASTER_KEY  // MAC Key
-            "0C" -> GenericKeyType.MASTER_KEY  // Data Encryption Key
-            "02" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT Initial Key (solo pruebas)
-            "03" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT 3DES IPEK
-            "08" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT 3DES BDK
-            "0B" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT AES IPEK
-            "10" -> GenericKeyType.DUKPT_INITIAL_KEY // DUKPT AES BDK
+            
+            // Mapeo específico según el tipo de dispositivo
+            "05", "04", "0C" -> {
+                // Usar keySubType para determinar el tipo específico
+                when (keySubType) {
+                    "01" -> {
+                        Log.i(TAG, "Tipo $futurexKeyType con SubType $keySubType -> WORKING_PIN_KEY")
+                        GenericKeyType.WORKING_PIN_KEY
+                    }
+                    "02" -> {
+                        Log.i(TAG, "Tipo $futurexKeyType con SubType $keySubType -> WORKING_MAC_KEY")
+                        GenericKeyType.WORKING_MAC_KEY
+                    }
+                    "03" -> {
+                        Log.i(TAG, "Tipo $futurexKeyType con SubType $keySubType -> WORKING_DATA_KEY")
+                        GenericKeyType.WORKING_DATA_KEY
+                    }
+                    else -> {
+                        Log.i(TAG, "Tipo $futurexKeyType con SubType $keySubType -> MASTER_KEY (fallback)")
+                        GenericKeyType.MASTER_KEY
+                    }
+                }
+            }
+            
+            // DUKPT types
+            "02", "03", "08", "0B", "10" -> GenericKeyType.DUKPT_INITIAL_KEY
+            
             else -> throw PedKeyException("Tipo de llave Futurex no soportado: $futurexKeyType")
         }
     }

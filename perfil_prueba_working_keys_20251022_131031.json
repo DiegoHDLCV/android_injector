@@ -1,0 +1,72 @@
+{
+  "name": "Perfil Test Working Keys",
+  "description": "Perfil de prueba con llaves working para inyección automática",
+  "applicationType": "Retail",
+  "useKEK": false,
+  "selectedKEKKcv": "",
+  "keyConfigurations": [
+    {
+      "usage": "PIN",
+      "keyType": "WORKING_PIN_KEY",
+      "slot": "01",
+      "selectedKey": "B47475",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "PIN",
+      "keyType": "WORKING_PIN_KEY",
+      "slot": "02",
+      "selectedKey": "2EB338",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "PIN",
+      "keyType": "WORKING_PIN_KEY",
+      "slot": "03",
+      "selectedKey": "051E37",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "MAC",
+      "keyType": "WORKING_MAC_KEY",
+      "slot": "04",
+      "selectedKey": "AA3968",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "MAC",
+      "keyType": "WORKING_MAC_KEY",
+      "slot": "05",
+      "selectedKey": "97B00C",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "DATA",
+      "keyType": "WORKING_DATA_KEY",
+      "slot": "06",
+      "selectedKey": "7E52D4",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+,
+    {
+      "usage": "DATA",
+      "keyType": "WORKING_DATA_KEY",
+      "slot": "07",
+      "selectedKey": "D5E2D7",
+      "injectionMethod": "auto",
+      "ksn": ""
+    }
+
+  ]
+}

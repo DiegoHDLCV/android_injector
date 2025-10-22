@@ -45,7 +45,7 @@ class AisinoPedController(private val application: Application) : IPedController
             GenericKeyType.MASTER_KEY -> 1 // PEDKEYTYPE_MASTKEY
             GenericKeyType.WORKING_PIN_KEY,
             GenericKeyType.WORKING_MAC_KEY,
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> 2 // PEDKEYTYPE_WORKKET
+            GenericKeyType.WORKING_DATA_KEY -> 2 // PEDKEYTYPE_WORKKET
             else -> null
         }
     }

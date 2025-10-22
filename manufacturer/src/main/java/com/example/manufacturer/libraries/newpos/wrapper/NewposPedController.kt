@@ -46,7 +46,7 @@ class NewposPedController(private val context: Context) : IPedController {
             }
             GenericKeyType.WORKING_PIN_KEY,
             GenericKeyType.WORKING_MAC_KEY,
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> {
+            GenericKeyType.WORKING_DATA_KEY -> {
                 when (algorithm) {
                     GenericKeyAlgorithm.SM4 -> NewposKeySystem.FIXED_SM4
                     GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> NewposKeySystem.FIXED_AES
@@ -72,7 +72,7 @@ class NewposPedController(private val context: Context) : IPedController {
             GenericKeyType.MASTER_KEY -> NewposKeyType.KEY_TYPE_MASTK
             GenericKeyType.WORKING_PIN_KEY -> NewposKeyType.KEY_TYPE_PINK
             GenericKeyType.WORKING_MAC_KEY -> NewposKeyType.KEY_TYPE_MACK
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> NewposKeyType.KEY_TYPE_EAK
+            GenericKeyType.WORKING_DATA_KEY -> NewposKeyType.KEY_TYPE_EAK
             GenericKeyType.DUKPT_INITIAL_KEY, GenericKeyType.DUKPT_WORKING_KEY -> NewposKeyType.KEY_TYPE_DUKPTK
             GenericKeyType.RSA_PRIVATE_KEY -> NewposKeyType.KEY_TYPE_RSA_PRIK
             GenericKeyType.TRANSPORT_KEY -> NewposKeyType.KEY_TYPE_TMSK

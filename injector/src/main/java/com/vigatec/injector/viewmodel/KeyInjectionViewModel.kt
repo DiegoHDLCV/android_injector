@@ -620,8 +620,11 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - Padding aplicado: ${(finalKeyData.length / 2) - keyLengthBytes} bytes")
         Log.i(TAG, "  - KeyLength que se enviará: ${String.format("%03X", finalKeyData.length / 2)} (${finalKeyData.length / 2} bytes)")
 
-        // Detectar algoritmo basado en longitud y tipo
-        val keyAlgorithm = detectKeyAlgorithm(keyLengthBytes, keyConfig.keyType)
+        // Detectar algoritmo basado en la información almacenada en la base de datos
+        val keyAlgorithm = detectKeyAlgorithmFromEntity(selectedKey, keyLengthBytes, keyConfig.keyType)
+        
+        // Detectar subtipo de llave basado en el tipo
+        val keySubType = detectKeySubType(keyConfig.keyType)
 
         // Construir comando "02" de Futurex para inyección de llave simétrica
         val command = "02" // Comando de inyección simétrica
@@ -683,7 +686,7 @@ class KeyInjectionViewModel @Inject constructor(
         }
         
         // Para el protocolo Futurex, concatenamos todo en un solo string
-        val payload = command + version + keySlot + ktkSlotStr + keyType + encryptionType + keyAlgorithm +
+        val payload = command + version + keySlot + ktkSlotStr + keyType + encryptionType + keyAlgorithm + keySubType +
                      keyChecksum + ktkChecksum + ksn + keyLength + keyHex
 
         Log.i(TAG, "=== PAYLOAD FINAL FUTUREX ===")
@@ -696,6 +699,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - Tipo: $keyType")
         Log.i(TAG, "  - Encriptación: $encryptionType")
         Log.i(TAG, "  - Algoritmo: $keyAlgorithm")
+        Log.i(TAG, "  - Subtipo: $keySubType")
         Log.i(TAG, "  - Checksum: $keyChecksum")
         Log.i(TAG, "  - KTK Checksum: $ktkChecksum")
         Log.i(TAG, "  - KSN: $ksn")
@@ -704,7 +708,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "================================================")
 
         // Construir el payload manualmente para Futurex
-        val payloadString = command + version + keySlot + ktkSlotStr + keyType + encryptionType + keyAlgorithm +
+        val payloadString = command + version + keySlot + ktkSlotStr + keyType + encryptionType + keyAlgorithm + keySubType +
                            keyChecksum + ktkChecksum + ksn + keyLength + keyHex
 
         Log.i(TAG, "=== PAYLOAD MANUAL FUTUREX ===")
@@ -715,7 +719,7 @@ class KeyInjectionViewModel @Inject constructor(
         // DEBUG: Verificar cálculo del LRC
         // IMPORTANTE: Para encryptionType 02, la KTK NO va en el payload de este comando
         // La KTK se envía en un comando separado ANTES de este
-        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm,
+        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm, keySubType,
                            keyChecksum, ktkChecksum, ksn, keyLength, keyHex)
         debugLrcCalculation(command, fields)
 
@@ -858,7 +862,7 @@ class KeyInjectionViewModel @Inject constructor(
     }
 
     /**
-     * Detecta el algoritmo de la llave basado en su longitud y tipo
+     * Detecta el algoritmo de la llave basado en la información almacenada en la base de datos
      * Códigos:
      * - 00 = 3DES-112 (16 bytes, 2 keys)
      * - 01 = 3DES-168 (24 bytes, 3 keys)
@@ -866,7 +870,42 @@ class KeyInjectionViewModel @Inject constructor(
      * - 03 = AES-192 (24 bytes)
      * - 04 = AES-256 (32 bytes)
      */
-    private fun detectKeyAlgorithm(keyLengthBytes: Int, keyType: String): String {
+    private fun detectKeyAlgorithmFromEntity(keyEntity: InjectedKeyEntity, keyLengthBytes: Int, keyType: String): String {
+        Log.i(TAG, "=== DETECTANDO ALGORITMO DE LLAVE ===")
+        Log.i(TAG, "  - KCV: ${keyEntity.kcv}")
+        Log.i(TAG, "  - Tipo: $keyType")
+        Log.i(TAG, "  - Longitud: $keyLengthBytes bytes")
+        Log.i(TAG, "  - Algoritmo en BD: ${keyEntity.keyAlgorithm}")
+        
+        // Si la entidad tiene información del algoritmo, usarla
+        if (keyEntity.keyAlgorithm.isNotEmpty() && keyEntity.keyAlgorithm != "UNASSIGNED") {
+            val algorithmCode = when (keyEntity.keyAlgorithm.uppercase()) {
+                "AES_128", "AES128" -> "02" // AES-128
+                "AES_192", "AES192" -> "03" // AES-192
+                "AES_256", "AES256" -> "04" // AES-256
+                "DES_TRIPLE", "TDES", "3DES" -> when (keyLengthBytes) {
+                    16 -> "00" // 3DES-112 (2 keys)
+                    24 -> "01" // 3DES-168 (3 keys)
+                    else -> "01" // Default 3DES-168
+                }
+                else -> {
+                    Log.w(TAG, "Algoritmo desconocido en BD: ${keyEntity.keyAlgorithm}, detectando por longitud...")
+                    detectKeyAlgorithmByLength(keyLengthBytes, keyType)
+                }
+            }
+            Log.i(TAG, "  - Algoritmo detectado desde BD: ${getAlgorithmDescription(algorithmCode)}")
+            return algorithmCode
+        }
+        
+        // Si no hay información en BD, detectar por longitud y tipo
+        Log.i(TAG, "  - Sin información de algoritmo en BD, detectando por longitud...")
+        return detectKeyAlgorithmByLength(keyLengthBytes, keyType)
+    }
+
+    /**
+     * Detecta el algoritmo de la llave basado en su longitud y tipo (método de fallback)
+     */
+    private fun detectKeyAlgorithmByLength(keyLengthBytes: Int, keyType: String): String {
         val keyTypeUpper = keyType.uppercase()
 
         // Si el tipo contiene AES explícitamente, usar algoritmo AES
@@ -885,6 +924,26 @@ class KeyInjectionViewModel @Inject constructor(
             24 -> "01" // 3DES-168 (3 keys)
             32 -> "04" // Si es 32 bytes y no es AES, asumir AES-256
             else -> "01" // Default 3DES-168
+        }
+    }
+
+    /**
+     * Detecta el subtipo de llave basado en el tipo de llave
+     * Códigos:
+     * - 00 = Generic/Master Key
+     * - 01 = Working PIN Key
+     * - 02 = Working MAC Key
+     * - 03 = Working DATA Key
+     * - 04 = DUKPT Key
+     */
+    private fun detectKeySubType(keyType: String): String {
+        val keyTypeUpper = keyType.uppercase()
+        return when {
+            keyTypeUpper.contains("WORKING") && keyTypeUpper.contains("PIN") -> "01"
+            keyTypeUpper.contains("WORKING") && keyTypeUpper.contains("MAC") -> "02"
+            keyTypeUpper.contains("WORKING") && keyTypeUpper.contains("DATA") -> "03"
+            keyTypeUpper.contains("DUKPT") -> "04"
+            else -> "00"  // Generic/Master
         }
     }
 
@@ -1398,7 +1457,10 @@ class KeyInjectionViewModel @Inject constructor(
         val encryptionType = "00" // EN CLARO (sin cifrar)
 
         // Detectar algoritmo basado en longitud
-        val keyAlgorithm = detectKeyAlgorithm(keyLengthBytes, kek.customName)
+        val keyAlgorithm = detectKeyAlgorithmByLength(keyLengthBytes, kek.customName)
+        
+        // Detectar keySubType para KEK (siempre "00" para Transport Key)
+        val keySubType = "00" // KEK/KTK es tipo genérico
 
         val keyChecksum = kek.kcv.take(4)
         val ktkChecksum = "0000" // No hay KTK superior
@@ -1414,6 +1476,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "Tipo de llave: $keyType (KEK/KTK)")
         Log.i(TAG, "Tipo de encriptación: $encryptionType (EN CLARO)")
         Log.i(TAG, "Algoritmo detectado: $keyAlgorithm (${getAlgorithmDescription(keyAlgorithm)})")
+        Log.i(TAG, "Subtipo de llave: $keySubType (Transport Key)")
         Log.i(TAG, "Checksum de llave: $keyChecksum")
         Log.i(TAG, "Checksum KTK: $ktkChecksum (no aplica)")
         Log.i(TAG, "KSN: $ksn (no aplica)")
@@ -1421,7 +1484,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "Datos de KEK (primeros 32 bytes): ${keyHex.take(64)}...")
 
         // Formatear comando Futurex
-        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm,
+        val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm, keySubType,
                            keyChecksum, ktkChecksum, ksn, keyLength, keyHex)
         val formattedCommand = messageFormatter!!.format(command, fields)
 

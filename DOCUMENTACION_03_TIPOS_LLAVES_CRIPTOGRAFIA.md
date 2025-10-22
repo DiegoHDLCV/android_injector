@@ -64,7 +64,7 @@ El sistema soporta múltiples tipos de llaves criptográficas, cada una con un p
 **Descripción**: Llave para cifrado/descifrado de datos sensibles.
 
 **Características**:
-- **Código en Sistema**: `KeyType.WORKING_DATA_ENCRYPTION_KEY`
+- **Código en Sistema**: `KeyType.WORKING_DATA_KEY`
 - **Código Futurex**: "0C"
 - **Inyección**: En claro o cifrada con Master Key
 - **Uso**: Cifrado de datos de track, CVV, etc.

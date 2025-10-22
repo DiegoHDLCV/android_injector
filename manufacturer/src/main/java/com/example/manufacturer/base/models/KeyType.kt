@@ -14,7 +14,7 @@ enum class KeyType {
     WORKING_MAC_KEY,
 
     /** Working Key specifically for data encryption/decryption (e.g., DEK, TDK). */
-    WORKING_DATA_ENCRYPTION_KEY,
+    WORKING_DATA_KEY,
 
     /** Initial Key for DUKPT schemes (e.g., IPEK, BDK). */
     DUKPT_INITIAL_KEY,

@@ -24,7 +24,12 @@ data class ProfilesScreenState(
     val showManageKeysModal: Boolean = false,
     val showInjectModal: Boolean = false,
     val formData: ProfileFormData = ProfileFormData(),
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    // Campos para importación de perfiles
+    val showImportModal: Boolean = false,
+    val importJsonText: String = "",
+    val importError: String? = null,
+    val importWarnings: List<String> = emptyList()
 )
 
 data class ProfileFormData(
@@ -209,5 +214,145 @@ class ProfileViewModel @Inject constructor(
             }
         }
         onFormDataChange(_state.value.formData.copy(keyConfigurations = updatedConfigs))
+    }
+
+    // Funciones para importación de perfiles
+    fun onShowImportModal() {
+        _state.value = _state.value.copy(
+            showImportModal = true,
+            importJsonText = "",
+            importError = null,
+            importWarnings = emptyList()
+        )
+    }
+
+    fun onDismissImportModal() {
+        _state.value = _state.value.copy(
+            showImportModal = false,
+            importJsonText = "",
+            importError = null,
+            importWarnings = emptyList()
+        )
+    }
+
+    fun onImportJsonChange(text: String) {
+        _state.value = _state.value.copy(
+            importJsonText = text,
+            importError = null
+        )
+    }
+
+    fun onImportProfile() {
+        viewModelScope.launch {
+            try {
+                val jsonText = _state.value.importJsonText.trim()
+                
+                if (jsonText.isEmpty()) {
+                    _state.value = _state.value.copy(importError = "El JSON no puede estar vacío")
+                    return@launch
+                }
+
+                // Parsear JSON
+                val profileData = parseProfileJson(jsonText)
+                
+                // Validar campos requeridos
+                if (profileData.name.isEmpty()) {
+                    _state.value = _state.value.copy(importError = "El campo 'name' es requerido")
+                    return@launch
+                }
+                
+                if (profileData.applicationType.isEmpty()) {
+                    _state.value = _state.value.copy(importError = "El campo 'applicationType' es requerido")
+                    return@launch
+                }
+
+                // Resolver conflicto de nombre si existe
+                var finalName = profileData.name
+                var counter = 2
+                while (profileRepository.getProfileByName(finalName) != null) {
+                    finalName = "${profileData.name} ($counter)"
+                    counter++
+                }
+
+                // Validar que las llaves existan en el almacén
+                val warnings = mutableListOf<String>()
+                val availableKeyKcvs = _state.value.availableKeys.map { it.kcv }
+                
+                profileData.keyConfigurations.forEach { config ->
+                    if (config.selectedKey.isNotEmpty() && !availableKeyKcvs.contains(config.selectedKey)) {
+                        warnings.add("Llave con KCV '${config.selectedKey}' no encontrada en el almacén")
+                    }
+                }
+
+                // Generar IDs únicos para las configuraciones
+                val keyConfigurations = profileData.keyConfigurations.mapIndexed { index, config ->
+                    config.copy(id = System.currentTimeMillis() + index)
+                }
+
+                // Crear perfil
+                val profile = ProfileEntity(
+                    name = finalName,
+                    description = profileData.description,
+                    applicationType = profileData.applicationType,
+                    keyConfigurations = keyConfigurations,
+                    useKEK = profileData.useKEK,
+                    selectedKEKKcv = profileData.selectedKEKKcv
+                )
+
+                // Guardar perfil
+                profileRepository.insertProfile(profile)
+
+                // Cerrar modal y limpiar estado
+                onDismissImportModal()
+
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    importError = "Error al procesar JSON: ${e.message}"
+                )
+            }
+        }
+    }
+
+    // Data class para parsear JSON del perfil
+    private data class ImportedProfileData(
+        val name: String = "",
+        val description: String = "",
+        val applicationType: String = "",
+        val useKEK: Boolean = false,
+        val selectedKEKKcv: String = "",
+        val keyConfigurations: List<KeyConfiguration> = emptyList()
+    )
+
+    private fun parseProfileJson(jsonText: String): ImportedProfileData {
+        // Parsear JSON usando org.json (disponible en Android)
+        val jsonObject = org.json.JSONObject(jsonText)
+        
+        val keyConfigsJson = jsonObject.optJSONArray("keyConfigurations")
+        val keyConfigurations = mutableListOf<KeyConfiguration>()
+        
+        if (keyConfigsJson != null) {
+            for (i in 0 until keyConfigsJson.length()) {
+                val configJson = keyConfigsJson.getJSONObject(i)
+                val config = KeyConfiguration(
+                    id = System.currentTimeMillis() + i, // ID temporal, se reasignará
+                    usage = configJson.optString("usage", ""),
+                    keyType = configJson.optString("keyType", ""),
+                    slot = configJson.optString("slot", ""),
+                    selectedKey = configJson.optString("selectedKey", ""),
+                    injectionMethod = configJson.optString("injectionMethod", "auto"),
+                    ksn = configJson.optString("ksn", "")
+                )
+                keyConfigurations.add(config)
+            }
+        }
+
+        return ImportedProfileData(
+            name = jsonObject.optString("name", ""),
+            description = jsonObject.optString("description", ""),
+            applicationType = jsonObject.optString("applicationType", ""),
+            useKEK = jsonObject.optBoolean("useKEK", false),
+            selectedKEKKcv = jsonObject.optString("selectedKEKKcv", ""),
+            keyConfigurations = keyConfigurations
+        )
     }
 } 

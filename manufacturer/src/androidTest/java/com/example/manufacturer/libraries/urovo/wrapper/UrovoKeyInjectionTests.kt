@@ -56,7 +56,7 @@ class UrovoKeyInjectionTests {
 
     // Data Working Key (encrypted with KTK)
     private val dataKeyIndex = 11
-    private val dataKeyType = KeyType.WORKING_DATA_ENCRYPTION_KEY
+    private val dataKeyType = KeyType.WORKING_DATA_KEY
     private val plainDataKeyBytes = "892FF24F80C13461760E1349083862D9".hexToBytes()
 
     // MAC Working Key (encrypted with KTK)
@@ -247,7 +247,7 @@ class UrovoKeyInjectionTests {
             iv = null,
             encrypt = true,
             keyIndex = 0,
-            keyType = KeyType.WORKING_DATA_ENCRYPTION_KEY
+            keyType = KeyType.WORKING_DATA_KEY
         )
         val encryptionResult = pedController.encrypt(encryptRequest)
 

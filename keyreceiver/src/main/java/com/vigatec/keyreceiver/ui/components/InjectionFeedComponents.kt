@@ -305,7 +305,7 @@ private fun formatKeyTypeName(keyType: String): String {
         keyType.contains("TRANSPORT_KEY", ignoreCase = true) -> "KTK"
         keyType.contains("WORKING_PIN_KEY", ignoreCase = true) -> "PIN"
         keyType.contains("WORKING_MAC_KEY", ignoreCase = true) -> "MAC"
-        keyType.contains("WORKING_DATA_ENCRYPTION_KEY", ignoreCase = true) -> "DATA"
+        keyType.contains("WORKING_DATA_KEY", ignoreCase = true) -> "DATA"
         keyType.contains("DUKPT", ignoreCase = true) -> "DUKPT"
         else -> keyType.take(10)
     }

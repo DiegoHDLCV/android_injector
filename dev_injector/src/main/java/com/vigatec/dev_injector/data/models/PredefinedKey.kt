@@ -64,7 +64,7 @@ object PredefinedKeys {
     
     val DATA_ENCRYPTION_KEY = PredefinedKey(
         name = "Data Encryption Key",
-        keyType = KeyType.WORKING_DATA_ENCRYPTION_KEY,
+        keyType = KeyType.WORKING_DATA_KEY,
         keyIndex = 11,
         keyAlgorithm = KeyAlgorithm.DES_TRIPLE,
         keyBytes = "892FF24F80C13461760E1349083862D9".hexToBytes(),

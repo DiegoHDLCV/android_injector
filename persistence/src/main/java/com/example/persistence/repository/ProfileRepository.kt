@@ -27,4 +27,8 @@ class ProfileRepository @Inject constructor(
     suspend fun getProfileNamesByKeyKcv(kcv: String): List<String> {
         return profileDao.getProfileNamesByKeyKcv(kcv)
     }
+
+    suspend fun getProfileByName(name: String): ProfileEntity? {
+        return profileDao.getProfileByName(name)
+    }
 }

@@ -55,7 +55,7 @@ class NewposKeyInjectionTests {
     private val plainTransportKeyBytes = "A1B2C3D4E5F60708090A0B0C0D0E0F10".hexToBytes()
 
     private val dataKeyIndex = 11
-    private val dataKeyType = KeyType.WORKING_DATA_ENCRYPTION_KEY
+    private val dataKeyType = KeyType.WORKING_DATA_KEY
     private val plainDataKeyBytes = "892FF24F80C13461760E1349083862D9".hexToBytes()
     private val macKeyIndex = 12
     private val macKeyType = KeyType.WORKING_MAC_KEY
@@ -98,7 +98,7 @@ class NewposKeyInjectionTests {
     fun testTdesEncryptionDecryptionWithWorkingKey() = runBlocking {
         println("\n--- START TEST: NEWPOS - SYMMETRIC CIPHER (3DES) ---")
         // --- PREPARACIÓN: Inyectar una llave de datos en texto plano ---
-        println("STEP 1: Injecting a plain text WORKING_DATA_ENCRYPTION_KEY into slot $dataKeyIndex.")
+        println("STEP 1: Injecting a plain text WORKING_DATA_KEY into slot $dataKeyIndex.")
         pedController.writeKeyPlain(dataKeyIndex, dataKeyType, keyAlgorithm, plainDataKeyBytes, null)
         assertTrue("The data key must be present after plain text injection", pedController.isKeyPresent(dataKeyIndex, dataKeyType))
 
@@ -134,10 +134,10 @@ class NewposKeyInjectionTests {
         // Llave de prueba en texto plano (3DES - 24 bytes)
         val testDataKeyBytes = "0123456789ABCDEFFEDCBA98765432100123456789ABCDEF".hexToBytes()
         val testKeySlot = 5
-        val testKeyType = KeyType.WORKING_DATA_ENCRYPTION_KEY
+        val testKeyType = KeyType.WORKING_DATA_KEY
         val testAlgorithm = KeyAlgorithm.DES_TRIPLE
 
-        println("STEP 1: Injecting WORKING_DATA_ENCRYPTION_KEY in plain text.")
+        println("STEP 1: Injecting WORKING_DATA_KEY in plain text.")
         println("  -> Key Slot: $testKeySlot")
         println("  -> Key Algorithm: $testAlgorithm")
         println("  -> Key Value (Hex): ${testDataKeyBytes.toHexString()}")
@@ -296,10 +296,10 @@ class NewposKeyInjectionTests {
         // Llave AES-256 de prueba (32 bytes)
         val testAesKeyBytes = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF".hexToBytes()
         val testKeySlot = 8
-        val testKeyType = KeyType.WORKING_DATA_ENCRYPTION_KEY
+        val testKeyType = KeyType.WORKING_DATA_KEY
         val testAlgorithm = KeyAlgorithm.AES_256
 
-        println("STEP 1: Injecting AES-256 WORKING_DATA_ENCRYPTION_KEY in plain text.")
+        println("STEP 1: Injecting AES-256 WORKING_DATA_KEY in plain text.")
         println("  -> Key Slot: $testKeySlot")
         println("  -> Key Algorithm: $testAlgorithm")
         println("  -> Key Value (Hex): ${testAesKeyBytes.toHexString()}")

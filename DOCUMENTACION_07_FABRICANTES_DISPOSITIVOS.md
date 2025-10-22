@@ -277,7 +277,7 @@ private fun mapToVanstoneKeyType(keyType: KeyType): Int {
         KeyType.MASTER_KEY -> 0           // Master Key
         KeyType.WORKING_PIN_KEY -> 2      // PIN Key
         KeyType.WORKING_MAC_KEY -> 1      // MAC Key
-        KeyType.WORKING_DATA_ENCRYPTION_KEY -> 3  // Data Key
+        KeyType.WORKING_DATA_KEY -> 3  // Data Key
         else -> 0  // Default a Master Key
     }
 }
@@ -459,7 +459,7 @@ private fun mapToNewposKeyType(keyType: KeyType): Int {
         KeyType.MASTER_KEY -> 0           // Main Key
         KeyType.WORKING_PIN_KEY -> 2      // PIN Key
         KeyType.WORKING_MAC_KEY -> 1      // MAC Key
-        KeyType.WORKING_DATA_ENCRYPTION_KEY -> 3
+        KeyType.WORKING_DATA_KEY -> 3
         else -> 0
     }
 }

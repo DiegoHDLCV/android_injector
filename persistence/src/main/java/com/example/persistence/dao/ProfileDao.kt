@@ -20,4 +20,7 @@ interface ProfileDao {
 
     @Query("SELECT name FROM profiles WHERE keyConfigurations LIKE '%' || :kcv || '%'")
     suspend fun getProfileNamesByKeyKcv(kcv: String): List<String>
+
+    @Query("SELECT * FROM profiles WHERE name = :name LIMIT 1")
+    suspend fun getProfileByName(name: String): ProfileEntity?
 } 

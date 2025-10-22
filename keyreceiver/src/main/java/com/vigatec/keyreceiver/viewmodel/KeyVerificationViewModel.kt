@@ -109,7 +109,7 @@ class KeyVerificationViewModel @Inject constructor(
                 KeyType.MASTER_KEY,
                 KeyType.TRANSPORT_KEY,
                 KeyType.WORKING_PIN_KEY,
-                KeyType.WORKING_DATA_ENCRYPTION_KEY,
+                KeyType.WORKING_DATA_KEY,
                 KeyType.WORKING_MAC_KEY
             )
             

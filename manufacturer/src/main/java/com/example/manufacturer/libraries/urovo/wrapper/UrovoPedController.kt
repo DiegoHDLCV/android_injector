@@ -29,7 +29,7 @@ class UrovoPedController(private val context: Context) : IPedController {
             GenericKeyType.MASTER_KEY -> UrovoConstants.KeyType.MAIN_KEY //
             GenericKeyType.WORKING_MAC_KEY -> UrovoConstants.KeyType.MAC_KEY //
             GenericKeyType.WORKING_PIN_KEY -> UrovoConstants.KeyType.PIN_KEY //
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> UrovoConstants.KeyType.TD_KEY //
+            GenericKeyType.WORKING_DATA_KEY -> UrovoConstants.KeyType.TD_KEY //
             GenericKeyType.DUKPT_INITIAL_KEY, GenericKeyType.DUKPT_WORKING_KEY -> {
                 Log.w(TAG, "DUKPT KeyType mapped to TD_KEY for Urovo ops.")
                 UrovoConstants.KeyType.TD_KEY
@@ -43,14 +43,14 @@ class UrovoPedController(private val context: Context) : IPedController {
         return when (generic) {
             GenericKeyType.WORKING_PIN_KEY -> UrovoConstants.DukptKeyTypeParam.PIN //
             GenericKeyType.WORKING_MAC_KEY -> UrovoConstants.DukptKeyTypeParam.MAC //
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> UrovoConstants.DukptKeyTypeParam.TRACK_DATA //
+            GenericKeyType.WORKING_DATA_KEY -> UrovoConstants.DukptKeyTypeParam.TRACK_DATA //
             else -> throw PedKeyException("Unsupported generic KeyType for Urovo DUKPT Param: $generic")
         }
     }
 
     private fun mapToUrovoDukptKeySetNum(generic: GenericKeyType): Int {
         return when (generic) {
-            GenericKeyType.WORKING_DATA_ENCRYPTION_KEY -> UrovoConstants.DukptKeySetNum.TDK_SET
+            GenericKeyType.WORKING_DATA_KEY -> UrovoConstants.DukptKeySetNum.TDK_SET
             GenericKeyType.WORKING_PIN_KEY -> UrovoConstants.DukptKeySetNum.PEK_SET
             GenericKeyType.WORKING_MAC_KEY -> UrovoConstants.DukptKeySetNum.MAC_SET
             else -> throw PedKeyException("Unsupported generic KeyType for Urovo DUKPT KeySetNum: $generic")
@@ -168,7 +168,7 @@ class UrovoPedController(private val context: Context) : IPedController {
             // CASO 2: Cargando una Llave de Trabajo (PIN, MAC, TD) cifrada por una Llave Maestra (ej. TMK)
             else if (keyType == GenericKeyType.WORKING_PIN_KEY ||
                 keyType == GenericKeyType.WORKING_MAC_KEY ||
-                keyType == GenericKeyType.WORKING_DATA_ENCRYPTION_KEY) {
+                keyType == GenericKeyType.WORKING_DATA_KEY) {
 
                 if (transportKeyType != GenericKeyType.MASTER_KEY) {
                     throw PedKeyException("Urovo loadWorkKey espera que la llave de transporte (TMK) sea de tipo MASTER_KEY")

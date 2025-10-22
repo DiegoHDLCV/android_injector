@@ -515,7 +515,7 @@ class KeyInjectionViewModel @Inject constructor(
         return when (keyType) {
             KeyType.WORKING_PIN_KEY,
             KeyType.WORKING_MAC_KEY,
-            KeyType.WORKING_DATA_ENCRYPTION_KEY -> true
+            KeyType.WORKING_DATA_KEY -> true
             else -> false
         }
     }

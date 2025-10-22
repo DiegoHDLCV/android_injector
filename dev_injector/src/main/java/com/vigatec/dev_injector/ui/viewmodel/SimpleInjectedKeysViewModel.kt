@@ -61,7 +61,7 @@ class SimpleInjectedKeysViewModel @Inject constructor(
                         KeyType.TRANSPORT_KEY,
                         KeyType.WORKING_PIN_KEY,
                         KeyType.WORKING_MAC_KEY,
-                        KeyType.WORKING_DATA_ENCRYPTION_KEY
+                        KeyType.WORKING_DATA_KEY
                     )
                     
                     for (slot in 0..15) {

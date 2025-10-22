@@ -54,7 +54,7 @@ class AisinoKeyInjectionTests {
 
     // Clave de Trabajo de Datos (cifrada con KTK)
     private val dataKeyIndex = 11
-    private val dataKeyType = KeyType.WORKING_DATA_ENCRYPTION_KEY
+    private val dataKeyType = KeyType.WORKING_DATA_KEY
     private val plainDataKeyBytes = "892FF24F80C13461760E1349083862D9".hexToBytes()
 
     // Clave de Trabajo de MAC (cifrada con KTK)
@@ -176,7 +176,7 @@ class AisinoKeyInjectionTests {
         println("PASO 3: Inyectando la WK cifrada en el slot $wkIndex.")
         val writeSuccess = pedController.writeKey(
             keyIndex = wkIndex,
-            keyType = KeyType.WORKING_DATA_ENCRYPTION_KEY,
+            keyType = KeyType.WORKING_DATA_KEY,
             keyAlgorithm = KeyAlgorithm.DES_TRIPLE,
             keyData = PedKeyData(encryptedWk),
             transportKeyIndex = ktkIndex,
@@ -187,13 +187,13 @@ class AisinoKeyInjectionTests {
 
         // --- PASO 4: Verificar que la Working Key está presente y es funcional ---
         println("PASO 4: Verificando que la WK en el slot $wkIndex está operativa.")
-        assertTrue("La WK debe existir en el slot $wkIndex después de la inyección.", pedController.isKeyPresent(wkIndex, KeyType.WORKING_DATA_ENCRYPTION_KEY))
+        assertTrue("La WK debe existir en el slot $wkIndex después de la inyección.", pedController.isKeyPresent(wkIndex, KeyType.WORKING_DATA_KEY))
 
         // Prueba funcional: Usar la nueva WK para cifrar y descifrar datos.
         val encryptedData = pedController.encrypt(
             PedCipherRequest(
                 keyIndex = wkIndex,
-                keyType = KeyType.WORKING_DATA_ENCRYPTION_KEY,
+                keyType = KeyType.WORKING_DATA_KEY,
                 data = dataToTestEncryption,
                 algorithm = KeyAlgorithm.DES_TRIPLE,
                 mode = BlockCipherMode.ECB,
@@ -205,7 +205,7 @@ class AisinoKeyInjectionTests {
         val decryptedData = pedController.decrypt(
             PedCipherRequest(
                 keyIndex = wkIndex,
-                keyType = KeyType.WORKING_DATA_ENCRYPTION_KEY,
+                keyType = KeyType.WORKING_DATA_KEY,
                 data = encryptedData,
                 algorithm = KeyAlgorithm.DES_TRIPLE,
                 mode = BlockCipherMode.ECB,

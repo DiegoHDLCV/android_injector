@@ -4,7 +4,7 @@ package com.example.manufacturer.base.models
  * Parameters for requesting encryption or decryption.
  *
  * @property keyIndex The index of the cryptographic key.
- * @property keyType The type of the key (e.g., WORKING_DATA_ENCRYPTION_KEY, RSA_PRIVATE_KEY).
+ * @property keyType The type of the key (e.g., WORKING_DATA_KEY, RSA_PRIVATE_KEY).
  * @property data The data to be encrypted or decrypted.
  * @property algorithm The cryptographic algorithm to use (must match the key type).
  * @property mode The block cipher mode (ECB, CBC). Null for algorithms like RSA.

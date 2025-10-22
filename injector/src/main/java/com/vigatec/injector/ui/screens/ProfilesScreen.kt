@@ -59,6 +59,9 @@ fun ProfilesScreen(
             TopAppBar(
                 title = { Text("Perfiles de Inyección", fontWeight = FontWeight.Bold) },
                 actions = {
+                    IconButton(onClick = { viewModel.onShowImportModal() }) {
+                        Icon(Icons.Default.Upload, contentDescription = "Importar Perfil")
+                    }
                     IconButton(onClick = { viewModel.onShowCreateModal() }) {
                         Icon(Icons.Default.Add, contentDescription = "Crear Perfil")
                     }
@@ -114,6 +117,18 @@ fun ProfilesScreen(
             onAddKeyConfig = { viewModel.addKeyConfiguration() },
             onRemoveKeyConfig = { viewModel.removeKeyConfiguration(it) },
             onUpdateKeyConfig = { id, field, value -> viewModel.updateKeyConfiguration(id, field, value) }
+        )
+    }
+
+    // Modal de importación de perfiles
+    if (state.showImportModal) {
+        ImportProfileModal(
+            importJsonText = state.importJsonText,
+            importError = state.importError,
+            importWarnings = state.importWarnings,
+            onDismiss = { viewModel.onDismissImportModal() },
+            onImportJsonChange = { viewModel.onImportJsonChange(it) },
+            onImportProfile = { viewModel.onImportProfile() }
         )
     }
 
@@ -1772,6 +1787,249 @@ fun KeyConfigurationItem(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ImportProfileModal(
+    importJsonText: String,
+    importError: String?,
+    importWarnings: List<String>,
+    onDismiss: () -> Unit,
+    onImportJsonChange: (String) -> Unit,
+    onImportProfile: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.9f)
+                .align(Alignment.Center),
+            shape = RoundedCornerShape(20.dp),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+
+                // ==== HEADER ====
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(
+                                text = "Importar Perfil",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "Pega el JSON del perfil a importar",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                            )
+                        }
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Cerrar",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+
+                // ==== CONTENIDO SCROLLEABLE ====
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    
+                    // Campo de texto para JSON
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "📋 JSON del Perfil",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        OutlinedTextField(
+                            value = importJsonText,
+                            onValueChange = onImportJsonChange,
+                            label = { Text("Pega aquí el JSON del perfil") },
+                            placeholder = { 
+                                Text(
+                                    """{
+  "name": "Mi Perfil Test",
+  "description": "Perfil de prueba",
+  "applicationType": "Retail",
+  "useKEK": false,
+  "keyConfigurations": [...]
+}""",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp),
+                            minLines = 15,
+                            maxLines = 20,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                            )
+                        )
+                    }
+
+                    // Mostrar errores
+                    if (importError != null) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = importError,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    // Mostrar warnings
+                    if (importWarnings.isNotEmpty()) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "Advertencias:",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                importWarnings.forEach { warning ->
+                                    Text(
+                                        text = "• $warning",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                        modifier = Modifier.padding(start = 28.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Información sobre el formato esperado
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = "Formato esperado:",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Text(
+                                text = "• name: Nombre del perfil (requerido)\n• applicationType: Tipo de aplicación (requerido)\n• description: Descripción opcional\n• useKEK: true/false para usar cifrado KEK\n• keyConfigurations: Array de configuraciones de llaves",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                modifier = Modifier.padding(start = 24.dp)
+                            )
+                        }
+                    }
+                }
+
+                // ==== FOOTER BOTONES ====
+                Surface(
+                    tonalElevation = 2.dp,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancelar", style = MaterialTheme.typography.labelLarge)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = onImportProfile,
+                            enabled = importJsonText.trim().isNotEmpty()
+                        ) {
+                            Icon(Icons.Default.Upload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Importar", style = MaterialTheme.typography.labelLarge)
                         }
                     }
                 }
