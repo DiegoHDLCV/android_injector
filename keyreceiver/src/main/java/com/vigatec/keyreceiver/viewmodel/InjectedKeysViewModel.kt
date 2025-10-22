@@ -44,8 +44,8 @@ class InjectedKeysViewModel @Inject constructor(
     private val _filterStatus = MutableStateFlow("Todos")
     val filterStatus: StateFlow<String> = _filterStatus.asStateFlow()
 
-    private val _filterKEKType = MutableStateFlow("Todas")
-    val filterKEKType: StateFlow<String> = _filterKEKType.asStateFlow()
+    private val _filterKTKType = MutableStateFlow("Todas")
+    val filterKTKType: StateFlow<String> = _filterKTKType.asStateFlow()
 
     private val _searchText = MutableStateFlow("")
     val searchText: StateFlow<String> = _searchText.asStateFlow()
@@ -269,8 +269,8 @@ class InjectedKeysViewModel @Inject constructor(
         applyFilters()
     }
 
-    fun updateFilterKEKType(kekType: String) {
-        _filterKEKType.value = kekType
+    fun updateFilterKTKType(ktkType: String) {
+        _filterKTKType.value = ktkType
         applyFilters()
     }
 
@@ -288,7 +288,7 @@ class InjectedKeysViewModel @Inject constructor(
         Log.d(TAG, "Filtros activos:")
         Log.d(TAG, "  - Algoritmo: ${_filterAlgorithm.value}")
         Log.d(TAG, "  - Estado: ${_filterStatus.value}")
-        Log.d(TAG, "  - Tipo KEK: ${_filterKEKType.value}")
+        Log.d(TAG, "  - Tipo KTK: ${_filterKTKType.value}")
         Log.d(TAG, "  - Búsqueda: '${_searchText.value}'")
         
         // Log detallado de todas las llaves antes de filtrar
@@ -318,13 +318,13 @@ class InjectedKeysViewModel @Inject constructor(
             Log.d(TAG, "Filtro estado '${_filterStatus.value}': $beforeCount → ${filtered.size}")
         }
 
-        // Filtro por tipo KEK
-        when (_filterKEKType.value) {
-            "Solo KEK" -> {
+        // Filtro por tipo KTK
+        when (_filterKTKType.value) {
+            "Solo KTK" -> {
                 val beforeCount = filtered.size
-                filtered = filtered.filter { it.isKEK }
-                Log.d(TAG, "Filtro 'Solo KEK': $beforeCount → ${filtered.size}")
-                Log.d(TAG, "Llaves KEK encontradas:")
+                filtered = filtered.filter { it.isKEK && it.kekType == "KEK_TRANSPORT" }
+                Log.d(TAG, "Filtro 'Solo KTK': $beforeCount → ${filtered.size}")
+                Log.d(TAG, "Llaves KTK encontradas:")
                 filtered.forEach { key ->
                     Log.d(TAG, "  - Slot=${key.keySlot}, kekType='${key.kekType}', KCV=${key.kcv}")
                 }
@@ -335,14 +335,14 @@ class InjectedKeysViewModel @Inject constructor(
                 Log.d(TAG, "Filtro 'Solo Operacionales': $beforeCount → ${filtered.size}")
             }
             "Todas" -> { 
-                Log.d(TAG, "Filtro 'Todas': No se aplica filtro de KEK")
-                Log.d(TAG, "Desglose por tipo KEK:")
+                Log.d(TAG, "Filtro 'Todas': No se aplica filtro de KTK")
+                Log.d(TAG, "Desglose por tipo KTK:")
                 val ktkCount = filtered.count { it.isKEK && it.kekType == "KEK_TRANSPORT" }
-                val kekCount = filtered.count { it.isKEK && it.kekType == "KEK_STORAGE" }
+                val kekStorageCount = filtered.count { it.isKEK && it.kekType == "KEK_STORAGE" }
                 val otherKekCount = filtered.count { it.isKEK && it.kekType !in listOf("KEK_TRANSPORT", "KEK_STORAGE") }
                 val operationalCount = filtered.count { !it.isKEK }
                 Log.d(TAG, "  - KTK (KEK_TRANSPORT): $ktkCount")
-                Log.d(TAG, "  - KEK Storage (KEK_STORAGE): $kekCount")
+                Log.d(TAG, "  - KEK Storage (KEK_STORAGE): $kekStorageCount")
                 Log.d(TAG, "  - Otros KEK: $otherKekCount")
                 Log.d(TAG, "  - Operacionales: $operationalCount")
                 
@@ -382,51 +382,51 @@ class InjectedKeysViewModel @Inject constructor(
         _filteredKeys.value = filtered
     }
 
-    // === FUNCIONES DE GESTIÓN DE KEK ===
+    // === FUNCIONES DE GESTIÓN DE KTK ===
 
-    fun setAsKEK(key: InjectedKeyEntity) {
+    fun setAsKTK(key: InjectedKeyEntity) {
         viewModelScope.launch {
             try {
                 // Validar que sea AES-256
                 if (!key.keyAlgorithm.contains("AES", ignoreCase = true) || key.keyData.length != 64) {
-                    _snackbarMessage.emit("Solo las llaves AES-256 pueden ser KEK")
+                    _snackbarMessage.emit("Solo las llaves AES-256 pueden ser KTK")
                     return@launch
                 }
 
-                Log.i(TAG, "Estableciendo llave como KEK: KCV=${key.kcv}")
-                injectedKeyRepository.setKeyAsKEK(key.kcv)
-                _snackbarMessage.emit("Llave ${key.kcv} establecida como KEK activa")
+                Log.i(TAG, "Estableciendo llave como KTK: KCV=${key.kcv}")
+                injectedKeyRepository.setKeyAsKTK(key.kcv)
+                _snackbarMessage.emit("Llave ${key.kcv} establecida como KTK activa")
                 
                 // Recargar para reflejar cambios
                 loadKeys()
             } catch (e: Exception) {
-                Log.e(TAG, "Error al establecer KEK", e)
-                _snackbarMessage.emit("Error al establecer KEK: ${e.message}")
+                Log.e(TAG, "Error al establecer KTK", e)
+                _snackbarMessage.emit("Error al establecer KTK: ${e.message}")
             }
         }
     }
 
-    fun removeAsKEK(key: InjectedKeyEntity) {
+    fun removeAsKTK(key: InjectedKeyEntity) {
         viewModelScope.launch {
             try {
-                Log.i(TAG, "Quitando flag KEK: KCV=${key.kcv}")
-                injectedKeyRepository.removeKeyAsKEK(key.kcv)
-                _snackbarMessage.emit("Llave ${key.kcv} ya no es KEK activa")
+                Log.i(TAG, "Quitando flag KTK: KCV=${key.kcv}")
+                injectedKeyRepository.removeKeyAsKTK(key.kcv)
+                _snackbarMessage.emit("Llave ${key.kcv} ya no es KTK activa")
                 
                 // Recargar para reflejar cambios
                 loadKeys()
             } catch (e: Exception) {
-                Log.e(TAG, "Error al quitar flag KEK", e)
-                _snackbarMessage.emit("Error al quitar flag KEK: ${e.message}")
+                Log.e(TAG, "Error al quitar flag KTK", e)
+                _snackbarMessage.emit("Error al quitar flag KTK: ${e.message}")
             }
         }
     }
 
-    suspend fun getCurrentKEK(): InjectedKeyEntity? {
+    suspend fun getCurrentKTK(): InjectedKeyEntity? {
         return try {
-            injectedKeyRepository.getCurrentKEK()
+            injectedKeyRepository.getCurrentKTK()
         } catch (e: Exception) {
-            Log.e(TAG, "Error al obtener KEK actual", e)
+            Log.e(TAG, "Error al obtener KTK actual", e)
             null
         }
     }

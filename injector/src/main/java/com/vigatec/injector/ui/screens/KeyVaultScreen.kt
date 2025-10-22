@@ -100,7 +100,7 @@ fun KeyVaultScreen(
                             key = keyWithProfiles.key,
                             assignedProfiles = keyWithProfiles.assignedProfiles,
                             onDelete = { viewModel.onShowDeleteModal(it) },
-                            onToggleKEK = { viewModel.toggleKeyAsKEK(it) },
+                            onToggleKTK = { viewModel.toggleKeyAsKTK(it) },
                             isAdmin = state.isAdmin
                         )
                     }
@@ -193,7 +193,7 @@ fun KeyCard(
     key: InjectedKeyEntity,
     assignedProfiles: List<String> = emptyList(),
     onDelete: (InjectedKeyEntity) -> Unit,
-    onToggleKEK: (InjectedKeyEntity) -> Unit,
+    onToggleKTK: (InjectedKeyEntity) -> Unit,
     isAdmin: Boolean = false
 ) {
     val isCeremonyKey = key.keyType == "CEREMONY_KEY"
@@ -358,7 +358,7 @@ fun KeyCard(
                 // Botón "Marcar como KTK" / "Quitar KTK" - Disponible para todos si NO es KEK Storage
                 if (!isKEKStorage) {
                     OutlinedButton(
-                        onClick = { onToggleKEK(key) },
+                        onClick = { onToggleKTK(key) },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(
                             containerColor = if (isKTK) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,

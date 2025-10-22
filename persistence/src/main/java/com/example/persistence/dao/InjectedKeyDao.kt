@@ -130,4 +130,34 @@ interface InjectedKeyDao {
     @Query("SELECT * FROM injected_keys WHERE isKEK = 1 LIMIT 1")
     suspend fun getCurrentKEK(): InjectedKeyEntity?
 
+    // === MÉTODOS ESPECÍFICOS PARA KTK ===
+
+    /**
+     * Limpia todos los flags KTK de todas las llaves.
+     * Útil antes de establecer una nueva KTK.
+     */
+    @Query("UPDATE injected_keys SET kekType = 'NONE' WHERE kekType = 'KEK_TRANSPORT'")
+    suspend fun clearAllKTKFlags()
+
+    /**
+     * Establece una llave específica como KTK activa.
+     * Marca la llave como KTK y establece su estado como ACTIVE.
+     */
+    @Query("UPDATE injected_keys SET kekType = 'KEK_TRANSPORT', status = 'ACTIVE' WHERE kcv = :kcv")
+    suspend fun setKeyAsKTK(kcv: String)
+
+    /**
+     * Quita el flag KTK de una llave específica.
+     * La llave vuelve a ser operacional manteniendo su estado original.
+     */
+    @Query("UPDATE injected_keys SET kekType = 'NONE' WHERE kcv = :kcv")
+    suspend fun removeKeyAsKTK(kcv: String)
+
+    /**
+     * Obtiene la llave que está actualmente marcada como KTK activa.
+     * Solo puede haber una KTK activa a la vez.
+     */
+    @Query("SELECT * FROM injected_keys WHERE kekType = 'KEK_TRANSPORT' LIMIT 1")
+    suspend fun getCurrentKTK(): InjectedKeyEntity?
+
 }

@@ -60,7 +60,7 @@ fun InjectedKeysScreen(
     // Estados de filtros
     val filterAlgorithm by viewModel.filterAlgorithm.collectAsState()
     val filterStatus by viewModel.filterStatus.collectAsState()
-    val filterKEKType by viewModel.filterKEKType.collectAsState()
+    val filterKTKType by viewModel.filterKTKType.collectAsState()
     val searchText by viewModel.searchText.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -120,11 +120,11 @@ fun InjectedKeysScreen(
             FiltersBar(
                 filterAlgorithm = filterAlgorithm,
                 filterStatus = filterStatus,
-                filterKEKType = filterKEKType,
+                filterKTKType = filterKTKType,
                 searchText = searchText,
                 onFilterAlgorithmChange = { viewModel.updateFilterAlgorithm(it) },
                 onFilterStatusChange = { viewModel.updateFilterStatus(it) },
-                onFilterKEKTypeChange = { viewModel.updateFilterKEKType(it) },
+                onFilterKTKTypeChange = { viewModel.updateFilterKTKType(it) },
                 onSearchTextChange = { viewModel.updateSearchText(it) }
             )
             
@@ -180,8 +180,8 @@ fun InjectedKeysScreen(
                                 CompactKeyCard(
                                     key = key,
                                     onDeleteClick = { viewModel.onDeleteKey(key) },
-                                    onSetAsKEKClick = { viewModel.setAsKEK(key) },
-                                    onRemoveAsKEKClick = { viewModel.removeAsKEK(key) }
+onSetAsKTKClick = { viewModel.setAsKTK(key) },
+onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
                                 )
                             }
                         } else {
@@ -200,8 +200,8 @@ fun InjectedKeysScreen(
                                 CompactKeyCard(
                                     key = key,
                                     onDeleteClick = { viewModel.onDeleteKey(key) },
-                                    onSetAsKEKClick = { viewModel.setAsKEK(key) },
-                                    onRemoveAsKEKClick = { viewModel.removeAsKEK(key) }
+onSetAsKTKClick = { viewModel.setAsKTK(key) },
+onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
                                 )
                             }
                         }
@@ -218,8 +218,8 @@ fun InjectedKeysScreen(
                                 CompactKeyCard(
                                     key = key,
                                     onDeleteClick = { viewModel.onDeleteKey(key) },
-                                    onSetAsKEKClick = { viewModel.setAsKEK(key) },
-                                    onRemoveAsKEKClick = { viewModel.removeAsKEK(key) }
+onSetAsKTKClick = { viewModel.setAsKTK(key) },
+onRemoveAsKTKClick = { viewModel.removeAsKTK(key) }
                                 )
                             }
                         }
@@ -410,8 +410,8 @@ fun KeyInfoCard(
     modifier: Modifier = Modifier, 
     key: InjectedKeyEntity, 
     onDeleteClick: () -> Unit,
-    onSetAsKEKClick: () -> Unit,
-    onRemoveAsKEKClick: () -> Unit
+    onSetAsKTKClick: () -> Unit,
+    onRemoveAsKTKClick: () -> Unit
 ) {
     // Logs para tracking de KTK en KeyInfoCard original
     LaunchedEffect(key.id) {
@@ -566,7 +566,7 @@ fun KeyInfoCard(
                 if (key.keyAlgorithm.contains("AES", ignoreCase = true) && key.keyData.length == 64) {
                     if (key.isKEK) {
                         Button(
-                            onClick = onRemoveAsKEKClick,
+                            onClick = onRemoveAsKTKClick,
                             enabled = isEnabled,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.secondary
@@ -574,15 +574,15 @@ fun KeyInfoCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.LockOpen,
-                                contentDescription = "Quitar como KEK",
+                                contentDescription = "Quitar como KTK",
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Quitar como KEK")
+                            Text("Quitar como KTK")
                         }
                     } else {
                         Button(
-                            onClick = onSetAsKEKClick,
+                            onClick = onSetAsKTKClick,
                             enabled = isEnabled,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary
@@ -590,11 +590,11 @@ fun KeyInfoCard(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
-                                contentDescription = "Usar como KEK",
+                                contentDescription = "Usar como KTK",
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Usar como KEK")
+                            Text("Usar como KTK")
                         }
                     }
                 }
@@ -616,8 +616,8 @@ fun KeyInfoCard(
 fun CompactKeyCard(
     key: InjectedKeyEntity,
     onDeleteClick: () -> Unit,
-    onSetAsKEKClick: () -> Unit,
-    onRemoveAsKEKClick: () -> Unit
+    onSetAsKTKClick: () -> Unit,
+    onRemoveAsKTKClick: () -> Unit
 ) {
     // Logs para tracking de KTK
     LaunchedEffect(key.id) {
@@ -766,26 +766,26 @@ fun CompactKeyCard(
                     }
                     if (!key.isKEK) {
                         IconButton(
-                            onClick = onSetAsKEKClick,
+                            onClick = onSetAsKTKClick,
                             enabled = isEnabled,
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 Icons.Default.Lock,
-                                contentDescription = "Usar como KEK",
+                                contentDescription = "Usar como KTK",
                                 modifier = Modifier.size(16.dp),
                                 tint = if (isEnabled) MaterialTheme.colorScheme.primary else Color.Gray
                             )
                         }
                     } else {
                         IconButton(
-                            onClick = onRemoveAsKEKClick,
+                            onClick = onRemoveAsKTKClick,
                             enabled = isEnabled,
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 Icons.Default.LockOpen,
-                                contentDescription = "Quitar como KEK",
+                                contentDescription = "Quitar como KTK",
                                 modifier = Modifier.size(16.dp),
                                 tint = if (isEnabled) MaterialTheme.colorScheme.secondary else Color.Gray
                             )
@@ -941,11 +941,11 @@ fun SectionHeader(title: String) {
 fun FiltersBar(
     filterAlgorithm: String,
     filterStatus: String,
-    filterKEKType: String,
+    filterKTKType: String,
     searchText: String,
     onFilterAlgorithmChange: (String) -> Unit,
     onFilterStatusChange: (String) -> Unit,
-    onFilterKEKTypeChange: (String) -> Unit,
+    onFilterKTKTypeChange: (String) -> Unit,
     onSearchTextChange: (String) -> Unit
 ) {
     Card(
@@ -997,12 +997,12 @@ fun FiltersBar(
                 )
             }
 
-            // Filtro por tipo KEK
+            // Filtro por tipo KTK
             FilterDropdown(
                 label = "Tipo",
-                options = listOf("Todas", "Solo KEK", "Solo Operacionales"),
-                selectedOption = filterKEKType,
-                onOptionSelected = onFilterKEKTypeChange,
+                options = listOf("Todas", "Solo KTK", "Solo Operacionales"),
+                selectedOption = filterKTKType,
+                onOptionSelected = onFilterKTKTypeChange,
                 modifier = Modifier.fillMaxWidth()
             )
         }

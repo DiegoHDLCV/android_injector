@@ -169,15 +169,15 @@ class KeyVaultViewModel @Inject constructor(
      * Marca o desmarca una llave como KTK (Key Transport Key)
      * La KTK se usa para cifrar llaves antes de transmitirlas al SubPOS
      */
-    fun toggleKeyAsKEK(key: InjectedKeyEntity) {
+    fun toggleKeyAsKTK(key: InjectedKeyEntity) {
         viewModelScope.launch {
             try {
-                if (key.isKEK) {
+                if (key.isKEK && key.kekType == "KEK_TRANSPORT") {
                     // Quitar flag KTK
-                    injectedKeyRepository.removeKeyAsKEK(key.kcv)
+                    injectedKeyRepository.removeKeyAsKTK(key.kcv)
                 } else {
                     // Establecer como KTK (automáticamente limpia KTKs anteriores)
-                    injectedKeyRepository.setKeyAsKEK(key.kcv)
+                    injectedKeyRepository.setKeyAsKTK(key.kcv)
                 }
                 loadKeys() // Recargar para reflejar cambios
             } catch (e: Exception) {

@@ -335,20 +335,46 @@ class InjectedKeyRepository @Inject constructor(
     }
 
     /**
-     * Establece una llave específica como KTK activa.
-     * Primero limpia cualquier KTK anterior y luego marca la nueva llave como KTK.
+     * Establece una llave específica como KEK Storage activa.
+     * Primero limpia cualquier KEK anterior y luego marca la nueva llave como KEK.
+     * USADO POR EL MÓDULO INJECTOR PARA KEK STORAGE.
      */
     suspend fun setKeyAsKEK(kcv: String) {
+        try {
+            Log.i(TAG, "=== ESTABLECIENDO LLAVE COMO KEK STORAGE ===")
+            Log.i(TAG, "KCV de la nueva KEK Storage: $kcv")
+            
+            // Primero limpiar cualquier KEK anterior
+            injectedKeyDao.clearAllKEKFlags()
+            Log.d(TAG, "KEK Storage anterior desmarcada")
+            
+            // Establecer la nueva KEK Storage
+            injectedKeyDao.setKeyAsKEK(kcv)
+            Log.i(TAG, "✓ Nueva KEK Storage establecida: KCV=$kcv")
+            Log.i(TAG, "================================================")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al establecer KEK Storage: KCV=$kcv", e)
+            throw e
+        }
+    }
+
+    /**
+     * Establece una llave específica como KTK activa.
+     * Primero limpia cualquier KTK anterior y luego marca la nueva llave como KTK.
+     * USADO POR EL MÓDULO KEYRECEIVER PARA KTK.
+     */
+    suspend fun setKeyAsKTK(kcv: String) {
         try {
             Log.i(TAG, "=== ESTABLECIENDO LLAVE COMO KTK ===")
             Log.i(TAG, "KCV de la nueva KTK: $kcv")
             
             // Primero limpiar cualquier KTK anterior
-            injectedKeyDao.clearAllKEKFlags()
+            injectedKeyDao.clearAllKTKFlags()
             Log.d(TAG, "KTK anterior desmarcada")
             
             // Establecer la nueva KTK
-            injectedKeyDao.setKeyAsKEK(kcv)
+            injectedKeyDao.setKeyAsKTK(kcv)
             Log.i(TAG, "✓ Nueva KTK establecida: KCV=$kcv")
             Log.i(TAG, "================================================")
             
@@ -359,15 +385,36 @@ class InjectedKeyRepository @Inject constructor(
     }
 
     /**
-     * Quita el flag KTK de una llave específica.
+     * Quita el flag KEK Storage de una llave específica.
      * La llave vuelve a ser operacional manteniendo su estado original.
+     * USADO POR EL MÓDULO INJECTOR PARA KEK STORAGE.
      */
     suspend fun removeKeyAsKEK(kcv: String) {
+        try {
+            Log.i(TAG, "=== QUITANDO FLAG KEK STORAGE ===")
+            Log.i(TAG, "KCV de la llave: $kcv")
+            
+            injectedKeyDao.removeKeyAsKEK(kcv)
+            Log.i(TAG, "✓ Flag KEK Storage removido: KCV=$kcv")
+            Log.i(TAG, "================================================")
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al quitar flag KEK Storage: KCV=$kcv", e)
+            throw e
+        }
+    }
+
+    /**
+     * Quita el flag KTK de una llave específica.
+     * La llave vuelve a ser operacional manteniendo su estado original.
+     * USADO POR EL MÓDULO KEYRECEIVER PARA KTK.
+     */
+    suspend fun removeKeyAsKTK(kcv: String) {
         try {
             Log.i(TAG, "=== QUITANDO FLAG KTK ===")
             Log.i(TAG, "KCV de la llave: $kcv")
             
-            injectedKeyDao.removeKeyAsKEK(kcv)
+            injectedKeyDao.removeKeyAsKTK(kcv)
             Log.i(TAG, "✓ Flag KTK removido: KCV=$kcv")
             Log.i(TAG, "================================================")
             
@@ -378,13 +425,36 @@ class InjectedKeyRepository @Inject constructor(
     }
 
     /**
-     * Obtiene la llave que está actualmente marcada como KTK activa.
-     * Solo puede haber una KTK activa a la vez.
+     * Obtiene la llave que está actualmente marcada como KEK Storage activa.
+     * Solo puede haber una KEK Storage activa a la vez.
      * Descifra automáticamente si está cifrada.
+     * USADO POR EL MÓDULO INJECTOR PARA KEK STORAGE.
      */
     suspend fun getCurrentKEK(): InjectedKeyEntity? {
         return try {
-            val ktk = injectedKeyDao.getCurrentKEK()
+            val kek = injectedKeyDao.getCurrentKEK()
+            if (kek != null) {
+                Log.d(TAG, "KEK Storage actual encontrada: KCV=${kek.kcv}, Estado=${kek.status}")
+                decryptKeyIfNeeded(kek)
+            } else {
+                Log.d(TAG, "No hay KEK Storage activa actualmente")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al obtener KEK Storage actual", e)
+            null
+        }
+    }
+
+    /**
+     * Obtiene la llave que está actualmente marcada como KTK activa.
+     * Solo puede haber una KTK activa a la vez.
+     * Descifra automáticamente si está cifrada.
+     * USADO POR EL MÓDULO KEYRECEIVER PARA KTK.
+     */
+    suspend fun getCurrentKTK(): InjectedKeyEntity? {
+        return try {
+            val ktk = injectedKeyDao.getCurrentKTK()
             if (ktk != null) {
                 Log.d(TAG, "KTK actual encontrada: KCV=${ktk.kcv}, Estado=${ktk.status}")
                 decryptKeyIfNeeded(ktk)
