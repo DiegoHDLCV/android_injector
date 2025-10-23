@@ -1,8 +1,17 @@
 {
-  "generated": "2025-10-23T20:02:00.498594",
-  "description": "Llaves de prueba DUKPT para inyecci\u00f3n con EncryptionType 05",
-  "totalKeys": 3,
+  "generated": "2025-10-23T20:08:56.298953",
+  "description": "Llaves de prueba DUKPT para inyecci\u00f3n con EncryptionType 05 (incluye KEK STORAGE obligatoria)",
+  "totalKeys": 4,
   "keys": [
+    {
+      "keyType": "KEK_STORAGE",
+      "futurexCode": "00",
+      "algorithm": "AES-256",
+      "keyHex": "E14007267311EBDA872B46AF9B1A086AE9348938BA25AF8CBD69DD5A7F896838",
+      "kcv": "112A8B",
+      "bytes": 32,
+      "description": "KEK STORAGE - Llave maestra del sistema para DUKPT"
+    },
     {
       "keyType": "DUKPT_IPEK",
       "futurexCode": "05",

@@ -19,10 +19,23 @@ def create_test_keys_file():
     """
     Crea un archivo JSON de llaves de prueba para importación en el almacén.
     Formato compatible con TestKeysImporter.kt
+
+    IMPORTANTE: Siempre debe incluir una KEK STORAGE como llave maestra
     """
 
     # Llaves generadas por generate_dukpt_keys.py
     keys = [
+        # OBLIGATORIO: KEK STORAGE (llave maestra del sistema)
+        {
+            "keyType": "KEK_STORAGE",
+            "futurexCode": "00",
+            "algorithm": "AES-256",
+            "keyHex": "E14007267311EBDA872B46AF9B1A086AE9348938BA25AF8CBD69DD5A7F896838",
+            "kcv": "112A8B",
+            "bytes": 32,
+            "description": "KEK STORAGE - Llave maestra del sistema para DUKPT"
+        },
+        # DUKPT IPEK Llaves
         {
             "keyType": "DUKPT_IPEK",
             "futurexCode": "05",
@@ -55,7 +68,7 @@ def create_test_keys_file():
     # Estructura del archivo de importación
     test_keys_file = {
         "generated": datetime.now().isoformat(),
-        "description": "Llaves de prueba DUKPT para inyección con EncryptionType 05",
+        "description": "Llaves de prueba DUKPT para inyección con EncryptionType 05 (incluye KEK STORAGE obligatoria)",
         "totalKeys": len(keys),
         "keys": keys
     }
@@ -83,7 +96,8 @@ def main():
     print()
     print("📊 Llaves incluidas:")
     for key in test_keys["keys"]:
-        print(f"  - {key['keyType']} ({key['algorithm']})")
+        key_type_display = f"{key['keyType']} ({key['algorithm']})"
+        print(f"  - {key_type_display}")
         print(f"    KCV: {key['kcv']}")
         print(f"    Hex: {key['keyHex'][:32]}...")
         print()
@@ -97,16 +111,23 @@ def main():
     print("3. Selecciona el archivo:", output_filename)
     print("4. Las llaves se importarán automáticamente al almacén")
     print()
-    print("⚠️  NOTA: Guarda el KCV de cada llave, lo necesitarás para el perfil")
+    print("⚠️  NOTA: Guarda los KCVs de cada llave, los necesitarás para el perfil")
     print()
 
     # Mostrar los KCVs para copiar fácilmente
     print("=" * 80)
-    print("🔑 KCVS PARA EL PERFIL:")
+    print("🔑 KCVS IMPORTANTES:")
     print("=" * 80)
     print()
+    print("KEK STORAGE (obligatoria):")
+    kek = next((k for k in test_keys["keys"] if k["keyType"] == "KEK_STORAGE"), None)
+    if kek:
+        print(f"  KEK STORAGE → KCV: {kek['kcv']}")
+    print()
+    print("DUKPT IPEK (para inyección):")
     for key in test_keys["keys"]:
-        print(f"{key['algorithm']:15s} → KCV: {key['kcv']}")
+        if key["keyType"] == "DUKPT_IPEK":
+            print(f"  {key['algorithm']:12s} → KCV: {key['kcv']}")
     print()
 
 
