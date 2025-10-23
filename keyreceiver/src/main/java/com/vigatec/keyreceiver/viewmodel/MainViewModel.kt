@@ -1002,11 +1002,15 @@ class MainViewModel @Inject constructor(
                             // Detener la escucha automáticamente cuando se desconecta el cable
                             if (listeningJob?.isActive == true) {
                                 Log.i(TAG, "║ Deteniendo escucha automáticamente por desconexión del cable...")
-                                viewModelScope.launch {
-                                    connectionMutex.withLock {
-                                        stopListeningInternal()
-                                    }
+                                // Cerrar el puerto directamente para forzar la desconexión
+                                try {
+                                    comController?.close()
+                                    Log.i(TAG, "║ Puerto cerrado forzadamente debido a desconexión del cable")
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "║ Error al cerrar puerto: ${e.message}", e)
                                 }
+                                // Cancelar el job de escucha
+                                listeningJob?.cancel()
                             }
                         }
                     }
@@ -1026,12 +1030,6 @@ class MainViewModel @Inject constructor(
     }
 
     private fun detectCableConnection(): Boolean {
-        // Si ya está escuchando, asumir que el cable está conectado
-        if (_connectionStatus.value == ConnectionStatus.LISTENING) {
-            Log.v(TAG, "║ 🔍 Detección: Ya escuchando → Cable asumido como PRESENTE ✓")
-            return true
-        }
-
         // Si está en proceso de conectar/cerrar, mantener estado anterior
         if (_connectionStatus.value == ConnectionStatus.INITIALIZING ||
             _connectionStatus.value == ConnectionStatus.OPENING ||
@@ -1040,7 +1038,8 @@ class MainViewModel @Inject constructor(
             return _cableConnected.value
         }
 
-        // Solo detectar cuando está DISCONNECTED o ERROR
+        // SIEMPRE hacer detección real del cable, incluso si está LISTENING
+        // para detectar desconexiones mientras se escucha
         return try {
             CommLog.d(TAG, "🔍 Iniciando detección de cable USB (4 métodos)...")
             

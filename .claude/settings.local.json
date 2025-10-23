@@ -3,7 +3,8 @@
     "allow": [
       "Bash(git commit:*)",
       "Bash(./gradlew :injector:compileDebugKotlin:*)",
-      "Bash(./gradlew:*)"
+      "Bash(./gradlew:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
