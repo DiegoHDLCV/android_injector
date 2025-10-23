@@ -508,7 +508,10 @@ class KeyInjectionViewModel @Inject constructor(
             throw Exception("Longitud de llave inválida: $keyLengthBytes bytes. Longitudes válidas: $validLengths")
         }
 
-        // === INTEGRACIÓN CON KTK (SIEMPRE REQUERIDA) ===
+        // === DETECTAR SI ES DUKPT PLAINTEXT (EncryptionType 05) ===
+        val isDukptPlaintext = isDukptPlaintextKey(keyConfig, selectedKey)
+
+        // === INTEGRACIÓN CON KTK (CONDICIONAL SEGÚN TIPO DE LLAVE) ===
         Log.i(TAG, "=== VERIFICANDO KTK PARA INYECCIÓN ===")
         val hasActiveKTK = kotlinx.coroutines.runBlocking { kekManager.hasActiveKEK() }
         val ktkData = kotlinx.coroutines.runBlocking { kekManager.getActiveKEKData() }
@@ -528,9 +531,16 @@ class KeyInjectionViewModel @Inject constructor(
             Log.i(TAG, "  - Slot de KTK: $ktkSlot (validado)")
         }
 
-        // OBLIGATORIO: La KTK siempre debe estar presente para inyectar un perfil
-        if (!hasActiveKTK || ktkData == null || ktkKcv == null) {
-            throw Exception("KTK (Key Transfer Key) es obligatoria para inyectar llaves. Por favor, genere y exporte una KTK primero.")
+        // VALIDACIÓN CONDICIONAL DE KTK:
+        // - DUKPT Plaintext (EncryptionType 05): NO requiere KTK (se envía sin cifrar)
+        // - Otras llaves: SÍ requieren KTK (se envían cifradas con EncryptionType 02)
+        if (isDukptPlaintext) {
+            Log.i(TAG, "✓ Modo DUKPT Plaintext (EncryptionType 05) - KTK NO requerida")
+            Log.w(TAG, "⚠️ ADVERTENCIA: IPEK se enviará en plaintext. SOLO para testing, NO usar en producción")
+        } else {
+            if (!hasActiveKTK || ktkData == null || ktkKcv == null) {
+                throw Exception("KTK (Key Transfer Key) es obligatoria para inyectar llaves cifradas. Para DUKPT plaintext (testing), asegúrate que sea una llave DUKPT sin cifrado.")
+            }
         }
 
         // Decidir tipo de encriptación y datos de llave
@@ -538,74 +548,101 @@ class KeyInjectionViewModel @Inject constructor(
         val finalKeyData: String
         val ktkSlotStr: String
         val ktkChecksum: String
+        var ktkAlgorithm = "" // Algoritmo de la KTK (vacío para plaintext)
 
-        // MODO CIFRADO: Usar KTK para cifrar la llave
-        // La KTK ya fue enviada previamente con encryptionType "00" (en claro)
-        // Ahora enviamos la llave cifrada con encryptionType "02"
-        Log.i(TAG, "=== MODO CIFRADO CON KTK (YA INYECTADA) ===")
-        Log.i(TAG, "Cifrando llave con KTK antes de enviar...")
+        if (isDukptPlaintext) {
+            // === MODO DUKPT PLAINTEXT (EncryptionType 05) ===
+            // La IPEK se envía sin cifrar, directamente en claro
+            Log.i(TAG, "=== MODO DUKPT PLAINTEXT (EncryptionType 05) ===")
+            Log.i(TAG, "Enviando IPEK DUKPT sin cifrado...")
 
-        // Detectar algoritmo de la KTK basado en su longitud
-        val ktkLengthBytes = ktkData.length / 2
-        val ktkAlgorithm = when (ktkLengthBytes) {
-            8 -> "3DES (Single DES - 8 bytes)"
-            16 -> "3DES (Double length - 16 bytes) o AES-128"
-            24 -> "3DES (Triple length - 24 bytes)"
-            32 -> "AES-256"
-            48 -> "AES-256 (Triple length - 48 bytes)"
-            else -> "Desconocido ($ktkLengthBytes bytes)"
-        }
+            // Usar la llave tal cual, sin cifrar
+            finalKeyData = selectedKey.keyData
 
-        // Detectar algoritmo de la llave operacional (usando variable existente)
-        val operationalKeyAlgorithm = when (keyLengthBytes) {
-            8 -> "3DES (Single DES - 8 bytes)"
-            16 -> "3DES (Double length - 16 bytes) o AES-128"
-            24 -> "3DES (Triple length - 24 bytes)"
-            32 -> "AES-256"
-            48 -> "AES-256 (Triple length - 48 bytes)"
-            else -> "Desconocido ($keyLengthBytes bytes)"
-        }
+            encryptionType = "05" // DUKPT Plaintext (sin cifrado)
+            ktkSlotStr = "00"      // No se usa KTK en plaintext
+            ktkChecksum = "0000"   // No se usa checksum de KTK
 
-        Log.i(TAG, "=== INFORMACIÓN DE KTK ===")
-        Log.i(TAG, "  - Algoritmo KTK: $ktkAlgorithm")
-        Log.i(TAG, "  - Longitud KTK: $ktkLengthBytes bytes (${ktkData.length} caracteres hex)")
-        Log.i(TAG, "  - KCV de KTK: $ktkKcv")
-        Log.i(TAG, "  - Primeros 32 caracteres: ${ktkData.take(32)}...")
-        Log.i(TAG, "")
-        Log.i(TAG, "=== INFORMACIÓN DE LLAVE OPERACIONAL ===")
-        Log.i(TAG, "  - Algoritmo llave: $operationalKeyAlgorithm")
-        Log.i(TAG, "  - Longitud llave: $keyLengthBytes bytes (${selectedKey.keyData.length} caracteres hex)")
-        Log.i(TAG, "  - KCV de llave: ${selectedKey.kcv}")
-        Log.i(TAG, "  - Tipo de llave: ${keyConfig.keyType}")
-        Log.i(TAG, "  - Slot destino: ${keyConfig.slot}")
-        Log.i(TAG, "  - Primeros 32 caracteres: ${selectedKey.keyData.take(32)}...")
-        Log.i(TAG, "")
-        Log.i(TAG, "=== INICIANDO CIFRADO ===")
-        Log.i(TAG, "Llamando a TripleDESCrypto.encryptKeyForTransmission()...")
+            Log.i(TAG, "✓ IPEK DUKPT lista para enviar en plaintext")
+            Log.i(TAG, "  - Datos (primeros 32): ${selectedKey.keyData.take(32)}...")
+            Log.i(TAG, "  - Tipo de encriptación: $encryptionType (Sin cifrado - TESTING ONLY)")
+            Log.i(TAG, "  - Slot de KTK: No usado")
+            Log.i(TAG, "  - Checksum de KTK: No usado")
+            Log.w(TAG, "  - ⚠️ ADVERTENCIA: IPEK enviada en plaintext. NO usar en producción")
+        } else {
+            // === MODO CIFRADO CON KTK (EncryptionType 02) ===
+            // Usar KTK para cifrar la llave
+            // La KTK ya fue enviada previamente con encryptionType "00" (en claro)
+            // Ahora enviamos la llave cifrada con encryptionType "02"
+            Log.i(TAG, "=== MODO CIFRADO CON KTK (YA INYECTADA) ===")
+            Log.i(TAG, "Cifrando llave con KTK antes de enviar...")
 
-        try {
-            // Cifrar la llave con la KTK usando TripleDESCrypto
-            finalKeyData = com.vigatec.utils.TripleDESCrypto.encryptKeyForTransmission(
-                keyData = selectedKey.keyData,
-                kekData = ktkData,
-                keyKcv = selectedKey.kcv
-            )
+            // En este punto, sabemos que ktkData y ktkKcv no son null (validados arriba)
+            val safeKtkData = ktkData!! // Garantizado no-null por la validación anterior
+            val safeKtkKcv = ktkKcv!!   // Garantizado no-null por la validación anterior
 
-            encryptionType = "02" // Llave cifrada (KTK ya fue inyectada previamente)
-            ktkSlotStr = ktkSlot.toString().padStart(2, '0') // Slot donde está la KTK
-            ktkChecksum = ktkKcv.take(4)
+            // Detectar algoritmo de la KTK basado en su longitud
+            val ktkLengthBytes = safeKtkData.length / 2
+            ktkAlgorithm = when (ktkLengthBytes) {
+                8 -> "3DES (Single DES - 8 bytes)"
+                16 -> "3DES (Double length - 16 bytes) o AES-128"
+                24 -> "3DES (Triple length - 24 bytes)"
+                32 -> "AES-256"
+                48 -> "AES-256 (Triple length - 48 bytes)"
+                else -> "Desconocido ($ktkLengthBytes bytes)"
+            }
 
-            Log.i(TAG, "✓ Llave cifrada exitosamente")
-            Log.i(TAG, "  - Datos originales (primeros 32): ${selectedKey.keyData.take(32)}...")
-            Log.i(TAG, "  - Datos cifrados (primeros 32): ${finalKeyData.take(32)}...")
-            Log.i(TAG, "  - Tipo de encriptación: $encryptionType (Cifrada con KTK en slot $ktkSlotStr)")
-            Log.i(TAG, "  - Slot de KTK: $ktkSlotStr")
-            Log.i(TAG, "  - Checksum de KTK: $ktkChecksum")
-            Log.i(TAG, "  - IMPORTANTE: La KTK ya debe estar inyectada en el dispositivo")
+            // Detectar algoritmo de la llave operacional (usando variable existente)
+            val operationalKeyAlgorithm = when (keyLengthBytes) {
+                8 -> "3DES (Single DES - 8 bytes)"
+                16 -> "3DES (Double length - 16 bytes) o AES-128"
+                24 -> "3DES (Triple length - 24 bytes)"
+                32 -> "AES-256"
+                48 -> "AES-256 (Triple length - 48 bytes)"
+                else -> "Desconocido ($keyLengthBytes bytes)"
+            }
 
-        } catch (e: Exception) {
-            Log.e(TAG, "✗ Error al cifrar llave con KTK: ${e.message}", e)
-            throw Exception("Error al cifrar llave con KTK: ${e.message}")
+            Log.i(TAG, "=== INFORMACIÓN DE KTK ===")
+            Log.i(TAG, "  - Algoritmo KTK: $ktkAlgorithm")
+            Log.i(TAG, "  - Longitud KTK: $ktkLengthBytes bytes (${safeKtkData.length} caracteres hex)")
+            Log.i(TAG, "  - KCV de KTK: $safeKtkKcv")
+            Log.i(TAG, "  - Primeros 32 caracteres: ${safeKtkData.take(32)}...")
+            Log.i(TAG, "")
+            Log.i(TAG, "=== INFORMACIÓN DE LLAVE OPERACIONAL ===")
+            Log.i(TAG, "  - Algoritmo llave: $operationalKeyAlgorithm")
+            Log.i(TAG, "  - Longitud llave: $keyLengthBytes bytes (${selectedKey.keyData.length} caracteres hex)")
+            Log.i(TAG, "  - KCV de llave: ${selectedKey.kcv}")
+            Log.i(TAG, "  - Tipo de llave: ${keyConfig.keyType}")
+            Log.i(TAG, "  - Slot destino: ${keyConfig.slot}")
+            Log.i(TAG, "  - Primeros 32 caracteres: ${selectedKey.keyData.take(32)}...")
+            Log.i(TAG, "")
+            Log.i(TAG, "=== INICIANDO CIFRADO ===")
+            Log.i(TAG, "Llamando a TripleDESCrypto.encryptKeyForTransmission()...")
+
+            try {
+                // Cifrar la llave con la KTK usando TripleDESCrypto
+                finalKeyData = com.vigatec.utils.TripleDESCrypto.encryptKeyForTransmission(
+                    keyData = selectedKey.keyData,
+                    kekData = safeKtkData,
+                    keyKcv = selectedKey.kcv
+                )
+
+                encryptionType = "02" // Llave cifrada (KTK ya fue inyectada previamente)
+                ktkSlotStr = ktkSlot.toString().padStart(2, '0') // Slot donde está la KTK
+                ktkChecksum = safeKtkKcv.take(4)
+
+                Log.i(TAG, "✓ Llave cifrada exitosamente")
+                Log.i(TAG, "  - Datos originales (primeros 32): ${selectedKey.keyData.take(32)}...")
+                Log.i(TAG, "  - Datos cifrados (primeros 32): ${finalKeyData.take(32)}...")
+                Log.i(TAG, "  - Tipo de encriptación: $encryptionType (Cifrada con KTK en slot $ktkSlotStr)")
+                Log.i(TAG, "  - Slot de KTK: $ktkSlotStr")
+                Log.i(TAG, "  - Checksum de KTK: $ktkChecksum")
+                Log.i(TAG, "  - IMPORTANTE: La KTK ya debe estar inyectada en el dispositivo")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "✗ Error al cifrar llave con KTK: ${e.message}", e)
+                throw Exception("Error al cifrar llave con KTK: ${e.message}")
+            }
         }
 
         // NUEVO: Recalcular longitud basándose en datos cifrados
@@ -661,12 +698,18 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "Slot de llave: $keySlot (${keyConfig.slot})")
         Log.i(TAG, "Slot KTK: $ktkSlotStr")
         Log.i(TAG, "Tipo de llave: $keyType (${keyConfig.keyType})")
-        Log.i(TAG, "Tipo de encriptación: $encryptionType (Cifrado con KTK en CLARO)")
+        Log.i(TAG, "Tipo de encriptación: $encryptionType (${if (isDukptPlaintext) "DUKPT Plaintext" else "Cifrado con KTK"})")
         Log.i(TAG, "Algoritmo de llave: $keyAlgorithm (${getAlgorithmDescription(keyAlgorithm)})")
         Log.i(TAG, "Checksum de llave: $keyChecksum (KCV: ${selectedKey.kcv})")
         Log.i(TAG, "Checksum KTK: $ktkChecksum")
         Log.i(TAG, "KSN: $ksn (20 caracteres)")
-        Log.i(TAG, "Longitud KTK: ${String.format("%03X", ktkData.length / 2)} (${ktkData.length / 2} bytes)")
+        if (!isDukptPlaintext && ktkData != null) {
+            Log.i(TAG, "Longitud KTK: ${String.format("%03X", ktkData.length / 2)} (${ktkData.length / 2} bytes)")
+        } else if (!isDukptPlaintext) {
+            Log.i(TAG, "Longitud KTK: No disponible (KTK no está cargada)")
+        } else {
+            Log.i(TAG, "Longitud KTK: No aplicable (DUKPT plaintext sin KTK)")
+        }
         Log.i(TAG, "Longitud de llave: $keyLength ($keyLengthBytes bytes)")
         Log.i(TAG, "  - Formato: ASCII HEX (3 dígitos)")
         Log.i(TAG, "  - Valor: '$keyLength'")
@@ -1523,5 +1566,38 @@ class KeyInjectionViewModel @Inject constructor(
         }
 
         Log.i(TAG, "================================================")
+    }
+
+    /**
+     * Detecta si una llave es DUKPT plaintext (EncryptionType 05)
+     *
+     * DUKPT plaintext se usa para testing solamente:
+     * - Requiere llave de tipo DUKPT Initial Key (IPEK)
+     * - La IPEK se envía sin cifrar (plaintext)
+     * - NO requiere KTK para la inyección
+     * - Se valida que tenga un KSN válido (20 caracteres hex)
+     *
+     * @return true si es DUKPT plaintext, false si es otra llave
+     */
+    private fun isDukptPlaintextKey(keyConfig: KeyConfiguration, selectedKey: InjectedKeyEntity): Boolean {
+        // Detectar si es tipo DUKPT
+        val isDukptType = keyConfig.keyType.contains("DUKPT", ignoreCase = true) &&
+                         keyConfig.keyType.contains("IPEK", ignoreCase = true)
+
+        // Detectar si tiene KSN válido (20 caracteres para DUKPT)
+        val hasValidKsn = keyConfig.ksn.length == 20 &&
+                         keyConfig.ksn.matches(Regex("[0-9A-Fa-f]{20}"))
+
+        // Es DUKPT plaintext si: es tipo DUKPT IPEK y tiene KSN válido
+        val isDukptPlaintext = isDukptType && hasValidKsn
+
+        Log.i(TAG, "=== DETECTANDO TIPO DE INYECCIÓN ===")
+        Log.i(TAG, "  - Tipo de llave: ${keyConfig.keyType}")
+        Log.i(TAG, "  - ¿Es DUKPT IPEK?: $isDukptType")
+        Log.i(TAG, "  - KSN: ${keyConfig.ksn}")
+        Log.i(TAG, "  - ¿KSN válido (20 hex)?: $hasValidKsn")
+        Log.i(TAG, "  - ¿Es DUKPT Plaintext?: $isDukptPlaintext")
+
+        return isDukptPlaintext
     }
 }

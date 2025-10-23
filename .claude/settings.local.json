@@ -5,7 +5,9 @@
       "Bash(./gradlew :injector:compileDebugKotlin:*)",
       "Bash(./gradlew:*)",
       "Bash(git add:*)",
-      "Read(//Users/diegoherreradelacalle/Library/CloudStorage/OneDrive-VIGATECS.A/Respaldos/Respaldo MAC/PROYECTOS/Vigatec/ANDROID/MARCAS POS/NEWPOS/asmart_api_doc/**)"
+      "Read(//Users/diegoherreradelacalle/Library/CloudStorage/OneDrive-VIGATECS.A/Respaldos/Respaldo MAC/PROYECTOS/Vigatec/ANDROID/MARCAS POS/NEWPOS/asmart_api_doc/**)",
+      "Bash(python3:*)",
+      "Read(//Users/diegoherreradelacalle/StudioProjects/**)"
     ],
     "deny": [],
     "ask": []
