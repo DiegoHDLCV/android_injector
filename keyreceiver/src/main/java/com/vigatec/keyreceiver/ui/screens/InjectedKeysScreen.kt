@@ -231,9 +231,12 @@ fun InjectedKeysScreen(
     if (showClearAllModal) {
         ConfirmationDialog(
             icon = Icons.Default.DeleteSweep,
-            title = "Limpiar Historial",
-            text = "¿Estás seguro de que quieres eliminar TODAS las llaves inyectadas? Esta acción es irreversible.",
-            onConfirm = { viewModel.clearAllKeys() },
+            title = "Eliminar Todas las Llaves",
+            text = "¿Estás seguro de que quieres eliminar TODAS las llaves del dispositivo y del historial? Esta acción es irreversible.",
+            onConfirm = { 
+                viewModel.dismissClearAllModal()
+                viewModel.deleteAllKeys() 
+            },
             onDismiss = { viewModel.dismissClearAllModal() }
         )
     }

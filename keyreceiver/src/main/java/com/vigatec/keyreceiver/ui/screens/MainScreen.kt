@@ -81,7 +81,10 @@ fun MainScreen(navController: NavHostController) {
             )
 
             // ========== 4. FEED DE LLAVES INYECTADAS (NUEVO!) ==========
-            InjectionFeedCard(injections = recentInjections)
+            InjectionFeedCard(
+                injections = recentInjections,
+                onClearHistory = { viewModel.clearRecentInjectionsFeed() }
+            )
 
             // ========== 5. BOTÓN VER TODAS LAS LLAVES ==========
             Button(

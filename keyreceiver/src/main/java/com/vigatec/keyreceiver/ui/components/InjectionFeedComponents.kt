@@ -26,6 +26,7 @@ import java.util.*
 @Composable
 fun InjectionFeedCard(
     injections: List<InjectionEvent>,
+    onClearHistory: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -53,22 +54,40 @@ fun InjectionFeedCard(
                     fontWeight = FontWeight.Bold
                 )
                 if (injections.isNotEmpty()) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${injections.size}",
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "${injections.size}",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        if (onClearHistory != null) {
+                            IconButton(
+                                onClick = onClearHistory,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Limpiar historial",
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
                     }
                 }
             }
 
-            Divider()
+            HorizontalDivider()
 
             // Lista de inyecciones con animaciones
             if (injections.isEmpty()) {

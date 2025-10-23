@@ -1117,6 +1117,18 @@ class MainViewModel @Inject constructor(
         Log.d(TAG, "Feed actualizado: ${currentList.size} elementos | Último: ${event.keyType} en slot ${event.slot}")
     }
 
+    /**
+     * Limpia el feed visual de inyecciones recientes
+     * Solo afecta la visualización, NO toca la base de datos
+     */
+    fun clearRecentInjectionsFeed() {
+        _recentInjections.value = emptyList()
+        Log.d(TAG, "Feed de inyecciones recientes limpiado")
+        viewModelScope.launch {
+            _snackbarEvent.emit("Historial visual limpiado")
+        }
+    }
+
     // MÉTODOS DE ENVÍO (Comentados - no se usan en la nueva UI, pero se preservan para futuras funcionalidades)
 
     /*

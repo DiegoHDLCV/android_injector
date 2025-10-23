@@ -241,10 +241,10 @@ class InjectedKeysViewModel @Inject constructor(
 
             // --- PASO 3: FINALIZAR LA OPERACIÓN BASADO EN EL RESULTADO ---
             if (hardwareSuccess) {
-                // SI EL HARDWARE SE LIMPIÓ, LIMPIAR LA BASE DE DATOS LOCAL
-                Log.d(TAG, "deleteAllKeys: 3. Éxito en hardware. Limpiando la base de datos local.")
+                // SI EL HARDWARE SE LIMPIÓ, ELIMINAR COMPLETAMENTE DE LA BD
+                Log.d(TAG, "deleteAllKeys: 3. Éxito en hardware. Eliminando todas las llaves de la base de datos.")
                 injectedKeyRepository.deleteAllKeys()
-                _snackbarMessage.emit("Dispositivo y base de datos limpiados con éxito.")
+                _snackbarMessage.emit("Todas las llaves han sido eliminadas del dispositivo y del historial.")
             } else {
                 // SI EL HARDWARE FALLÓ O LA TAREA FUE CANCELADA, REVERTIR EL ESTADO
                 Log.w(TAG, "deleteAllKeys: 3. Fallo/Cancelación en hardware. Reviertiendo estado a 'SUCCESSFUL'.")
@@ -304,8 +304,9 @@ class InjectedKeysViewModel @Inject constructor(
         
         // Log detallado de todas las llaves antes de filtrar
         filtered.forEachIndexed { index, key ->
-            Log.d(TAG, "Llave $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', Art=${key.keyAlgorithm}, KCV=${key.kcv}")
+            Log.d(TAG, "Llave $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', Art=${key.keyAlgorithm}, KCV=${key.kcv}, Status=${key.status}")
         }
+
 
         // Filtro por algoritmo
         if (_filterAlgorithm.value != "Todos") {
