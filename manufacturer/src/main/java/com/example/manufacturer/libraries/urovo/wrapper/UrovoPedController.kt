@@ -330,6 +330,16 @@ class UrovoPedController(private val context: Context) : IPedController {
         }
     }
 
+    override suspend fun createDukptAESKey(
+        keyIndex: Int,
+        keyAlgorithm: GenericKeyAlgorithm,
+        ipekBytes: ByteArray,
+        ksnBytes: ByteArray,
+        kcvBytes: ByteArray?
+    ): Boolean {
+        throw PedKeyException("createDukptAESKey not implemented for Urovo PED")
+    }
+
     override suspend fun getDukptInfo(groupIndex: Int): DukptInfo? {
         val ksnOut = ByteArray(12) // Buffer grande para TDES (10) o AES (12)
         return try {

@@ -69,6 +69,28 @@ interface IPedController {
         initialKsn: ByteArray,
         keyChecksum: String?
     ): Boolean
+
+    /**
+     * Crea una llave DUKPT AES en plaintext (sin cifrar).
+     * Este método usa el método nativo createDukptAESKey() de NewPOS.
+     *
+     * @param keyIndex Índice donde guardar la IPEK (0-255)
+     * @param keyAlgorithm Algoritmo de la IPEK (AES_128, AES_192, AES_256, DES_DOUBLE, DES_TRIPLE)
+     * @param ipekBytes Datos de la IPEK en plaintext (16/24/32 bytes según algoritmo)
+     * @param ksnBytes KSN (Key Serial Number) de 10 bytes
+     * @param kcvBytes KCV opcional para validación
+     * @return true si la inyección fue exitosa
+     * @throws PedException si hay error en la inyección
+     */
+    @Throws(PedException::class)
+    suspend fun createDukptAESKey(
+        keyIndex: Int,
+        keyAlgorithm: KeyAlgorithm,
+        ipekBytes: ByteArray,
+        ksnBytes: ByteArray,
+        kcvBytes: ByteArray?
+    ): Boolean
+
     @Throws(PedException::class)
     suspend fun getDukptInfo(groupIndex: Int): DukptInfo?
     @Throws(PedException::class)

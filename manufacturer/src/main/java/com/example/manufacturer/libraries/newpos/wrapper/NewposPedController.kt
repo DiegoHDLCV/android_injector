@@ -16,6 +16,7 @@ import com.pos.device.ped.KeySystem as NewposKeySystem
 import com.pos.device.ped.KeyType as NewposKeyType
 import com.pos.device.ped.MACMode as NewposMACMode
 import com.pos.device.ped.PinBlockFormat as NewposPinBlockFormat
+import com.pos.device.ped.DukptType
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -328,6 +329,61 @@ class NewposPedController(private val context: Context) : IPedController {
         }
     }
 
+    /**
+     * Escribe una IPEK DUKPT cifrada con KBPK en formato TR-31.
+     * Este método es específico para DUKPT AES y soporta el formato TR-31 completo.
+     */
+    suspend fun writeDukptIPEK(
+        kbpkIndex: Int,           // Índice de KBPK (KTK para DUKPT)
+        ipekIndex: Int,           // Índice donde guardar IPEK
+        dukptType: DukptType,     // AES128/192/256
+        ksn: ByteArray,           // 12 bytes
+        ipekHeader: ByteArray,    // Header TR-31
+        ipekData: ByteArray       // IPEK cifrada
+    ): Boolean {
+        Log.i(TAG, "=== DUKPT IPEK Injection (TR-31 Format) ===")
+        Log.i(TAG, "KBPK Index: $kbpkIndex")
+        Log.i(TAG, "IPEK Index: $ipekIndex")
+        Log.i(TAG, "DUKPT Type: $dukptType")
+        Log.i(TAG, "KSN: ${ksn.joinToString("") { "%02X".format(it) }}")
+        Log.i(TAG, "Header Length: ${ipekHeader.size} bytes")
+        Log.i(TAG, "Data Length: ${ipekData.size} bytes")
+
+        try {
+            val result = pedInstance.writeDukptIPEK(
+                mapDukptTypeToKeySystem(dukptType),
+                kbpkIndex,
+                ipekIndex,
+                ksn,
+                ipekHeader,
+                ipekData
+            )
+
+            if (result != 0) {
+                throw PedKeyException("Failed to write DUKPT IPEK (TR-31). NewPOS Error Code: $result")
+            }
+            
+            Log.i(TAG, "✅ DUKPT IPEK written successfully")
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error writing DUKPT IPEK (TR-31)", e)
+            throw PedKeyException("Failed to write DUKPT IPEK (TR-31): ${e.message}", e)
+        }
+    }
+
+    /**
+     * Mapea DukptType a KeySystem de NewPOS
+     */
+    private fun mapDukptTypeToKeySystem(dukptType: DukptType): NewposKeySystem {
+        return when (dukptType) {
+            DukptType.DUKPT_TYPE_AES128 -> NewposKeySystem.MS_AES
+            DukptType.DUKPT_TYPE_AES192 -> NewposKeySystem.MS_AES
+            DukptType.DUKPT_TYPE_AES256 -> NewposKeySystem.MS_AES
+            DukptType.DUKPT_TYPE_2TDEA -> NewposKeySystem.MS_DES
+            DukptType.DUKPT_TYPE_3TDEA -> NewposKeySystem.MS_DES
+        }
+    }
+
     override suspend fun deleteKey(keyIndex: Int, keyType: GenericKeyType): Boolean {
         // To delete, we don't need the algorithm, just the generic type for mapping.
         val npKeySystem = mapToNewposKeySystem(keyType)
@@ -444,6 +500,53 @@ class NewposPedController(private val context: Context) : IPedController {
         } catch (e: Exception) {
             Log.e(TAG, "Error writing DUKPT initial key for group $groupIndex", e)
             throw PedKeyException("Failed to write DUKPT initial key: ${e.message}", e)
+        }
+    }
+
+    override suspend fun createDukptAESKey(
+        keyIndex: Int,
+        keyAlgorithm: GenericKeyAlgorithm,
+        ipekBytes: ByteArray,
+        ksnBytes: ByteArray,
+        kcvBytes: ByteArray?
+    ): Boolean {
+        Log.d(TAG, "=== createDukptAESKey (DUKPT Plaintext) ===")
+        Log.d(TAG, "KeyIndex: $keyIndex")
+        Log.d(TAG, "Algorithm: $keyAlgorithm")
+        Log.d(TAG, "IPEK length: ${ipekBytes.size} bytes")
+        Log.d(TAG, "KSN length: ${ksnBytes.size} bytes")
+        Log.d(TAG, "KSN: ${ksnBytes.joinToString("") { "%02X".format(it) }}")
+
+        if (kcvBytes != null) {
+            Log.d(TAG, "Expected KCV: ${kcvBytes.joinToString("") { "%02X".format(it) }}")
+        }
+
+        try {
+            val result = when (keyAlgorithm) {
+                GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> {
+                    Log.d(TAG, "Calling createDukptKey (TDES)")
+                    pedInstance.createDukptKey(keyIndex, ipekBytes, ksnBytes)
+                }
+                GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256 -> {
+                    val npDukptType = mapToNewposDukptType(keyAlgorithm)
+                        ?: throw PedKeyException("Unsupported AES algorithm for DUKPT: $keyAlgorithm")
+                    Log.d(TAG, "Calling createDukptAESKey with DukptType: $npDukptType")
+                    pedInstance.createDukptAESKey(keyIndex, npDukptType, ipekBytes, ksnBytes)
+                }
+                else -> throw PedKeyException("Unsupported algorithm for DUKPT: $keyAlgorithm")
+            }
+
+            if (result != 0) {
+                Log.e(TAG, "createDukptAESKey failed with NewPOS error code: $result")
+                throw PedKeyException("Failed to create DUKPT key. NewPOS Error Code: $result")
+            }
+
+            Log.d(TAG, "✓ DUKPT key created successfully in slot $keyIndex")
+            return true
+        } catch (e: Exception) {
+            if (e is PedException) throw e
+            Log.e(TAG, "Unexpected error creating DUKPT key", e)
+            throw PedKeyException("Unexpected error creating DUKPT key.", e)
         }
     }
 

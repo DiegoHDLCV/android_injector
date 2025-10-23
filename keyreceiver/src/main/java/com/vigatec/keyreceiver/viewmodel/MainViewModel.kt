@@ -619,6 +619,61 @@ class MainViewModel @Inject constructor(
                         }
                     }
                 }
+                "04" -> {
+                    Log.d(TAG, "Manejando EncryptionType 04: DUKPT TR-31 (AES)")
+                    
+                    // Validar que sea una llave DUKPT
+                    if (genericKeyType != GenericKeyType.DUKPT_INITIAL_KEY) {
+                        throw PedKeyException("EncryptionType 04 solo soporta DUKPT_INITIAL_KEY, recibido: $genericKeyType")
+                    }
+                    
+                    // Validar KSN
+                    if (command.ksn.length != 20) {
+                        throw PedKeyException("KSN debe tener 20 caracteres para DUKPT, recibido: ${command.ksn.length}")
+                    }
+                    
+                    // Obtener KBPK (Key Block Protection Key) del slot especificado
+                    val kbpkSlot = command.ktkSlot
+                    val kbpkFromDb = injectedKeyRepository.getKeyBySlotAndType(kbpkSlot, GenericKeyType.TRANSPORT_KEY.name)
+                        ?: injectedKeyRepository.getKeyBySlotAndType(kbpkSlot, GenericKeyType.MASTER_KEY.name)
+                    
+                    if (kbpkFromDb == null) {
+                        throw PedKeyException("KBPK no encontrada en slot $kbpkSlot. Debe inyectarse primero.")
+                    }
+                    
+                    Log.d(TAG, "KBPK encontrada en BD:")
+                    Log.d(TAG, "  - Slot: ${kbpkFromDb.keySlot}")
+                    Log.d(TAG, "  - KCV: ${kbpkFromDb.kcv}")
+                    Log.d(TAG, "  - Algoritmo: ${kbpkFromDb.keyAlgorithm}")
+                    
+                    // Parsear formato TR-31
+                    val tr31Data = parseTR31Format(command.keyHex)
+                    
+                    // Determinar tipo DUKPT basado en algoritmo
+                    val dukptType = mapAlgorithmToDukptType(genericAlgorithm)
+                    
+                    Log.d(TAG, "=== DUKPT TR-31 INJECTION ===")
+                    Log.d(TAG, "KBPK Slot: $kbpkSlot")
+                    Log.d(TAG, "IPEK Slot: ${command.keySlot}")
+                    Log.d(TAG, "DUKPT Type: $dukptType")
+                    Log.d(TAG, "KSN: ${command.ksn}")
+                    Log.d(TAG, "TR-31 Header: ${tr31Data.first.joinToString("") { "%02X".format(it) }}")
+                    Log.d(TAG, "TR-31 Data: ${tr31Data.second.joinToString("") { "%02X".format(it) }}")
+                    
+                    // Llamar al método específico de DUKPT TR-31
+                    if (pedController is com.example.manufacturer.libraries.newpos.wrapper.NewposPedController) {
+                        pedController.writeDukptIPEK(
+                            kbpkIndex = kbpkSlot,
+                            ipekIndex = command.keySlot,
+                            dukptType = dukptType,
+                            ksn = command.ksn.hexToByteArray(),
+                            ipekHeader = tr31Data.first,
+                            ipekData = tr31Data.second
+                        )
+                    } else {
+                        throw PedKeyException("DUKPT TR-31 solo soportado en NewPOS PED")
+                    }
+                }
                 "02" -> {
                     Log.d(TAG, "Manejando EncryptionType 02: Llave cifrada con KTK (inyección segura por hardware)")
 
@@ -680,6 +735,36 @@ class MainViewModel @Inject constructor(
                     )
 
                     Log.d(TAG, "✓ Llave cifrada inyectada exitosamente en slot ${command.keySlot} usando descifrado por hardware")
+                }
+                "05" -> {
+                    Log.d(TAG, "=== EncryptionType 05: DUKPT IPEK Plaintext ===")
+                    Log.d(TAG, "Inyectando IPEK DUKPT sin cifrado (solo para testing)")
+                    Log.d(TAG, "  - Slot: ${command.keySlot}")
+                    Log.d(TAG, "  - Algoritmo: $genericAlgorithm")
+                    Log.d(TAG, "  - KSN: ${command.ksn}")
+                    Log.d(TAG, "  - IPEK length: ${command.keyHex.length / 2} bytes")
+
+                    // Validar que KSN no esté vacío
+                    if (command.ksn.isBlank() || command.ksn == "00000000000000000000") {
+                        throw PedKeyException("KSN inválido o vacío para DUKPT: ${command.ksn}")
+                    }
+
+                    // INYECCIÓN DUKPT PLAINTEXT:
+                    // La IPEK se envía en texto plano al PED
+                    // Este método es SOLO para testing - NO usar en producción
+                    pedController!!.createDukptAESKey(
+                        keyIndex = command.keySlot,
+                        keyAlgorithm = genericAlgorithm,
+                        ipekBytes = command.keyHex.hexToByteArray(),
+                        ksnBytes = command.ksn.hexToByteArray(),
+                        kcvBytes = if (command.keyChecksum.isNotBlank())
+                            command.keyChecksum.hexToByteArray()
+                        else
+                            null
+                    )
+
+                    Log.d(TAG, "✓ IPEK DUKPT inyectada exitosamente en slot ${command.keySlot}")
+                    Log.w(TAG, "⚠️ ADVERTENCIA: IPEK enviada en plaintext - SOLO USAR PARA TESTING")
                 }
                 else -> throw PedKeyException("Tipo de encriptación '${command.encryptionType}' no soportado.")
             }
@@ -1189,6 +1274,40 @@ class MainViewModel @Inject constructor(
         }
     }
     */
+
+    /**
+     * Parsea formato TR-31 para extraer header y datos
+     */
+    private fun parseTR31Format(keyHex: String): Pair<ByteArray, ByteArray> {
+        val keyBytes = keyHex.hexToByteArray()
+        
+        // TR-31 tiene un header fijo de 16 bytes seguido de los datos
+        // Para simplificar, asumimos que los primeros 16 bytes son el header
+        // y el resto son los datos cifrados
+        if (keyBytes.size < 16) {
+            throw PedKeyException("Datos TR-31 insuficientes: ${keyBytes.size} bytes")
+        }
+        
+        val header = keyBytes.take(16).toByteArray()
+        val data = keyBytes.drop(16).toByteArray()
+        
+        Log.d(TAG, "TR-31 parseado: Header=${header.size} bytes, Data=${data.size} bytes")
+        return Pair(header, data)
+    }
+    
+    /**
+     * Mapea algoritmo genérico a DukptType de NewPOS
+     */
+    private fun mapAlgorithmToDukptType(algorithm: KeyAlgorithm): com.pos.device.ped.DukptType {
+        return when (algorithm) {
+            KeyAlgorithm.AES_128 -> com.pos.device.ped.DukptType.DUKPT_TYPE_AES128
+            KeyAlgorithm.AES_192 -> com.pos.device.ped.DukptType.DUKPT_TYPE_AES192
+            KeyAlgorithm.AES_256 -> com.pos.device.ped.DukptType.DUKPT_TYPE_AES256
+            KeyAlgorithm.DES_DOUBLE -> com.pos.device.ped.DukptType.DUKPT_TYPE_2TDEA
+            KeyAlgorithm.DES_TRIPLE -> com.pos.device.ped.DukptType.DUKPT_TYPE_3TDEA
+            else -> throw PedKeyException("Algoritmo no soportado para DUKPT: $algorithm")
+        }
+    }
 
     /**
      * Realiza verificación automática de llaves instaladas al iniciar la aplicación

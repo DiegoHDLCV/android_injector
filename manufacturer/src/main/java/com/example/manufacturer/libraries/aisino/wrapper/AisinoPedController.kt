@@ -540,6 +540,17 @@ class AisinoPedController(private val application: Application) : IPedController
     }
 
     @Throws(PedException::class)
+    override suspend fun createDukptAESKey(
+        keyIndex: Int,
+        keyAlgorithm: GenericKeyAlgorithm,
+        ipekBytes: ByteArray,
+        ksnBytes: ByteArray,
+        kcvBytes: ByteArray?
+    ): Boolean {
+        throw PedKeyException("createDukptAESKey not implemented for Aisino PED")
+    }
+
+    @Throws(PedException::class)
     override suspend fun getDukptInfo(groupIndex: Int): DukptInfo? = withContext(Dispatchers.IO) {
         try {
             val ksnOut = ByteArray(10) // Aisino KSN is 10 bytes
