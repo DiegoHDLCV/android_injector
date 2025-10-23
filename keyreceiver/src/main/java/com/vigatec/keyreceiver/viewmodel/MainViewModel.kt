@@ -1002,6 +1002,8 @@ class MainViewModel @Inject constructor(
                             // Detener la escucha automáticamente cuando se desconecta el cable
                             if (listeningJob?.isActive == true) {
                                 Log.i(TAG, "║ Deteniendo escucha automáticamente por desconexión del cable...")
+                                // Forzar estado a DISCONNECTED inmediatamente
+                                _connectionStatus.value = ConnectionStatus.DISCONNECTED
                                 // Cerrar el puerto directamente para forzar la desconexión
                                 try {
                                     comController?.close()
