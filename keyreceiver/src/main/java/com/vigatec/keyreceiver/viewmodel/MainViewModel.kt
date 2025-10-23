@@ -998,6 +998,16 @@ class MainViewModel @Inject constructor(
                             Log.w(TAG, "║ ⚠️  CABLE USB DESCONECTADO")
                             CommLog.w(TAG, "⚠️ CABLE USB DESCONECTADO - Reconecte el cable")
                             _snackbarEvent.emit("Cable USB desconectado")
+
+                            // Detener la escucha automáticamente cuando se desconecta el cable
+                            if (listeningJob?.isActive == true) {
+                                Log.i(TAG, "║ Deteniendo escucha automáticamente por desconexión del cable...")
+                                viewModelScope.launch {
+                                    connectionMutex.withLock {
+                                        stopListeningInternal()
+                                    }
+                                }
+                            }
                         }
                     }
 

@@ -76,6 +76,7 @@ fun MainScreen(navController: NavHostController) {
             // ========== 3. BOTONES DE CONTROL ==========
             ControlButtons(
                 status = status,
+                cableConnected = cableDetected,
                 onStartListening = { viewModel.startListening() },
                 onStopListening = { viewModel.stopListening() }
             )
@@ -249,6 +250,7 @@ private fun ConnectionStatusCard(status: ConnectionStatus) {
 @Composable
 private fun ControlButtons(
     status: ConnectionStatus,
+    cableConnected: Boolean,
     onStartListening: () -> Unit,
     onStopListening: () -> Unit
 ) {
@@ -258,7 +260,7 @@ private fun ControlButtons(
     ) {
         Button(
             onClick = onStartListening,
-            enabled = status == ConnectionStatus.DISCONNECTED || status == ConnectionStatus.ERROR,
+            enabled = cableConnected && (status == ConnectionStatus.DISCONNECTED || status == ConnectionStatus.ERROR),
             modifier = Modifier.weight(1f)
         ) {
             Icon(
