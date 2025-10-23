@@ -659,10 +659,11 @@ class MainViewModel @Inject constructor(
                     Log.d(TAG, "KSN: ${command.ksn}")
                     Log.d(TAG, "TR-31 Header: ${tr31Data.first.joinToString("") { "%02X".format(it) }}")
                     Log.d(TAG, "TR-31 Data: ${tr31Data.second.joinToString("") { "%02X".format(it) }}")
-                    
+
                     // Llamar al método específico de DUKPT TR-31
-                    if (pedController is com.example.manufacturer.libraries.newpos.wrapper.NewposPedController) {
-                        pedController.writeDukptIPEK(
+                    val currentPedController = pedController
+                    if (currentPedController is com.example.manufacturer.libraries.newpos.wrapper.NewposPedController) {
+                        currentPedController.writeDukptIPEK(
                             kbpkIndex = kbpkSlot,
                             ipekIndex = command.keySlot,
                             dukptType = dukptType,
