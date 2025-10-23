@@ -210,32 +210,39 @@ class NewposPedController(private val context: Context) : IPedController {
         keyAlgorithm: GenericKeyAlgorithm,
         keyData: PedKeyData,
         transportKeyIndex: Int?,
-        transportKeyType: GenericKeyType?
+        transportKeyType: GenericKeyType?,
+        transportKeyAlgorithm: GenericKeyAlgorithm?
     ): Boolean {
         if (transportKeyIndex == null || transportKeyType == null) {
             throw PedKeyException("NewPOS requires transportKeyIndex and transportKeyType for encrypted key loading.")
         }
 
-        // CORRECCIÓN: El KeySystem debe ser el de la llave de transporte (la que descifra), no el de la llave de destino.
-        val npTransportKeySystem = mapToNewposKeySystem(transportKeyType, keyAlgorithm)
+        // FIX: Usar transportKeyAlgorithm si está disponible, sino usar keyAlgorithm como fallback
+        val effectiveTransportAlgorithm = transportKeyAlgorithm ?: keyAlgorithm
+
+        // Logging para debugging
+        Log.d(TAG, "=== KeySystem Selection ===")
+        Log.d(TAG, "Transport Key Algorithm: $effectiveTransportAlgorithm")
+        Log.d(TAG, "Destination Key Algorithm: $keyAlgorithm")
+
+        val npTransportKeySystem = mapToNewposKeySystem(transportKeyType, effectiveTransportAlgorithm)
         val npDestKeyType = mapToNewposKeyType(keyType)
             ?: throw PedKeyException("Unsupported destination key type for KeyType mapping: $keyType")
 
-        val npKcvMode = if (keyData.kcv != null) Ped.KEY_VERIFY_KVC else Ped.KEY_VERIFY_NONE
-        if (keyData.kcv != null) Log.d(TAG, "KCV check enabled (NewPOS internal check).")
+        Log.d(TAG, "Selected KeySystem: $npTransportKeySystem")
+        Log.d(TAG, "========================")
 
         try {
             Log.d(TAG, "Calling writeKey: TransportKS=$npTransportKeySystem, DestKT=$npDestKeyType, MKeyIdx=$transportKeyIndex, DestKeyIdx=$keyIndex")
             val result = pedInstance.writeKey(
-                npTransportKeySystem, // Se usa el KeySystem de la llave de transporte
+                npTransportKeySystem, // Usa el KeySystem correcto de la llave de transporte
                 npDestKeyType,
                 transportKeyIndex,
                 keyIndex,
-                npKcvMode,
+                Ped.KEY_VERIFY_NONE,
                 keyData.keyBytes
             )
             if (result != 0) {
-                // Agregar el código de error al mensaje de la excepción es útil para depurar
                 throw PedKeyException("Failed to write key (encrypted). NewPOS Error Code: $result")
             }
             return true

@@ -24,7 +24,8 @@ interface IPedController {
         keyAlgorithm: KeyAlgorithm, // <<< AÑADIDO: Algoritmo de la llave que se está cargando
         keyData: PedKeyData,
         transportKeyIndex: Int? = null,
-        transportKeyType: KeyType? = null
+        transportKeyType: KeyType? = null,
+        transportKeyAlgorithm: KeyAlgorithm? = null // <<< AÑADIDO: Algoritmo de la llave de transporte/KTK
     ): Boolean
 
     @Throws(PedException::class)

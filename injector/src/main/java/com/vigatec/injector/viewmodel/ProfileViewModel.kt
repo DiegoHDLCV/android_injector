@@ -18,6 +18,8 @@ data class ProfilesScreenState(
     val profiles: List<ProfileEntity> = emptyList(),
     val filteredProfiles: List<ProfileEntity> = emptyList(),
     val availableKeys: List<InjectedKeyEntity> = emptyList(),
+    val compatibleKeys: List<InjectedKeyEntity> = emptyList(), // Llaves filtradas por compatibilidad KTK
+    val ktkCompatibilityWarning: String? = null, // Advertencia de compatibilidad KTK
     val isLoading: Boolean = true,
     val selectedProfile: ProfileEntity? = null,
     val showCreateModal: Boolean = false,
@@ -106,7 +108,7 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             // Obtener la KTK activa del almacén (KEK_TRANSPORT, no KEK_STORAGE)
             val currentKTK = injectedKeyRepository.getCurrentKTK()
-            
+
             val formData = if (profile != null) {
                 ProfileFormData(
                     id = profile.id,
@@ -124,7 +126,60 @@ class ProfileViewModel @Inject constructor(
                     selectedKTKKcv = currentKTK?.kcv ?: "" // Auto-seleccionar KTK activa si existe
                 )
             }
+
+            // Filtrar llaves compatibles y generar advertencia si aplica
+            updateCompatibleKeys(currentKTK)
+
             _state.value = _state.value.copy(showCreateModal = true, selectedProfile = profile, formData = formData)
+        }
+    }
+
+    /**
+     * Filtra las llaves disponibles según compatibilidad con la KTK seleccionada.
+     * Si KTK es 3DES → solo llaves 3DES (writeKey() solo soporta 3DES)
+     * Si KTK es AES → advertir que writeKey() no soporta AES
+     */
+    private fun updateCompatibleKeys(currentKTK: InjectedKeyEntity?) {
+        val allKeys = _state.value.availableKeys
+
+        if (currentKTK == null || !_state.value.formData.useKTK) {
+            // Sin KTK, mostrar todas las llaves
+            _state.value = _state.value.copy(
+                compatibleKeys = allKeys,
+                ktkCompatibilityWarning = null
+            )
+            return
+        }
+
+        val ktkAlgorithm = currentKTK.keyAlgorithm
+
+        when {
+            // KTK es 3DES → solo mostrar llaves 3DES
+            ktkAlgorithm.contains("DES", ignoreCase = true) -> {
+                val compatibleKeys = allKeys.filter { key ->
+                    key.keyAlgorithm.contains("DES", ignoreCase = true)
+                }
+                _state.value = _state.value.copy(
+                    compatibleKeys = compatibleKeys,
+                    ktkCompatibilityWarning = "⚠️ KTK 3DES seleccionada: Solo se mostrarán llaves 3DES compatibles con writeKey()"
+                )
+            }
+
+            // KTK es AES → advertir que writeKey() no soporta AES
+            ktkAlgorithm.contains("AES", ignoreCase = true) -> {
+                _state.value = _state.value.copy(
+                    compatibleKeys = emptyList(),
+                    ktkCompatibilityWarning = "❌ KTK AES no soportada: El método writeKey() solo acepta 3DES. Para inyectar llaves AES, necesitas usar DUKPT (requiere implementación futura)"
+                )
+            }
+
+            // Otros algoritmos → mostrar todas
+            else -> {
+                _state.value = _state.value.copy(
+                    compatibleKeys = allKeys,
+                    ktkCompatibilityWarning = "⚠️ Algoritmo KTK desconocido: ${ktkAlgorithm}. Verifica compatibilidad manualmente."
+                )
+            }
         }
     }
 

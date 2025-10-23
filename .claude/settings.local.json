@@ -4,7 +4,8 @@
       "Bash(git commit:*)",
       "Bash(./gradlew :injector:compileDebugKotlin:*)",
       "Bash(./gradlew:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Read(//Users/diegoherreradelacalle/Library/CloudStorage/OneDrive-VIGATECS.A/Respaldos/Respaldo MAC/PROYECTOS/Vigatec/ANDROID/MARCAS POS/NEWPOS/asmart_api_doc/**)"
     ],
     "deny": [],
     "ask": []

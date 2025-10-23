@@ -141,7 +141,8 @@ class UrovoPedController(private val context: Context) : IPedController {
         keyAlgorithm: GenericKeyAlgorithm, // Algoritmo de la nueva llave
         keyData: PedKeyData, // Datos de la nueva llave (cifrada) y su KCV (en claro)
         transportKeyIndex: Int?, // Índice de la llave que cifra (mkId o tekId)
-        transportKeyType: GenericKeyType? // Tipo de la llave que cifra
+        transportKeyType: GenericKeyType?, // Tipo de la llave que cifra
+        transportKeyAlgorithm: GenericKeyAlgorithm? // Nuevo parámetro (no usado en Urovo)
     ): Boolean {
         if (transportKeyIndex == null || transportKeyType == null) {
             throw PedKeyException("La carga de llaves cifradas requiere transportKeyIndex y transportKeyType")

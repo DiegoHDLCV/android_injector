@@ -110,7 +110,8 @@ fun ProfilesScreen(
     if (state.showCreateModal) {
         CreateProfileModal(
             formData = state.formData,
-            availableKeys = state.availableKeys,
+            availableKeys = state.compatibleKeys, // Usar llaves compatibles en lugar de todas
+            ktkCompatibilityWarning = state.ktkCompatibilityWarning, // Pasar advertencia
             onDismiss = { viewModel.onDismissCreateModal() },
             onSave = { viewModel.onSaveProfile() },
             onFormDataChange = { viewModel.onFormDataChange(it) },
@@ -909,6 +910,7 @@ fun deriveUsageFromKeyType(keyType: String): String {
 fun CreateProfileModal(
     formData: ProfileFormData,
     availableKeys: List<InjectedKeyEntity>,
+    ktkCompatibilityWarning: String? = null, // Advertencia de compatibilidad KTK
     onDismiss: () -> Unit,
     onSave: () -> Unit,
     onFormDataChange: (ProfileFormData) -> Unit,
@@ -1224,6 +1226,45 @@ fun CreateProfileModal(
                             }
                         }
 
+                        // Mostrar advertencia de compatibilidad KTK si existe
+                        if (ktkCompatibilityWarning != null) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (ktkCompatibilityWarning.startsWith("❌")) {
+                                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                                    } else {
+                                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                                    }
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (ktkCompatibilityWarning.startsWith("❌")) {
+                                            Icons.Default.Error
+                                        } else {
+                                            Icons.Default.Warning
+                                        },
+                                        contentDescription = null,
+                                        tint = if (ktkCompatibilityWarning.startsWith("❌")) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.tertiary
+                                        }
+                                    )
+                                    Text(
+                                        text = ktkCompatibilityWarning,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+
                         if (formData.keyConfigurations.isEmpty()) {
                             Text(
                                 "No hay llaves configuradas.",
@@ -1298,10 +1339,57 @@ fun KeyConfigurationItem(
     // Estados UI
     var keyTypeExpanded by rememberSaveable { mutableStateOf(false) }
     var keyExpanded by rememberSaveable { mutableStateOf(false) }
+    var isExpanded by rememberSaveable { mutableStateOf(false) } // Iniciar contraídas
 
     // Derivados
     val isKeySelected = remember(config.selectedKey) { config.selectedKey.isNotBlank() }
     val headline = remember(config) { "Config. ${config.id}" }
+    
+    // Encontrar la llave seleccionada para obtener su algoritmo
+    val selectedKeyEntity = remember(config.selectedKey, availableKeys) {
+        availableKeys.find { it.kcv == config.selectedKey }
+    }
+    
+    // Resumen compacto para estado colapsado
+    val compactSummary = remember(config, selectedKeyEntity) {
+        buildString {
+            if (config.keyType.isNotBlank()) {
+                append("Tipo: ${config.keyType}")
+            }
+            if (config.slot.isNotBlank()) {
+                if (isNotEmpty()) append(" • ")
+                append("Slot: ${config.slot}")
+            }
+            if (config.selectedKey.isNotBlank()) {
+                if (isNotEmpty()) append(" • ")
+                append("KCV: ${config.selectedKey.take(6)}...")
+                // Agregar algoritmo si está disponible
+                selectedKeyEntity?.keyAlgorithm?.let { algorithm ->
+                    append(" (${algorithm})")
+                }
+            }
+            if (isEmpty()) {
+                append("Configuración nueva")
+            }
+        }
+    }
+    
+    // Indicador de estado de validación
+    val hasRequiredData = config.keyType.isNotBlank() && config.slot.isNotBlank() && config.selectedKey.isNotBlank()
+    val isDukptKey = config.keyType.contains("DUKPT", ignoreCase = true)
+    val isDukptValid = !isDukptKey || config.ksn.length == 20
+    val isFullyValid = hasRequiredData && isDukptValid
+    
+    // Valor a mostrar en el campo de texto (KCV + algoritmo)
+    val displayValue = remember(config.selectedKey, selectedKeyEntity) {
+        if (config.selectedKey.isBlank()) {
+            ""
+        } else {
+            selectedKeyEntity?.let { key ->
+                "${key.kcv} (${key.keyAlgorithm})"
+            } ?: config.selectedKey
+        }
+    }
 
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -1313,7 +1401,7 @@ fun KeyConfigurationItem(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            // ===== Header compacto con meta + eliminar =====
+            // ===== Header compacto con meta + controles =====
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1322,59 +1410,101 @@ fun KeyConfigurationItem(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(MaterialTheme.colorScheme.primaryContainer),
+                            .background(
+                                if (isFullyValid) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(getKeyTypeIcon(config.keyType), fontSize = 18.sp)
                     }
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Configuración de llave",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            // Indicador de estado
+                            if (!isFullyValid) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.error)
+                                )
+                            }
+                        }
+                        // Resumen compacto
                         Text(
-                            text = "Configuración de llave",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        // Meta en una línea
-                        Text(
-                            text = buildString {
-                                append(headline)
-                                append(" • Tipo: ${config.keyType.ifBlank { "—" }}")
-                                append(" • Slot: ${config.slot.ifBlank { "—" }}")
-                            },
+                            text = if (isExpanded) headline else compactSummary,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (isFullyValid) MaterialTheme.colorScheme.onSurfaceVariant 
+                                   else MaterialTheme.colorScheme.error,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                CompositionLocalProvider(LocalMinimumTouchTargetEnforcement provides false) {
-                    IconButton(
-                        onClick = onRemove,
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Eliminar configuración",
-                            tint = MaterialTheme.colorScheme.error
-                        )
+                // Botones de control
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Botón expandir/colapsar
+                    CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
+                        IconButton(
+                            onClick = { isExpanded = !isExpanded },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                contentDescription = if (isExpanded) "Colapsar" else "Expandir",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    
+                    // Botón eliminar
+                    CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
+                        IconButton(
+                            onClick = onRemove,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Eliminar configuración",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
                 }
             }
 
-            // ===== Layout responsive (1 o 2 columnas según ancho) =====
-            val configuration = LocalConfiguration.current
-            val isWide = configuration.screenWidthDp.dp >= 600.dp
-            val fieldSpacing = 10.dp
+            // ===== Contenido colapsable =====
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                // ===== Layout responsive (1 o 2 columnas según ancho) =====
+                val configuration = LocalConfiguration.current
+                val isWide = configuration.screenWidthDp.dp >= 600.dp
+                val fieldSpacing = 10.dp
 
-            if (isWide) {
+                if (isWide) {
                 // 2 columnas: reduce scroll vertical y la percepción de "modal chico"
                 Row(horizontalArrangement = Arrangement.spacedBy(fieldSpacing)) {
                     Column(
@@ -1524,7 +1654,7 @@ fun KeyConfigurationItem(
                         onExpandedChange = { keyExpanded = !keyExpanded }
                     ) {
                         OutlinedTextField(
-                            value = config.selectedKey,
+                            value = displayValue,
                             onValueChange = {}, // no editable
                             readOnly = true,
                             label = { Text("Llave seleccionada (KCV)") },
@@ -1574,7 +1704,7 @@ fun KeyConfigurationItem(
                                                         fontFamily = FontFamily.Monospace
                                                     )
                                                     Text(
-                                                        "ID: ${key.id}",
+                                                        "${key.keyAlgorithm} • ID: ${key.id}",
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
@@ -1725,7 +1855,7 @@ fun KeyConfigurationItem(
                         onExpandedChange = { keyExpanded = !keyExpanded }
                     ) {
                         OutlinedTextField(
-                            value = config.selectedKey,
+                            value = displayValue,
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Llave seleccionada (KCV)") },
@@ -1769,7 +1899,7 @@ fun KeyConfigurationItem(
                                                         fontFamily = FontFamily.Monospace
                                                     )
                                                     Text(
-                                                        "ID: ${key.id}",
+                                                        "${key.keyAlgorithm} • ID: ${key.id}",
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
@@ -1790,6 +1920,7 @@ fun KeyConfigurationItem(
                         }
                     }
                 }
+            }
             }
         }
     }

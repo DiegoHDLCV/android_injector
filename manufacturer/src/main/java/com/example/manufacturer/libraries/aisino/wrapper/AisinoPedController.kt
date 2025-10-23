@@ -217,7 +217,8 @@ class AisinoPedController(private val application: Application) : IPedController
         keyAlgorithm: GenericKeyAlgorithm,
         keyData: PedKeyData,
         transportKeyIndex: Int?,
-        transportKeyType: GenericKeyType?
+        transportKeyType: GenericKeyType?,
+        transportKeyAlgorithm: GenericKeyAlgorithm? // Nuevo parámetro (no usado en Aisino)
     ): Boolean = withContext(Dispatchers.IO) {
         Log.i(TAG, "--- Starting writeKey (for encrypted key) ---")
         Log.d(TAG, "Attempting to write an encrypted key with the following parameters:")

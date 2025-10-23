@@ -583,6 +583,15 @@ class MainViewModel @Inject constructor(
                     if (ktkFromDb == null) throw PedKeyException("KTK pre-cargada en slot $validKtkSlot no encontrada.")
                     if (!ktkFromDb.kcv.take(4).equals(command.ktkChecksum.take(4), ignoreCase = true)) throw PedKeyException("El KCV de la KTK en BD ('${ktkFromDb.kcv.take(4)}') no coincide con el del comando ('${command.ktkChecksum.take(4)}').")
 
+                    // Obtener algoritmo de la KTK
+                    val ktkAlgorithm = try {
+                        KeyAlgorithm.valueOf(ktkFromDb.keyAlgorithm)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "No se pudo obtener algoritmo de KTK: ${ktkFromDb.keyAlgorithm}, usando genérico como fallback")
+                        genericAlgorithm  // Fallback al algoritmo de la llave destino
+                    }
+                    Log.d(TAG, "Algoritmo de KTK: $ktkAlgorithm")
+
                     val encryptedKeyBytes = command.keyHex.hexToByteArray()
 
                     when (genericKeyType) {
@@ -601,7 +610,8 @@ class MainViewModel @Inject constructor(
                                 keyAlgorithm = genericAlgorithm,
                                 keyData = keyData,
                                 transportKeyIndex = validKtkSlot,
-                                transportKeyType = GenericKeyType.TRANSPORT_KEY
+                                transportKeyType = GenericKeyType.TRANSPORT_KEY,
+                                transportKeyAlgorithm = ktkAlgorithm  // Pasar algoritmo de KTK
                             )
                         }
                         else -> {
@@ -631,6 +641,15 @@ class MainViewModel @Inject constructor(
                     Log.d(TAG, "  - KCV: ${ktkFromDb.kcv}")
                     Log.d(TAG, "  - Algoritmo: ${ktkFromDb.keyAlgorithm}")
 
+                    // Obtener el algoritmo de la KTK para pasarlo al PED
+                    val ktkAlgorithm = try {
+                        KeyAlgorithm.valueOf(ktkFromDb.keyAlgorithm)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "No se pudo obtener algoritmo de KTK: ${ktkFromDb.keyAlgorithm}, usando genérico como fallback")
+                        genericAlgorithm
+                    }
+                    Log.d(TAG, "Algoritmo de KTK: $ktkAlgorithm")
+
                     // Validar que el KCV de la KTK coincida con el esperado
                     if (!ktkFromDb.kcv.take(4).equals(command.ktkChecksum.take(4), ignoreCase = true)) {
                         throw PedKeyException("El KCV de la KTK en BD ('${ktkFromDb.kcv.take(4)}') no coincide con el esperado en el comando ('${command.ktkChecksum.take(4)}')")
@@ -656,7 +675,8 @@ class MainViewModel @Inject constructor(
                             kcv = command.keyChecksum.hexToByteArray()         // KCV de la llave descifrada
                         ),
                         transportKeyIndex = validKtkSlot02,                    // Slot de la KTK
-                        transportKeyType = GenericKeyType.TRANSPORT_KEY        // Tipo: Transport Key
+                        transportKeyType = GenericKeyType.TRANSPORT_KEY,       // Tipo: Transport Key
+                        transportKeyAlgorithm = ktkAlgorithm                   // Algoritmo de KTK
                     )
 
                     Log.d(TAG, "✓ Llave cifrada inyectada exitosamente en slot ${command.keySlot} usando descifrado por hardware")
