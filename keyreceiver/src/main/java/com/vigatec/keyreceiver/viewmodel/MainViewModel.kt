@@ -610,7 +610,7 @@ class MainViewModel @Inject constructor(
                     }
                 }
                 "02" -> {
-                    Log.d(TAG, "Manejando EncryptionType 02: Llave cifrada con KTK (KTK ya inyectada)")
+                    Log.d(TAG, "Manejando EncryptionType 02: Llave cifrada con KTK (inyección segura por hardware)")
 
                     // DEFENSIVO: Validar slot de KTK
                     var validKtkSlot02 = command.ktkSlot
@@ -619,11 +619,8 @@ class MainViewModel @Inject constructor(
                         validKtkSlot02 = 0
                     }
 
-                    // La KTK ya debe estar inyectada en el dispositivo (slot validKtkSlot02)
-                    // Necesitamos descifrar la llave usando la KTK
-                    Log.d(TAG, "Descifrando llave con KTK en slot $validKtkSlot02")
-
-                    // Obtener la KTK de la base de datos para descifrar
+                    // Obtener la KTK de la base de datos SOLO para validar el KCV
+                    // La llave NO será descifrada en software - el PED lo hará por hardware
                     val ktkFromDb = injectedKeyRepository.getKeyBySlotAndType(validKtkSlot02, GenericKeyType.TRANSPORT_KEY.name)
                     if (ktkFromDb == null) {
                         throw PedKeyException("KTK no encontrada en slot $validKtkSlot02. Debe inyectarse primero.")
@@ -633,43 +630,36 @@ class MainViewModel @Inject constructor(
                     Log.d(TAG, "  - Slot: ${ktkFromDb.keySlot}")
                     Log.d(TAG, "  - KCV: ${ktkFromDb.kcv}")
                     Log.d(TAG, "  - Algoritmo: ${ktkFromDb.keyAlgorithm}")
-                    
-                    Log.d(TAG, "=== DIAGNÓSTICO DE DESCIFRADO ===")
-                    Log.d(TAG, "KTK usada para descifrar:")
-                    Log.d(TAG, "  - Datos KTK: ${ktkFromDb.keyData.take(32)}...")
-                    Log.d(TAG, "Llave a descifrar:")
-                    Log.d(TAG, "  - Datos cifrados: ${command.keyHex}")
-                    Log.d(TAG, "  - KCV esperado: ${command.keyChecksum}")
-                    Log.d(TAG, "  - KtkChecksum: ${command.ktkChecksum}")
 
-                    // Descifrar la llave con la KTK
-                    val originalKeyLengthBytes = when (genericAlgorithm) {
-                        KeyAlgorithm.AES_192 -> 24
-                        KeyAlgorithm.AES_256 -> 32
-                        KeyAlgorithm.DES_TRIPLE -> 24
-                        KeyAlgorithm.DES_DOUBLE -> 16
-                        else -> 16 // Fallback seguro
+                    // Validar que el KCV de la KTK coincida con el esperado
+                    if (!ktkFromDb.kcv.take(4).equals(command.ktkChecksum.take(4), ignoreCase = true)) {
+                        throw PedKeyException("El KCV de la KTK en BD ('${ktkFromDb.kcv.take(4)}') no coincide con el esperado en el comando ('${command.ktkChecksum.take(4)}')")
                     }
 
-                    val decryptedKeyHex = com.vigatec.utils.TripleDESCrypto.decryptKeyAfterTransmission(
-                        encryptedKeyData = command.keyHex,
-                        kekData = ktkFromDb.keyData,
-                        expectedKcv = command.keyChecksum,
-                        originalKeyLengthBytes = originalKeyLengthBytes,
-                        algorithmType = genericAlgorithm.name
-                    )
-                    Log.d(TAG, "Llave descifrada exitosamente")
-                    Log.d(TAG, "  - Longitud: ${decryptedKeyHex.length / 2} bytes")
+                    Log.d(TAG, "=== INYECCIÓN SEGURA POR HARDWARE ===")
+                    Log.d(TAG, "Llave cifrada (nunca se descifra en software):")
+                    Log.d(TAG, "  - Datos cifrados: ${command.keyHex}")
                     Log.d(TAG, "  - KCV esperado: ${command.keyChecksum}")
+                    Log.d(TAG, "  - Slot KTK: $validKtkSlot02")
+                    Log.d(TAG, "  - KCV KTK: ${command.ktkChecksum}")
+                    Log.d(TAG, "El PED descifrará la llave usando la KTK del slot $validKtkSlot02")
 
-                    // Inyectar la llave descifrada en el dispositivo
-                    pedController!!.writeKeyPlain(
-                        command.keySlot,
-                        genericKeyType,
-                        genericAlgorithm,
-                        decryptedKeyHex.hexToByteArray(),
-                        command.keyChecksum.hexToByteArray()
+                    // ⭐ INYECCIÓN SEGURA: La llave se envía CIFRADA al PED
+                    // El descifrado ocurre dentro del HSM/PED usando la KTK ya inyectada
+                    // La llave NUNCA está en claro en la memoria de la aplicación
+                    pedController!!.writeKey(
+                        keyIndex = command.keySlot,
+                        keyType = genericKeyType,
+                        keyAlgorithm = genericAlgorithm,
+                        keyData = PedKeyData(
+                            keyBytes = command.keyHex.hexToByteArray(),        // Llave CIFRADA
+                            kcv = command.keyChecksum.hexToByteArray()         // KCV de la llave descifrada
+                        ),
+                        transportKeyIndex = validKtkSlot02,                    // Slot de la KTK
+                        transportKeyType = GenericKeyType.TRANSPORT_KEY        // Tipo: Transport Key
                     )
+
+                    Log.d(TAG, "✓ Llave cifrada inyectada exitosamente en slot ${command.keySlot} usando descifrado por hardware")
                 }
                 else -> throw PedKeyException("Tipo de encriptación '${command.encryptionType}' no soportado.")
             }
