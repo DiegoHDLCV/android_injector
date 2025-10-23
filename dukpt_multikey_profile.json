@@ -1,0 +1,33 @@
+{
+  "name": "DUKPT Multi-Algorithm Test",
+  "description": "Perfil con llaves DUKPT AES-128/192/256 para pruebas",
+  "applicationType": "Retail",
+  "useKEK": false,
+  "selectedKEKKcv": "",
+  "keyConfigurations": [
+    {
+      "usage": "DUKPT",
+      "keyType": "DUKPT Initial Key (IPEK)",
+      "slot": "01",
+      "selectedKey": "072043",
+      "injectionMethod": "auto",
+      "ksn": "FFFF9876543210000000"
+    },
+    {
+      "usage": "DUKPT",
+      "keyType": "DUKPT Initial Key (IPEK)",
+      "slot": "02",
+      "selectedKey": "5D614B",
+      "injectionMethod": "auto",
+      "ksn": "FFFF9876543210000001"
+    },
+    {
+      "usage": "DUKPT",
+      "keyType": "DUKPT Initial Key (IPEK)",
+      "slot": "03",
+      "selectedKey": "AB1234",
+      "injectionMethod": "auto",
+      "ksn": "FFFF9876543210000002"
+    }
+  ]
+}
