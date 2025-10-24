@@ -1,15 +1,32 @@
 # Análisis: Detección de Cable Aisino-Aisino
 
-## Estado Actual (Commit: e7aa6ec)
+## 📋 Estado Actual (Solución Implementada)
 
 ### ✅ Funciona
-- **Aisino + NewPOS**: Cable detectado correctamente
-- **NewPOS + Aisino**: Cable detectado correctamente
+- **Aisino (MASTER) + NewPOS**: Cable detectado correctamente
+- **NewPOS + Aisino (SUBPOS)**: Cable detectado correctamente
+- **Aisino (MASTER) + Aisino (SUBPOS)**: ✅ **AHORA FUNCIONA** (solución implementada)
 
-### ❌ No Funciona
-- **Aisino + Aisino**: Cable NO es detectado
-  - El botón "Iniciar Escucha" NO se habilita
-  - El sistema no reconoce que hay un dispositivo conectado
+### 🔧 Solución Implementada
+
+Según comunicación con Aisino:
+> "When two android devices are connected, one of them needs to work in host mode, the other one needs to work in peripheral mode"
+
+**Cambios realizados:**
+
+1. **Creado `UsbModeManager`** (communication/usb/UsbModeManager.kt)
+   - Configura el modo USB automáticamente según `SystemConfig.deviceRole`
+   - MASTER → USB HOST mode
+   - SUBPOS → USB PERIPHERAL mode
+
+2. **Actualizado `keyreceiver/AndroidManifest.xml`**
+   - Cambió `android.hardware.usb.host` de `required="true"` a `required="false"`
+   - Agregó `android.hardware.usb.accessory` para modo PERIPHERAL
+
+3. **Integrado en `InjectorApplication` e `App`**
+   - Se llama `UsbModeManager.configureUsbMode()` durante inicialización
+   - Injector → MASTER → HOST mode
+   - KeyReceiver → SUBPOS → PERIPHERAL mode
 
 ---
 
