@@ -7,7 +7,12 @@
       "Bash(git add:*)",
       "Read(//Users/diegoherreradelacalle/Library/CloudStorage/OneDrive-VIGATECS.A/Respaldos/Respaldo MAC/PROYECTOS/Vigatec/ANDROID/MARCAS POS/NEWPOS/asmart_api_doc/**)",
       "Bash(python3:*)",
-      "Read(//Users/diegoherreradelacalle/StudioProjects/**)"
+      "Read(//Users/diegoherreradelacalle/StudioProjects/**)",
+      "Bash(awk '{print $9, \"\"\"\"(\"\"\"\" $5 \"\"\"\")\"\"\"\"}')",
+      "Read(//Users/diegoherreradelacalle/Library/CloudStorage/OneDrive-VIGATECS.A/Respaldos/**)",
+      "Bash(find:*)",
+      "Bash(/dev/null)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

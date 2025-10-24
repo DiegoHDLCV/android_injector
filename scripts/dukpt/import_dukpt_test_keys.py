@@ -106,8 +106,12 @@ def main():
     # Generar archivo de llaves
     test_keys = create_test_keys_file()
 
-    # Guardar a archivo
-    output_filename = "test_keys_dukpt.json"
+    # Guardar a archivo en data/dukpt/keys/
+    import os
+    output_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'dukpt', 'keys')
+    os.makedirs(output_dir, exist_ok=True)
+    output_filename = os.path.join(output_dir, "test_keys_dukpt.json")
+
     with open(output_filename, 'w') as f:
         json.dump(test_keys, f, indent=2)
 

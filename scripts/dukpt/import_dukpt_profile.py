@@ -175,51 +175,58 @@ def main():
     print("=" * 80)
     print()
 
+    # Crear directorio de salida
+    import os
+    output_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'dukpt', 'profiles')
+    os.makedirs(output_dir, exist_ok=True)
+
     # Generar perfil simple
     print("1️⃣  Generando perfil simple (AES-128)...")
     simple_profile = create_dukpt_profile()
-    simple_filename = "dukpt_test_profile.json"
+    simple_filename = os.path.join(output_dir, "dukpt_test_profile.json")
     with open(simple_filename, 'w') as f:
         json.dump(simple_profile, f, indent=2)
-    print(f"   ✅ {simple_filename}")
+    print(f"   ✅ dukpt_test_profile.json")
     print()
 
     # Generar perfil multi-key
     print("2️⃣  Generando perfil multi-key (AES-128/192/256 + 3DES)...")
     multi_profile = create_dukpt_profile_multikey()
-    multi_filename = "dukpt_multikey_profile.json"
+    multi_filename = os.path.join(output_dir, "dukpt_multikey_profile.json")
     with open(multi_filename, 'w') as f:
         json.dump(multi_profile, f, indent=2)
-    print(f"   ✅ {multi_filename}")
+    print(f"   ✅ dukpt_multikey_profile.json")
     print()
 
     # Generar perfil 2TDEA
     print("3️⃣  Generando perfil 2TDEA (TripleDES Double-length)...")
     tdea2_profile = create_dukpt_profile_2tdea()
-    tdea2_filename = "dukpt_2tdea_profile.json"
+    tdea2_filename = os.path.join(output_dir, "dukpt_2tdea_profile.json")
     with open(tdea2_filename, 'w') as f:
         json.dump(tdea2_profile, f, indent=2)
-    print(f"   ✅ {tdea2_filename}")
+    print(f"   ✅ dukpt_2tdea_profile.json")
     print()
 
     # Generar perfil 3TDEA
     print("4️⃣  Generando perfil 3TDEA (TripleDES Triple-length)...")
     tdea3_profile = create_dukpt_profile_3tdea()
-    tdea3_filename = "dukpt_3tdea_profile.json"
+    tdea3_filename = os.path.join(output_dir, "dukpt_3tdea_profile.json")
     with open(tdea3_filename, 'w') as f:
         json.dump(tdea3_profile, f, indent=2)
-    print(f"   ✅ {tdea3_filename}")
+    print(f"   ✅ dukpt_3tdea_profile.json")
     print()
 
     print("=" * 80)
     print("📱 INSTRUCCIONES DE IMPORTACIÓN:")
     print("=" * 80)
     print()
+    print("Archivos generados en:", output_dir)
+    print()
     print("OPCIÓN 1: Perfil Simple AES-128 (recomendado para primera prueba)")
     print("-" * 80)
     print("1. Abre la app Injector")
     print("2. Ve a: Profiles > Import Profile")
-    print("3. Selecciona:", simple_filename)
+    print("3. Selecciona: data/dukpt/profiles/dukpt_test_profile.json")
     print("4. El perfil se importará y estará listo para usar")
     print()
 
@@ -227,7 +234,7 @@ def main():
     print("-" * 80)
     print("1. Abre la app Injector")
     print("2. Ve a: Profiles > Import Profile")
-    print("3. Selecciona:", multi_filename)
+    print("3. Selecciona: data/dukpt/profiles/dukpt_multikey_profile.json")
     print("4. Permite probar 5 algoritmos diferentes en la misma prueba")
     print()
 
@@ -235,7 +242,7 @@ def main():
     print("-" * 80)
     print("1. Abre la app Injector")
     print("2. Ve a: Profiles > Import Profile")
-    print("3. Selecciona:", tdea2_filename)
+    print("3. Selecciona: data/dukpt/profiles/dukpt_2tdea_profile.json")
     print("4. Para pruebas aisladas de 3DES Double-length")
     print()
 
@@ -243,7 +250,7 @@ def main():
     print("-" * 80)
     print("1. Abre la app Injector")
     print("2. Ve a: Profiles > Import Profile")
-    print("3. Selecciona:", tdea3_filename)
+    print("3. Selecciona: data/dukpt/profiles/dukpt_3tdea_profile.json")
     print("4. Para pruebas aisladas de 3DES Triple-length")
     print()
 
@@ -252,12 +259,12 @@ def main():
     print("=" * 80)
     print()
     print("1. ✅ Importar las llaves primero:")
-    print("   - Ejecuta: python3 import_dukpt_test_keys.py")
-    print("   - Importa el archivo test_keys_dukpt.json en Injector")
+    print("   - Ejecuta: python3 scripts/dukpt/import_dukpt_test_keys.py")
+    print("   - Importa el archivo data/dukpt/keys/test_keys_dukpt.json en Injector")
     print()
     print("2. ✅ Luego importar el perfil:")
     print("   - Ejecuta este script")
-    print("   - Importa el archivo de perfil en Injector")
+    print("   - Importa el archivo de perfil en Injector (data/dukpt/profiles/)")
     print()
     print("3. ✅ Finalmente, probar la inyección:")
     print("   - Abre KeyReceiver y conecta cable USB")
