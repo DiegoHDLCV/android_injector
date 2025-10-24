@@ -86,19 +86,14 @@ object AisinoCommunicationManager : ICommunicationManager {
 
     private fun autoScanPortsAndBauds() {
         if (scanning) {
-            Log.w(TAG, "AutoScan: ya en progreso, se omite")
             return
         }
         scanning = true
         try {
             val ports = com.example.config.SystemConfig.aisinoCandidatePorts
             val bauds = com.example.config.SystemConfig.aisinoCandidateBauds
-            Log.i(TAG, "AutoScan: probando puertos $ports con baudios $bauds")
 
-            // Intentar encontrar todos los puertos disponibles
-            Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
-            Log.i(TAG, "║ ENUMERACIÓN DE PUERTOS DISPONIBLES")
-            Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
+            // Intentar encontrar todos los puertos disponibles (sin logs por puerto)
             val availablePorts = mutableListOf<Int>()
             for (portNum in 0..15) {
                 try {
@@ -111,21 +106,17 @@ object AisinoCommunicationManager : ICommunicationManager {
                     val openRes = testController.open()
                     if (openRes == 0) {
                         availablePorts.add(portNum)
-                        Log.i(TAG, "║ ✓ Puerto $portNum está disponible")
                         testController.close()
                     }
                 } catch (e: Exception) {
                     // Puerto no disponible, continuar
                 }
             }
-            Log.i(TAG, "║ Puertos disponibles encontrados: $availablePorts")
-            Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
+
             for (p in ports) {
                 for (b in bauds) {
                     try {
-                        // Crear controlador temporal
                         val temp = AisinoComController(comport = p)
-                        // Config init
                         temp.init(
                             when (b) {
                                 115200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_115200
@@ -142,33 +133,29 @@ object AisinoCommunicationManager : ICommunicationManager {
                         )
                         val openRes = temp.open()
                         if (openRes != 0) {
-                            Log.w(TAG, "AutoScan: open fallo para puerto $p baud $b (code=$openRes)")
                             continue
                         }
                         // Intento de lectura rápida
                         val buf = ByteArray(16)
                         val read = temp.readData(16, buf, 200)
-                        val hex = buf.take(if (read>0) read else 0).joinToString(" ") { "%02X".format(it) }
-                        Log.d(TAG, "AutoScan: puerto $p baud $b read=$read data=$hex")
                         // Criterio de selección: éxito de open; si recibe >0 bytes mejor
                         if (read > 0) {
-                            Log.i(TAG, "AutoScan: seleccionando puerto $p baud $b (datos recibidos)")
+                            Log.i(TAG, "AutoScan: seleccionó puerto $p @ ${b}bps (datos recibidos)")
                             selectedPort = p
                             selectedBaud = b
                             temp.close()
                             return
                         } else if (selectedPort == DEFAULT_AISINO_COMPORT) {
-                            // Fallback temporal si aún no elegimos puerto que lea algo
                             selectedPort = p
                             selectedBaud = b
                         }
                         temp.close()
                     } catch (e: Exception) {
-                        Log.e(TAG, "AutoScan: excepción puerto $p baud $b", e)
+                        // Silenciar excepciones de scan
                     }
                 }
             }
-            Log.i(TAG, "AutoScan: puerto elegido $selectedPort baud $selectedBaud")
+            Log.d(TAG, "AutoScan: usando puerto $selectedPort @ ${selectedBaud}bps")
         } finally {
             scanning = false
         }

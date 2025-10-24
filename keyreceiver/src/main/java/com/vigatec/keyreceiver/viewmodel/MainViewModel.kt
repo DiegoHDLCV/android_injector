@@ -294,56 +294,31 @@ class MainViewModel @Inject constructor(
                         val newData = "RX [${System.currentTimeMillis()}]: HEX($hexString) ASCII('$receivedString')\n"
                         _rawReceivedData.value += newData
 
-                        Log.v(TAG, "RAW_SERIAL_IN (HEX): $hexString (ASCII: '$receivedString')")
+                        Log.d(TAG, "RX ${bytesRead}B: ${hexString.take(40)}...")
                         CommLog.i(TAG, "RX ${bytesRead}B: $hexString")
 
-                        // ⚠️ CRÍTICO: Enviar datos al parser para procesamiento
-                        Log.i(TAG, "=== PROCESANDO DATOS RECIBIDOS ===")
-                        Log.i(TAG, "Bytes recibidos: ${received.size}")
-                        Log.i(TAG, "Parser configurado: ${messageParser::class.simpleName}")
-                        Log.i(TAG, "Protocolo actual: ${SystemConfig.commProtocolSelected}")
-                        
                         try {
-                            Log.i(TAG, "Enviando datos al parser Futurex...")
                             messageParser.appendData(received)
-                            Log.i(TAG, "✓ Datos enviados al parser")
-                            
-                            // Procesar mensajes parseados
-                            Log.i(TAG, "Intentando parsear mensajes...")
+
                             var parsedMessage = messageParser.nextMessage()
                             var messageCount = 0
-                            
+
                             while (parsedMessage != null) {
                                 messageCount++
-                                Log.i(TAG, "Mensaje parseado #$messageCount: $parsedMessage")
+                                Log.i(TAG, "✓ Mensaje parseado: ${parsedMessage::class.simpleName}")
                                 processParsedCommand(parsedMessage)
                                 parsedMessage = messageParser.nextMessage()
                             }
-                            
-                            if (messageCount == 0) {
-                                Log.i(TAG, "⚠️ No se pudo parsear ningún mensaje completo")
-                            } else {
-                                Log.i(TAG, "✓ Se procesaron $messageCount mensajes")
-                            }
                         } catch (e: Exception) {
-                            Log.e(TAG, "✗ Error procesando datos: ${e.message}", e)
+                            Log.e(TAG, "❌ Error procesando datos: ${e.message}")
                         }
-                        
-                        Log.i(TAG, "================================================")
 
                         _snackbarEvent.emit("Datos recibidos: ${bytesRead} bytes")
                     } else {
                         silentReads++
-                        if (!anyDataEver && silentReads % 5 == 0) {
-                            //Log.i(TAG, "${silentReads} lecturas silenciosas AISINO - intentando re-scan")
-                            CommunicationSDKManager.rescanIfSupported()
-                            comController = CommunicationSDKManager.getComController()
-                            if (comController != null) {
-                                comController!!.init(baudRate, parity, dataBits)
-                                comController!!.open()
-                                //Log.i(TAG, "Re-scan aplicado y puerto reabierto")
-                            }
-                        }
+                        // ⚠️ DESHABILITADO: El re-scan automático cierra/reabre el puerto
+                        // y causa pérdida de datos en comunicación Aisino-to-Aisino
+                        // Solo se hace auto-scan al inicializar, NO durante la escucha
                     }
                 }
             } catch (e: Exception) {

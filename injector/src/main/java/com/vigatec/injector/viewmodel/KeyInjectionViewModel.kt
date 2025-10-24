@@ -79,66 +79,34 @@ class KeyInjectionViewModel @Inject constructor(
     private var currentUsername: String = "system"
 
     init {
-        Log.i(TAG, "=== INICIALIZANDO KEYINJECTIONVIEWMODEL FUTUREX ===")
-        Log.i(TAG, "Configurando manejadores de protocolo...")
+        Log.d(TAG, "Inicializando KeyInjectionViewModel")
         setupProtocolHandlers()
-        
-        Log.i(TAG, "Inicializando servicio de polling...")
-        // La inicialización de SDKs se centraliza en SplashViewModel mediante SDKInitManager
-        // Aquí solo inicializamos PollingService asumiendo SDK ya inicializado
         initializePollingService()
-        
-        Log.i(TAG, "✓ KeyInjectionViewModel inicializado exitosamente")
-        Log.i(TAG, "================================================")
     }
     
     private fun initializePollingService() {
         viewModelScope.launch {
             try {
-                Log.i(TAG, "=== INICIALIZANDO SERVICIO DE POLLING FUTUREX ===")
-                
-                // Inicializar el servicio de polling
-                Log.i(TAG, "Inicializando PollingService...")
                 pollingService.initialize()
-                Log.i(TAG, "✓ PollingService inicializado exitosamente en KeyInjectionViewModel")
-                Log.i(TAG, "================================================")
-                
+                Log.d(TAG, "✓ PollingService inicializado")
             } catch (e: Exception) {
-                Log.e(TAG, "✗ Error al inicializar PollingService", e)
+                Log.e(TAG, "❌ Error al inicializar PollingService", e)
             }
         }
     }
 
     private fun setupProtocolHandlers() {
-        Log.i(TAG, "=== CONFIGURANDO MANEJADORES DE PROTOCOLO FUTUREX ===")
-        Log.i(TAG, "Protocolo de comunicación seleccionado: ${SystemConfig.commProtocolSelected}")
-        
         messageParser = when (SystemConfig.commProtocolSelected) {
-            CommProtocol.LEGACY -> {
-                Log.i(TAG, "Configurando parser para protocolo LEGACY")
-                LegacyMessageParser()
-            }
-            CommProtocol.FUTUREX -> {
-                Log.i(TAG, "Configurando parser para protocolo FUTUREX")
-                FuturexMessageParser()
-            }
+            CommProtocol.LEGACY -> LegacyMessageParser()
+            CommProtocol.FUTUREX -> FuturexMessageParser()
         }
-        
+
         messageFormatter = when (SystemConfig.commProtocolSelected) {
-            CommProtocol.LEGACY -> {
-                Log.i(TAG, "Configurando formatter para protocolo LEGACY")
-                LegacyMessageFormatter
-            }
-            CommProtocol.FUTUREX -> {
-                Log.i(TAG, "Configurando formatter para protocolo FUTUREX")
-                FuturexMessageFormatter
-            }
+            CommProtocol.LEGACY -> LegacyMessageFormatter
+            CommProtocol.FUTUREX -> FuturexMessageFormatter
         }
-        
-        Log.i(TAG, "✓ Protocolo de comunicación establecido en: ${SystemConfig.commProtocolSelected}")
-        Log.i(TAG, "✓ Parser configurado: ${messageParser?.javaClass?.simpleName}")
-        Log.i(TAG, "✓ Formatter configurado: ${messageFormatter?.javaClass?.simpleName}")
-        Log.i(TAG, "================================================")
+
+        Log.d(TAG, "Protocolo: ${SystemConfig.commProtocolSelected}")
     }
 
     fun showInjectionModal(profile: ProfileEntity, username: String = "system") {
@@ -1009,40 +977,29 @@ class KeyInjectionViewModel @Inject constructor(
             throw Exception("Controlador de comunicación no inicializado")
         }
 
-        Log.i(TAG, "=== ENVIANDO DATOS FUTUREX ===")
-        Log.i(TAG, "Tamaño de datos: ${data.size} bytes")
-        Log.i(TAG, "Datos en hexadecimal: ${data.toHexString()}")
-        Log.i(TAG, "Datos en ASCII: ${String(data, Charsets.US_ASCII)}")
-        
         val result = comController!!.write(data, 1000)
         if (result < 0) {
-            Log.e(TAG, "Error al enviar datos: $result")
+            Log.e(TAG, "❌ Error al enviar datos: $result")
             throw Exception("Error al enviar datos: $result")
         }
 
-        Log.i(TAG, "Datos enviados exitosamente: ${result} bytes escritos")
-        Log.i(TAG, "================================================")
+        Log.i(TAG, "✓ Enviados ${result} bytes: ${data.toHexString().take(40)}...")
     }
 
     private suspend fun waitForResponse(): ByteArray {
-        Log.i(TAG, "=== ESPERANDO RESPUESTA FUTUREX ===")
-        Log.i(TAG, "Timeout configurado: 10000ms")
-        
+        Log.i(TAG, "Esperando respuesta (timeout: 10s)...")
+
         val buffer = ByteArray(1024)
         val bytesRead = comController!!.readData(buffer.size, buffer, 10000)
-        
+
         if (bytesRead <= 0) {
-            Log.e(TAG, "Timeout o error al leer respuesta: $bytesRead bytes leídos")
+            Log.e(TAG, "❌ Timeout o error al leer respuesta: $bytesRead bytes leídos")
             throw Exception("Timeout o error al leer respuesta")
         }
 
         val response = buffer.copyOf(bytesRead)
-        Log.i(TAG, "Respuesta recibida exitosamente:")
-        Log.i(TAG, "  - Bytes leídos: $bytesRead")
-        Log.i(TAG, "  - Datos en hexadecimal: ${response.toHexString()}")
-        Log.i(TAG, "  - Datos en ASCII: ${String(response, Charsets.US_ASCII)}")
-        Log.i(TAG, "================================================")
-        
+        Log.i(TAG, "✓ Recibidos $bytesRead bytes: ${response.toHexString().take(40)}...")
+
         return response
     }
 
