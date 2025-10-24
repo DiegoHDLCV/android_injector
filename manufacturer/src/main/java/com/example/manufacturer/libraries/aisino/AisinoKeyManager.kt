@@ -10,6 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 object AisinoKeyManager : IKeyManager {
 
@@ -17,6 +20,10 @@ object AisinoKeyManager : IKeyManager {
     private var pedControllerInstance: IPedController? = null
     private var isInitialized = false
     private val initializationMutex = Mutex()
+
+    // Flujo de estado para notificar cuando la inicialización está completa
+    private val _initializationState = MutableStateFlow(false)
+    val initializationState: StateFlow<Boolean> = _initializationState.asStateFlow()
 
     // El método connect no es estándar en la interfaz, pero se puede implementar si es necesario.
     override suspend fun connect() {
@@ -63,6 +70,7 @@ object AisinoKeyManager : IKeyManager {
                     // 3. Asignar la instancia solo después de una inicialización exitosa
                     pedControllerInstance = controller
                     isInitialized = true
+                    _initializationState.value = true // Emitir que la inicialización está completa
                     Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
                     Log.i(TAG, "║ ✅ AisinoKeyManager COMPLETAMENTE INICIALIZADO Y LISTO")
                     Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
@@ -114,6 +122,7 @@ object AisinoKeyManager : IKeyManager {
         } finally {
             pedControllerInstance = null
             isInitialized = false
+            _initializationState.value = false // Resetear el estado
             Log.d(TAG, "AisinoKeyManager liberado.")
         }
     }

@@ -94,6 +94,32 @@ object AisinoCommunicationManager : ICommunicationManager {
             val ports = com.example.config.SystemConfig.aisinoCandidatePorts
             val bauds = com.example.config.SystemConfig.aisinoCandidateBauds
             Log.i(TAG, "AutoScan: probando puertos $ports con baudios $bauds")
+
+            // Intentar encontrar todos los puertos disponibles
+            Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
+            Log.i(TAG, "║ ENUMERACIÓN DE PUERTOS DISPONIBLES")
+            Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
+            val availablePorts = mutableListOf<Int>()
+            for (portNum in 0..15) {
+                try {
+                    val testController = AisinoComController(comport = portNum)
+                    testController.init(
+                        com.example.communication.base.EnumCommConfBaudRate.BPS_115200,
+                        com.example.communication.base.EnumCommConfParity.NOPAR,
+                        com.example.communication.base.EnumCommConfDataBits.DB_8
+                    )
+                    val openRes = testController.open()
+                    if (openRes == 0) {
+                        availablePorts.add(portNum)
+                        Log.i(TAG, "║ ✓ Puerto $portNum está disponible")
+                        testController.close()
+                    }
+                } catch (e: Exception) {
+                    // Puerto no disponible, continuar
+                }
+            }
+            Log.i(TAG, "║ Puertos disponibles encontrados: $availablePorts")
+            Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
             for (p in ports) {
                 for (b in bauds) {
                     try {

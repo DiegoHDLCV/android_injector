@@ -9,6 +9,7 @@ import com.example.manufacturer.base.controllers.ped.IPedController
 import com.example.manufacturer.libraries.newpos.NewposKeyManager
 import com.example.manufacturer.libraries.aisino.AisinoKeyManager
 import com.example.manufacturer.libraries.urovo.UrovoKeyManager
+import kotlinx.coroutines.flow.StateFlow
 
 object KeySDKManager : IKeyManager {
 
@@ -59,6 +60,21 @@ object KeySDKManager : IKeyManager {
         } else {
             // Si el manager seleccionado no es Aisino, siempre está "listo"
             true
+        }
+    }
+
+    /**
+     * Retorna el StateFlow de inicialización del manager específico.
+     * Para Aisino, retorna el estado de inicialización de AisinoKeyManager.
+     * Para otros managers, se puede extender para soportarlos.
+     */
+    fun getInitializationState(): StateFlow<Boolean>? {
+        return when (SystemConfig.managerSelected) {
+            EnumManufacturer.AISINO -> AisinoKeyManager.initializationState
+            else -> {
+                Log.w(TAG, "getInitializationState() no soportado para ${SystemConfig.managerSelected}")
+                null
+            }
         }
     }
 

@@ -96,8 +96,8 @@ class AisinoPedController(private val application: Application) : IPedController
         Log.d(TAG, "AisinoPedController instance created.")
     }
 
-    override suspend fun initializePed(application: Application): Boolean = withContext(Dispatchers.IO) {
-        Log.i(TAG, ">>> INICIO: Aisino SDK Initialization")
+    override suspend fun initializePed(application: Application): Boolean = withContext(Dispatchers.Main) {
+        Log.i(TAG, ">>> INICIO: Aisino SDK Initialization (Main Thread)")
         suspendCancellableCoroutine { continuation ->
             try {
                 val curAppDir = context.filesDir.absolutePath
@@ -109,7 +109,7 @@ class AisinoPedController(private val application: Application) : IPedController
                     return@suspendCancellableCoroutine
                 }
 
-                Log.d(TAG, "Initializing SystemApi.SystemInit_Api...")
+                Log.d(TAG, "Initializing SystemApi.SystemInit_Api on Main Thread...")
                 SystemApi.SystemInit_Api(0, pathBytes, context, object : ISdkStatue {
                     override fun sdkInitSuccessed() {
                         Log.i(TAG, "SystemApi.SystemInit_Api: Success. Initializing SdkApi...")
@@ -118,12 +118,12 @@ class AisinoPedController(private val application: Application) : IPedController
                         // --- Step 2: Initialize SdkApi ---
                         SdkApi.getInstance().init(context, object : ISdkStatue {
                             override fun sdkInitSuccessed() {
-                                Log.i(TAG, "SdkApi.getInstance().init(): Success. SDK initialization complete.")
-                                
+                                Log.i(TAG, "SdkApi.getInstance().init(): Success. SDK initialization complete (Main Thread).")
+
                                 // Verificar el estado del dispositivo después de la inicialización
                                 val deviceStatus = checkDeviceStatus()
                                 Log.i(TAG, "Device status check completed: $deviceStatus")
-                                
+
                                 if (continuation.isActive) {
                                     continuation.resume(true)
                                 }

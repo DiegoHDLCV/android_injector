@@ -1362,27 +1362,59 @@ class MainViewModel @Inject constructor(
                 Log.i(TAG, "║ INICIANDO VERIFICACIÓN AUTOMÁTICA DE LLAVES")
                 Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
 
-                // Esperar a que el SDK de Aisino esté completamente inicializado
-                // El SDK de Aisino tarda aproximadamente 3-4 segundos en completar la inicialización
-                val maxWaitTime = 10000L // 10 segundos máximo
-                val checkInterval = 500L // Verificar cada 500ms
-                var elapsedTime = 0L
+                // Esperar a que el SDK esté completamente inicializado usando StateFlow
+                // En lugar de polling, nos suscribimos al flujo de estado del manager
+                val maxWaitTime = 10000L // 10 segundos máximo timeout
+                val startTime = System.currentTimeMillis()
 
-                Log.i(TAG, "║ ⏳ Esperando a que AisinoKeyManager esté listo...")
-                while (!KeySDKManager.isAisinoReady() && elapsedTime < maxWaitTime) {
-                    kotlinx.coroutines.delay(checkInterval)
-                    elapsedTime += checkInterval
-                    Log.d(TAG, "║   Tiempo esperado: ${elapsedTime}ms de ${maxWaitTime}ms")
+                Log.i(TAG, "║ ⏳ Esperando a que KeySDKManager esté listo...")
+
+                // Intentar usar StateFlow primero
+                val initState = KeySDKManager.getInitializationState()
+                var isReady = false
+
+                if (initState != null) {
+                    // Usar StateFlow para esperar el evento de inicialización lista
+                    isReady = initState.value
+
+                    if (!isReady) {
+                        // Esperar con timeout o hasta que esté listo
+                        initState.collect { ready ->
+                            if (ready) {
+                                isReady = true
+                            }
+                            val elapsedTime = System.currentTimeMillis() - startTime
+                            if (elapsedTime >= maxWaitTime || isReady) {
+                                // Salir de la recolección
+                                return@collect
+                            }
+                        }
+                    }
+                } else {
+                    Log.d(TAG, "║ getInitializationState() no disponible, usando método polling...")
+                    // Fallback a polling si getInitializationState() no está disponible
+                    while (!KeySDKManager.isAisinoReady()) {
+                        val elapsedTime = System.currentTimeMillis() - startTime
+                        if (elapsedTime >= maxWaitTime) {
+                            Log.w(TAG, "║ ⚠️  TIMEOUT: KeySDKManager no estuvo listo en ${maxWaitTime}ms")
+                            Log.w(TAG, "║ PED Controller no disponible para verificación automática")
+                            Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
+                            return@launch
+                        }
+                        kotlinx.coroutines.delay(100)
+                    }
+                    isReady = true // Si llegamos aquí sin timeout, está listo
                 }
 
-                if (elapsedTime >= maxWaitTime) {
-                    Log.w(TAG, "║ ⚠️  TIMEOUT: AisinoKeyManager no estuvo listo en ${maxWaitTime}ms")
+                val elapsedTime = System.currentTimeMillis() - startTime
+                if (!isReady) {
+                    Log.w(TAG, "║ ⚠️  TIMEOUT: KeySDKManager no estuvo listo en ${maxWaitTime}ms")
                     Log.w(TAG, "║ PED Controller no disponible para verificación automática")
                     Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
                     return@launch
                 }
 
-                Log.i(TAG, "║ ✓ AisinoKeyManager está listo (${elapsedTime}ms de espera)")
+                Log.i(TAG, "║ ✓ KeySDKManager está listo (${elapsedTime}ms de espera)")
 
                 val pedController = KeySDKManager.getPedController()
                 if (pedController == null) {

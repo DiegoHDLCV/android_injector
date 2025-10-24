@@ -1,5 +1,5 @@
 {
-  "generated": "2025-10-24T09:03:46.519142",
+  "generated": "2025-10-24T10:21:52.707563",
   "description": "Llaves de prueba DUKPT para inyecci\u00f3n con EncryptionType 05 - Incluye AES (128/192/256) y 3DES (2TDEA/3TDEA) - (incluye KEK STORAGE obligatoria)",
   "totalKeys": 6,
   "keys": [

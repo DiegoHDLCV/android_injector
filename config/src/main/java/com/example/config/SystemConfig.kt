@@ -32,9 +32,14 @@ object SystemConfig {
     @Volatile var deviceRole: DeviceRole = DeviceRole.SUBPOS
 
     // --- NUEVO: Candidatos de puertos y baudios para Aisino (pueden ajustarse vía futura pantalla de settings) ---
-    var aisinoCandidatePorts: List<Int> = listOf(0, 1)
-    // Orden: intenta 9600 primero (más común), luego 115200
-    var aisinoCandidateBauds: List<Int> = listOf(9600, 115200)
+    // Los puertos 6, 7, 8 corresponden a:
+    // - 6: ttyGS0 (Gadget Serial)
+    // - 7: ttyUSB0 (USB Serial)
+    // - 8: ttyACM0 (ACM Serial - Communication Device Class)
+    // Estos son los mismos puertos que usa NewPOS, asegurando compatibilidad con el mismo hardware
+    var aisinoCandidatePorts: List<Int> = listOf(7, 8, 6)  // USB primero, luego ACM, luego Gadget (como NewPOS)
+    // Orden: intenta 115200 primero (velocidad estándar para cables PED), luego 9600
+    var aisinoCandidateBauds: List<Int> = listOf(115200, 9600)
 
     // Helpers
     fun isMaster(): Boolean = deviceRole == DeviceRole.MASTER
