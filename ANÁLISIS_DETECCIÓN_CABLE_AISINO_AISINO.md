@@ -9,24 +9,64 @@
 
 ### 🔧 Solución Implementada
 
-Según comunicación con Aisino:
-> "When two android devices are connected, one of them needs to work in host mode, the other one needs to work in peripheral mode"
+Según comunicación con Aisino Support:
+> **"The one which connects OTG will work in host mode"**
+
+**Esto significa**: El dispositivo que tenga el **cable OTG (con adaptador)** automáticamente actuará como USB HOST. El dispositivo con puerto USB normal actuará como PERIPHERAL.
+
+**No necesitamos forzar manualmente los modos** - Android configura automáticamente según el tipo de conector USB.
 
 **Cambios realizados:**
 
 1. **Creado `UsbModeManager`** (communication/usb/UsbModeManager.kt)
-   - Configura el modo USB automáticamente según `SystemConfig.deviceRole`
-   - MASTER → USB HOST mode
-   - SUBPOS → USB PERIPHERAL mode
+   - Proporciona información clara sobre qué cable usar
+   - MASTER (injector) → **Usar cable OTG** → Automáticamente USB HOST
+   - SUBPOS (keyreceiver) → **Usar puerto USB normal** → Automáticamente PERIPHERAL
+   - Intenta configuración manual vía setprop como fallback si es necesario
 
 2. **Actualizado `keyreceiver/AndroidManifest.xml`**
    - Cambió `android.hardware.usb.host` de `required="true"` a `required="false"`
-   - Agregó `android.hardware.usb.accessory` para modo PERIPHERAL
+   - Agregó `android.hardware.usb.accessory` para permitir modo PERIPHERAL
 
 3. **Integrado en `InjectorApplication` e `App`**
    - Se llama `UsbModeManager.configureUsbMode()` durante inicialización
-   - Injector → MASTER → HOST mode
-   - KeyReceiver → SUBPOS → PERIPHERAL mode
+   - Solo proporciona información y configuración de fallback si es necesario
+   - La configuración automática por puerto USB es la primaria
+
+---
+
+## 🔌 Cómo Usar (Instrucciones Prácticas)
+
+### Configuración Correcta para Aisino-Aisino
+
+**Dispositivo MASTER (injector)**:
+1. Obtener un cable USB **OTG (On-The-Go)** con adaptador
+2. Conectar el cable OTG al puerto USB del dispositivo MASTER
+3. El dispositivo MASTER automáticamente será USB HOST
+4. Podrá detectar dispositivos conectados
+
+**Dispositivo SUBPOS (keyreceiver)**:
+1. Usar un cable USB **normal (sin OTG)**
+2. Conectar el cable al puerto USB normal del dispositivo SUBPOS
+3. El dispositivo SUBPOS automáticamente será USB PERIPHERAL
+4. Será detectado automáticamente por el MASTER
+
+**Conexión**:
+- Conectar ambos dispositivos entre sí con los cables respectivos
+- El MASTER detectará automáticamente al SUBPOS
+- El botón "Iniciar Escucha" se habilitará
+
+### Verificación en Logs
+
+```
+║ MASTER (injector):
+║   • Debe usar CABLE OTG para ser USB HOST
+║   • Detectará dispositivos conectados al otro puerto
+
+║ SUBPOS (keyreceiver):
+║   • Debe usar PUERTO USB NORMAL (no OTG)
+║   • Será detectado automáticamente por el HOST
+```
 
 ---
 
