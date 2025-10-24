@@ -233,6 +233,7 @@ class MainViewModel @Inject constructor(
 
         listeningJob = viewModelScope.launch(Dispatchers.IO) {
             Log.i(TAG, "startListeningInternal: Lanzando job de escucha en Dispatchers.IO.")
+            var readAttempts = 0  // Declare before try so it's accessible in finally
             try {
                 _connectionStatus.value = ConnectionStatus.INITIALIZING
                 Log.d(TAG, "startListeningInternal: Estado de conexión cambiado a INITIALIZING.")
@@ -282,7 +283,6 @@ class MainViewModel @Inject constructor(
                 val buffer = ByteArray(1024)
                 var silentReads = 0
                 var anyDataEver = false
-                var readAttempts = 0
                 val loopStartTime = System.currentTimeMillis()
 
                 try {
@@ -290,20 +290,26 @@ class MainViewModel @Inject constructor(
                         readAttempts++
                         val readStartTime = System.currentTimeMillis()
 
-                        // 🔧 MEJORA: Usar timeout más corto (2000ms) para permitir más responsividad
-                        // pero sin sobrecargar la CPU con demasiados ciclos rápidos
+                        // 🔧 MEJORA: Usar timeout de 1000ms (más corto que antes)
+                        // Esto debería esperar ~1 segundo por lectura
                         val bytesRead = try {
-                            comController!!.readData(buffer.size, buffer, 2000)
+                            comController!!.readData(buffer.size, buffer, 1000)
                         } catch (e: Exception) {
                             Log.e(TAG, "❌ EXCEPCIÓN en readData() intento #$readAttempts: ${e.message}", e)
                             throw e
                         }
                         val readDuration = System.currentTimeMillis() - readStartTime
 
-                        // 🔍 DEBUG: Log every read attempt to understand loop behavior
-                        if (readAttempts % 20 == 0 || bytesRead != 0) {
+                        // 🔍 DEBUG: Solo loguear cada 100 intentos OR si hay datos/errores
+                        if (readAttempts % 100 == 0) {
                             val elapsed = System.currentTimeMillis() - loopStartTime
-                            Log.d(TAG, "🔄 ReadAttempt #$readAttempts (${elapsed}ms total): bytesRead=$bytesRead, duration=${readDuration}ms, silent=$silentReads")
+                            Log.d(TAG, "🔄 ReadAttempt #$readAttempts (${elapsed}ms): bytesRead=$bytesRead, duration=${readDuration}ms")
+                        }
+
+                        // 🚨 WARNING: Si readData retorna inmediatamente (duration < 50ms), algo está mal
+                        if (readDuration < 50 && bytesRead == 0) {
+                            // readData no está esperando el timeout - agregar delay preventivo
+                            kotlinx.coroutines.delay(50)
                         }
 
                         if (bytesRead > 0) {
@@ -340,17 +346,11 @@ class MainViewModel @Inject constructor(
                             silentReads++
                             // ⚠️ DESHABILITADO: El re-scan automático cierra/reabre el puerto
                             // y causa pérdida de datos en comunicación Aisino-to-Aisino
-                            // Solo se hace auto-scan al inicializar, NO durante la escucha
 
-                            // 🔍 DEBUG: Check for negative error codes that might indicate port issues
+                            // ⚠️ SOLO loguear si hay código de error REAL (no timeout normal)
                             if (bytesRead < 0) {
-                                Log.w(TAG, "⚠️ readData retornó código de error: $bytesRead (intento #$readAttempts)")
+                                Log.w(TAG, "⚠️ readData error code: $bytesRead (attempt #$readAttempts)")
                             }
-                        }
-
-                        // 🔍 DEBUG: Log the loop status
-                        if (!isActive) {
-                            Log.w(TAG, "⚠️ Loop EXITING: isActive became false after $readAttempts attempts")
                         }
                     }
                 } catch (loopException: Exception) {
@@ -365,21 +365,14 @@ class MainViewModel @Inject constructor(
                     Log.i(TAG, "startListeningInternal: Job de escucha cancelado, ignorando excepción.", e)
                 }
             } finally {
-                // 🔍 DEBUG: Log the exit condition
-                Log.w(TAG, "╔══════════════════════════════════════════════════════════════")
-                Log.w(TAG, "║ startListeningInternal: Bloque FINALLY - Job finalizando")
-                Log.w(TAG, "║ isActive=$isActive (job.isActive=${listeningJob?.isActive})")
-                Log.w(TAG, "║ connectionStatus=${_connectionStatus.value}")
-                Log.w(TAG, "║ Reason: Escucha terminada (verifica arriba qué causó la salida)")
-                Log.w(TAG, "╚══════════════════════════════════════════════════════════════")
-
+                Log.d(TAG, "startListeningInternal: Closing port after $readAttempts attempts")
                 val closeRes = comController?.close()
                 CommLog.d(TAG, "close() => $closeRes")
-                kotlinx.coroutines.delay(500) // Dar tiempo al SO para liberar el puerto
+                kotlinx.coroutines.delay(500)
                 if (_connectionStatus.value != ConnectionStatus.ERROR) {
                     _connectionStatus.value = ConnectionStatus.DISCONNECTED
                 }
-                Log.i(TAG, "startListeningInternal: Hilo de escucha finalizado.")
+                Log.i(TAG, "Listening closed.")
             }
         }
     }
