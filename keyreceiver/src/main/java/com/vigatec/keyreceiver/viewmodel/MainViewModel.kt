@@ -289,8 +289,11 @@ class MainViewModel @Inject constructor(
                     while (isActive) {
                         readAttempts++
                         val readStartTime = System.currentTimeMillis()
+
+                        // 🔧 MEJORA: Usar timeout más corto (2000ms) para permitir más responsividad
+                        // pero sin sobrecargar la CPU con demasiados ciclos rápidos
                         val bytesRead = try {
-                            comController!!.readData(buffer.size, buffer, 1000)
+                            comController!!.readData(buffer.size, buffer, 2000)
                         } catch (e: Exception) {
                             Log.e(TAG, "❌ EXCEPCIÓN en readData() intento #$readAttempts: ${e.message}", e)
                             throw e
@@ -298,7 +301,7 @@ class MainViewModel @Inject constructor(
                         val readDuration = System.currentTimeMillis() - readStartTime
 
                         // 🔍 DEBUG: Log every read attempt to understand loop behavior
-                        if (readAttempts % 10 == 0 || bytesRead != 0) {
+                        if (readAttempts % 20 == 0 || bytesRead != 0) {
                             val elapsed = System.currentTimeMillis() - loopStartTime
                             Log.d(TAG, "🔄 ReadAttempt #$readAttempts (${elapsed}ms total): bytesRead=$bytesRead, duration=${readDuration}ms, silent=$silentReads")
                         }
