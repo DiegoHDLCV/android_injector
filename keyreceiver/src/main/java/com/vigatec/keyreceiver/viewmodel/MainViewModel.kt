@@ -282,8 +282,21 @@ class MainViewModel @Inject constructor(
                 val buffer = ByteArray(1024)
                 var silentReads = 0
                 var anyDataEver = false
+                var readAttempts = 0
+                val loopStartTime = System.currentTimeMillis()
+
                 while (isActive) {
+                    readAttempts++
+                    val readStartTime = System.currentTimeMillis()
                     val bytesRead = comController!!.readData(buffer.size, buffer, 1000)
+                    val readDuration = System.currentTimeMillis() - readStartTime
+
+                    // 🔍 DEBUG: Log every read attempt to understand loop behavior
+                    if (readAttempts % 10 == 0 || bytesRead != 0) {
+                        val elapsed = System.currentTimeMillis() - loopStartTime
+                        Log.d(TAG, "🔄 ReadAttempt #$readAttempts (${elapsed}ms total): bytesRead=$bytesRead, duration=${readDuration}ms, silent=$silentReads")
+                    }
+
                     if (bytesRead > 0) {
                         anyDataEver = true
                         silentReads = 0
@@ -319,6 +332,16 @@ class MainViewModel @Inject constructor(
                         // ⚠️ DESHABILITADO: El re-scan automático cierra/reabre el puerto
                         // y causa pérdida de datos en comunicación Aisino-to-Aisino
                         // Solo se hace auto-scan al inicializar, NO durante la escucha
+
+                        // 🔍 DEBUG: Check for negative error codes that might indicate port issues
+                        if (bytesRead < 0) {
+                            Log.w(TAG, "⚠️ readData retornó código de error: $bytesRead")
+                        }
+                    }
+
+                    // 🔍 DEBUG: Log the loop status
+                    if (!isActive) {
+                        Log.w(TAG, "⚠️ Loop EXITING: isActive became false after $readAttempts attempts")
                     }
                 }
             } catch (e: Exception) {
@@ -329,7 +352,14 @@ class MainViewModel @Inject constructor(
                     Log.i(TAG, "startListeningInternal: Job de escucha cancelado, ignorando excepción.", e)
                 }
             } finally {
-                Log.d(TAG, "startListeningInternal: Bloque finally de la escucha. Cerrando comController si está abierto.")
+                // 🔍 DEBUG: Log the exit condition
+                Log.w(TAG, "╔══════════════════════════════════════════════════════════════")
+                Log.w(TAG, "║ startListeningInternal: Bloque FINALLY - Job finalizando")
+                Log.w(TAG, "║ isActive=$isActive (job.isActive=${listeningJob?.isActive})")
+                Log.w(TAG, "║ connectionStatus=${_connectionStatus.value}")
+                Log.w(TAG, "║ Reason: Escucha terminada (verifica arriba qué causó la salida)")
+                Log.w(TAG, "╚══════════════════════════════════════════════════════════════")
+
                 val closeRes = comController?.close()
                 CommLog.d(TAG, "close() => $closeRes")
                 kotlinx.coroutines.delay(500) // Dar tiempo al SO para liberar el puerto
