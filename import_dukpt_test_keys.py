@@ -77,7 +77,7 @@ def create_test_keys_file():
             "keyType": "DUKPT_IPEK",
             "futurexCode": "05",
             "algorithm": "DES_TRIPLE",
-            "keyHex": "A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0C1D2E3F",
+            "keyHex": "A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0C1D2E3F00",
             "kcv": "7B5E9C",
             "bytes": 24,
             "description": "IPEK 3TDEA DUKPT - Generada con KSN FFFF9876543210000002"
