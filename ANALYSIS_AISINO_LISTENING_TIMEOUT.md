@@ -4,38 +4,66 @@
 
 ## Síntomas Observados
 
+### Primer Reporte (15:11-15:12)
 ```
 15:11:42.040  ¡Conexión establecida! Escuchando en protocolo FUTUREX
 15:11:54.671  ⚠️ CABLE USB DESCONECTADO (sin cancelar listening)
 15:12:08.200  startListeningInternal: Bloque finally - Cerrando comController
-             [Tiempo transcurrido: ~26 segundos]
+             [Tiempo transcurrido: ~26 segundos, completó 26 ciclos]
 
 16:03:53-16:04:03  Injector intenta enviar datos → TIMEOUT (0 bytes recibidos)
 ```
 
+### Segundo Reporte - PROBLEMA GRAVE DESCUBIERTO (15:26)
+```
+15:26:37.237  ¡Conexión establecida! Escuchando
+15:26:44.402  ⚠️ CABLE USB DESCONECTADO
+15:26:59.455  ⚠️ Loop EXITING: isActive became false after 11 attempts
+             [Tiempo transcurrido: ~22 segundos, completó solo 11 ciclos]
+```
+
+### Logs de NewPOS - REVELADOR
+```
+🔄 ReadAttempt #575180 (29625ms): duration=0ms (¡SIEMPRE 0MS!)
+🔄 ReadAttempt #575200 (29626ms): duration=0ms
+🔄 ReadAttempt #575220 (29627ms): duration=0ms
+             [~575k intentos en 29.6 segundos = ~19,400/segundo]
+             [Debería ser ~0.5/segundo con timeout 2000ms]
+```
+
 ## Causas Identificadas
 
+### ⚠️ **CAUSA RAÍZ DESCUBIERTA: `readData()` NO ESPERA EL TIMEOUT**
+
+**Observación Crítica**: En los logs de NewPOS, TODOS los `readData()` retornan en `0ms`:
+```
+🔄 ReadAttempt #575180: duration=0ms
+🔄 ReadAttempt #575200: duration=0ms
+🔄 ReadAttempt #575220: duration=0ms
+```
+
+**Significado**:
+- `readData(2000)` debería esperar ~2 segundos (o devolver si hay datos)
+- Pero está devolviendo INMEDIATAMENTE en 0ms cuando no hay datos
+- Esto causa un **BUSY-WAIT LOOP** a máxima velocidad (~19,400 ciclos/segundo)
+- Satura el puerto, la CPU y degrada el sistema
+
+**Consecuencias**:
+1. **Aisino-to-Aisino**: La CPU degradada causa que `isActive` se vuelva false después de ~22 segundos
+2. **Aisino-to-NewPOS**: Funciona porque absorbe mejor el busy-wait o tiene mejor sincronización
+3. **Logs masivos**: ~575k líneas de log cada 30 segundos (ilegible)
+
 ### 1. **Código Removido Pero Efecto Persiste**
-- Commits anteriores tenían `rescanIfSupported()` cada 5 lecturas silenciosas
-- Este código cierra/reabre el puerto, causando pérdida de datos
-- **Fue removido en commit 426f36f**, pero la escucha sigue cerrando
+- Commits anteriores tenían `rescanIfSupported()` que cierra/reabre el puerto
+- **Fue removido**, pero el problema de busy-wait permanece
 
 ### 2. **Cancelación Automática por Detección de Cable**
-- La detección de cable USB triggers un `stopListening()` automático
-- **Fue deshabilitado en commit ca049a6**, pero la escucha sigue cerrando
+- **Fue deshabilitado**, pero no es la causa principal
 
-### 3. **Causa Raíz Probable: Acumulación de Timeouts**
-- La escucha llama `readData(1000ms)` en un loop
-- Después de ~26 ciclos de 1000ms timeouts = ~26 segundos
-- El driver nativo Vanstone (`Rs232Api.PortRecv_Api`) podría estar:
-  - Degradando el estado del puerto con cada timeout
-  - Alcanzando un límite interno de reintentos
-  - Retornando códigos de error que no están siendo manejados correctamente
-
-### 4. **Puerto Inestable Aisino**
-- La detección de cable USB Aisino es notoriamente inconsistente
-- El puerto RS232 físico podría estar perdiendo estabilidad
-- Los timeouts repetidos podrían estar causando un círculo vicioso
+### 3. **Puerto Degradado por Busy-Wait**
+- Cada 0ms de `readData()` sin esperar timeout degrada el puerto nativo
+- Después de ~22 segundos, el puerto entra en estado inconsistente
+- `isActive` se vuelve false por degradación del scope
 
 ## Soluciones Implementadas
 
@@ -69,26 +97,56 @@
 - Permite que el puerto respire entre ciclos
 ```
 
+### ✅ Commit a3d2f86: CRÍTICO - Arreglar Busy-Wait y Logs Masivos
+```kotlin
+// Problema: readData() retorna en 0ms sin esperar timeout
+// Causa: ~19,400 ciclos/segundo en lugar de ~0.5/segundo
+// Consecuencia: Listening cierra en 22 segundos, logs ilegibles
+
+// Soluciones:
+1. **Detectar Busy-Wait**:
+   if (readDuration < 50 && bytesRead == 0) {
+       delay(50)  // Preventivo si readData no espera
+   }
+
+2. **Reducir Logs Masivos**:
+   - DEBUG cada 100 intentos (en lugar de cada 20)
+   - Eliminar logs innecesarios
+   - Logs solo para eventos reales (datos/errores)
+
+3. **Mejor Diagnóstico**:
+   - readAttempts declarado FUERA del try
+   - Accesible en finally block
+   - Log final: "Closing port after N attempts"
+```
+
 ## Diagnóstico Esperado en Próximas Ejecuciones
 
-Con los logs detallados ahora en lugar:
+Con los fixes implementados:
 
-1. **Si el loop cierra normalmente**:
-   - Veremos exactamente cuántos `readAttempts` completó
-   - Podremos identificar si es ~26 (coincidiendo con ~26 segundos)
-   - O si completa muchos más, indicando otro problema
+### 1. **Si el busy-wait se arregla** (ESPERADO):
+   - Logs DEBUG: cada 100 intentos (controlado)
+   - Duration: debería ser ~1000-2000ms (no 0ms)
+   - Listening: debería durar MINUTOS (no 22 segundos)
+   - CPU: normal (no al 100%)
 
-2. **Si hay excepciones**:
-   - `readData() EXCEPCIÓN` será capturado y logueado
-   - Veremos el mensaje de excepción exacto
-   - Podremos identificar si es del driver nativo o del código Kotlin
+### 2. **Si aún hay busy-wait**:
+   - Veremos delay(50ms) siendo invocado constantemente
+   - Log final: "Closing port after N attempts" donde N es bajo (~11-26)
+   - Duration: seguirá siendo ~0ms
+   - Esto indica que el problema está en la capa nativa (Rs232Api)
 
-3. **Si hay códigos de error**:
-   - Veremos log: `readData retornó código de error: -X`
+### 3. **Código de Errores**:
+   - Si hay verdaderos errores: `readData error code: -X`
    - Códigos conocidos:
      * `-4` = ERROR_NOT_OPEN (puerto cerrado)
-     * `-6` = ERROR_READ_TIMEOUT_OR_FAILURE (timeout)
+     * `-6` = ERROR_READ_TIMEOUT_OR_FAILURE
      * `-99` = ERROR_GENERAL_EXCEPTION
+
+### 4. **Aisino-to-Aisino ahora debería funcionar**:
+   - Si el busy-wait está arreglado, la comunicación debería mejorar
+   - Listening durará más de 22 segundos
+   - Injector podrá enviar datos y recibir respuesta
 
 ## Próximos Pasos para Investigación
 
