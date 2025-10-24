@@ -285,64 +285,74 @@ class MainViewModel @Inject constructor(
                 var readAttempts = 0
                 val loopStartTime = System.currentTimeMillis()
 
-                while (isActive) {
-                    readAttempts++
-                    val readStartTime = System.currentTimeMillis()
-                    val bytesRead = comController!!.readData(buffer.size, buffer, 1000)
-                    val readDuration = System.currentTimeMillis() - readStartTime
-
-                    // 🔍 DEBUG: Log every read attempt to understand loop behavior
-                    if (readAttempts % 10 == 0 || bytesRead != 0) {
-                        val elapsed = System.currentTimeMillis() - loopStartTime
-                        Log.d(TAG, "🔄 ReadAttempt #$readAttempts (${elapsed}ms total): bytesRead=$bytesRead, duration=${readDuration}ms, silent=$silentReads")
-                    }
-
-                    if (bytesRead > 0) {
-                        anyDataEver = true
-                        silentReads = 0
-                        val received = buffer.copyOf(bytesRead)
-                        val receivedString = String(received, Charsets.US_ASCII)
-                        val hexString = received.joinToString("") { "%02X".format(it) }
-
-                        val newData = "RX [${System.currentTimeMillis()}]: HEX($hexString) ASCII('$receivedString')\n"
-                        _rawReceivedData.value += newData
-
-                        Log.d(TAG, "RX ${bytesRead}B: ${hexString.take(40)}...")
-                        CommLog.i(TAG, "RX ${bytesRead}B: $hexString")
-
-                        try {
-                            messageParser.appendData(received)
-
-                            var parsedMessage = messageParser.nextMessage()
-                            var messageCount = 0
-
-                            while (parsedMessage != null) {
-                                messageCount++
-                                Log.i(TAG, "✓ Mensaje parseado: ${parsedMessage::class.simpleName}")
-                                processParsedCommand(parsedMessage)
-                                parsedMessage = messageParser.nextMessage()
-                            }
+                try {
+                    while (isActive) {
+                        readAttempts++
+                        val readStartTime = System.currentTimeMillis()
+                        val bytesRead = try {
+                            comController!!.readData(buffer.size, buffer, 1000)
                         } catch (e: Exception) {
-                            Log.e(TAG, "❌ Error procesando datos: ${e.message}")
+                            Log.e(TAG, "❌ EXCEPCIÓN en readData() intento #$readAttempts: ${e.message}", e)
+                            throw e
+                        }
+                        val readDuration = System.currentTimeMillis() - readStartTime
+
+                        // 🔍 DEBUG: Log every read attempt to understand loop behavior
+                        if (readAttempts % 10 == 0 || bytesRead != 0) {
+                            val elapsed = System.currentTimeMillis() - loopStartTime
+                            Log.d(TAG, "🔄 ReadAttempt #$readAttempts (${elapsed}ms total): bytesRead=$bytesRead, duration=${readDuration}ms, silent=$silentReads")
                         }
 
-                        _snackbarEvent.emit("Datos recibidos: ${bytesRead} bytes")
-                    } else {
-                        silentReads++
-                        // ⚠️ DESHABILITADO: El re-scan automático cierra/reabre el puerto
-                        // y causa pérdida de datos en comunicación Aisino-to-Aisino
-                        // Solo se hace auto-scan al inicializar, NO durante la escucha
+                        if (bytesRead > 0) {
+                            anyDataEver = true
+                            silentReads = 0
+                            val received = buffer.copyOf(bytesRead)
+                            val receivedString = String(received, Charsets.US_ASCII)
+                            val hexString = received.joinToString("") { "%02X".format(it) }
 
-                        // 🔍 DEBUG: Check for negative error codes that might indicate port issues
-                        if (bytesRead < 0) {
-                            Log.w(TAG, "⚠️ readData retornó código de error: $bytesRead")
+                            val newData = "RX [${System.currentTimeMillis()}]: HEX($hexString) ASCII('$receivedString')\n"
+                            _rawReceivedData.value += newData
+
+                            Log.d(TAG, "RX ${bytesRead}B: ${hexString.take(40)}...")
+                            CommLog.i(TAG, "RX ${bytesRead}B: $hexString")
+
+                            try {
+                                messageParser.appendData(received)
+
+                                var parsedMessage = messageParser.nextMessage()
+                                var messageCount = 0
+
+                                while (parsedMessage != null) {
+                                    messageCount++
+                                    Log.i(TAG, "✓ Mensaje parseado: ${parsedMessage::class.simpleName}")
+                                    processParsedCommand(parsedMessage)
+                                    parsedMessage = messageParser.nextMessage()
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "❌ Error procesando datos: ${e.message}")
+                            }
+
+                            _snackbarEvent.emit("Datos recibidos: ${bytesRead} bytes")
+                        } else {
+                            silentReads++
+                            // ⚠️ DESHABILITADO: El re-scan automático cierra/reabre el puerto
+                            // y causa pérdida de datos en comunicación Aisino-to-Aisino
+                            // Solo se hace auto-scan al inicializar, NO durante la escucha
+
+                            // 🔍 DEBUG: Check for negative error codes that might indicate port issues
+                            if (bytesRead < 0) {
+                                Log.w(TAG, "⚠️ readData retornó código de error: $bytesRead (intento #$readAttempts)")
+                            }
+                        }
+
+                        // 🔍 DEBUG: Log the loop status
+                        if (!isActive) {
+                            Log.w(TAG, "⚠️ Loop EXITING: isActive became false after $readAttempts attempts")
                         }
                     }
-
-                    // 🔍 DEBUG: Log the loop status
-                    if (!isActive) {
-                        Log.w(TAG, "⚠️ Loop EXITING: isActive became false after $readAttempts attempts")
-                    }
+                } catch (loopException: Exception) {
+                    Log.e(TAG, "⚠️ EXCEPCIÓN CAPTURADA en el loop de lectura (intento #$readAttempts): ${loopException.message}")
+                    throw loopException
                 }
             } catch (e: Exception) {
                 if (isActive) {
