@@ -751,6 +751,24 @@ class MainViewModel @Inject constructor(
                         throw PedKeyException("KSN inválido o vacío para DUKPT: ${command.ksn}")
                     }
 
+                    // VALIDACIÓN LONGITUD IPEK SEGÚN ALGORITMO
+                    val ipekBytes = command.keyHex.hexToByteArray()
+                    val expectedLength = when (genericAlgorithm) {
+                        GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> 16 // Ambos 3DES usan 16 bytes para DUKPT
+                        GenericKeyAlgorithm.AES_128 -> 16
+                        GenericKeyAlgorithm.AES_192 -> 24
+                        GenericKeyAlgorithm.AES_256 -> 32
+                        else -> throw PedKeyException("Algoritmo no soportado para DUKPT: $genericAlgorithm")
+                    }
+
+                    if (ipekBytes.size != expectedLength) {
+                        throw PedKeyException(
+                            "Longitud de IPEK incorrecta para $genericAlgorithm: " +
+                            "recibido ${ipekBytes.size} bytes, esperado $expectedLength bytes. " +
+                            "Para DUKPT 3DES (2TDEA y 3TDEA) siempre se usan 16 bytes."
+                        )
+                    }
+
                     // INYECCIÓN DUKPT PLAINTEXT:
                     // La IPEK se envía en texto plano al PED
                     // Este método es SOLO para testing - NO usar en producción
@@ -780,7 +798,7 @@ class MainViewModel @Inject constructor(
                     pedController!!.createDukptAESKey(
                         keyIndex = command.keySlot,
                         keyAlgorithm = genericAlgorithm,
-                        ipekBytes = command.keyHex.hexToByteArray(),
+                        ipekBytes = ipekBytes,
                         ksnBytes = ksnForInjection,
                         kcvBytes = if (command.keyChecksum.isNotBlank())
                             command.keyChecksum.hexToByteArray()
