@@ -49,6 +49,19 @@ object KeySDKManager : IKeyManager {
         }
     }
 
+    /**
+     * Verifica si el AisinoKeyManager está completamente listo para usar.
+     * Esta es una consulta no-blocking útil para sincronización.
+     */
+    fun isAisinoReady(): Boolean {
+        return if (SystemConfig.managerSelected == EnumManufacturer.AISINO) {
+            (AisinoKeyManager as? com.example.manufacturer.libraries.aisino.AisinoKeyManager)?.isReady() ?: false
+        } else {
+            // Si el manager seleccionado no es Aisino, siempre está "listo"
+            true
+        }
+    }
+
     // Delegar getPedController al manager específico
     override fun getPedController(): IPedController? {
         Log.d(TAG, "Delegando getPedController a ${SystemConfig.managerSelected} KeyManager...")

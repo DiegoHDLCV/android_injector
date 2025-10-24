@@ -1358,14 +1358,36 @@ class MainViewModel @Inject constructor(
     private fun performAutomaticKeyVerification() {
         viewModelScope.launch {
             try {
-                Log.i(TAG, "=== VERIFICACIÓN AUTOMÁTICA DE LLAVES ===")
-                
-                // Esperar un poco para que el dispositivo esté listo
-                kotlinx.coroutines.delay(2000)
-                
+                Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
+                Log.i(TAG, "║ INICIANDO VERIFICACIÓN AUTOMÁTICA DE LLAVES")
+                Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
+
+                // Esperar a que el SDK de Aisino esté completamente inicializado
+                // El SDK de Aisino tarda aproximadamente 3-4 segundos en completar la inicialización
+                val maxWaitTime = 10000L // 10 segundos máximo
+                val checkInterval = 500L // Verificar cada 500ms
+                var elapsedTime = 0L
+
+                Log.i(TAG, "║ ⏳ Esperando a que AisinoKeyManager esté listo...")
+                while (!KeySDKManager.isAisinoReady() && elapsedTime < maxWaitTime) {
+                    kotlinx.coroutines.delay(checkInterval)
+                    elapsedTime += checkInterval
+                    Log.d(TAG, "║   Tiempo esperado: ${elapsedTime}ms de ${maxWaitTime}ms")
+                }
+
+                if (elapsedTime >= maxWaitTime) {
+                    Log.w(TAG, "║ ⚠️  TIMEOUT: AisinoKeyManager no estuvo listo en ${maxWaitTime}ms")
+                    Log.w(TAG, "║ PED Controller no disponible para verificación automática")
+                    Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
+                    return@launch
+                }
+
+                Log.i(TAG, "║ ✓ AisinoKeyManager está listo (${elapsedTime}ms de espera)")
+
                 val pedController = KeySDKManager.getPedController()
                 if (pedController == null) {
-                    Log.w(TAG, "PED Controller no disponible para verificación automática")
+                    Log.w(TAG, "║ ⚠️  PED Controller es null después de verificar que está listo")
+                    Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
                     return@launch
                 }
                 

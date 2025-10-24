@@ -6,8 +6,10 @@ import com.example.manufacturer.base.controllers.manager.IKeyManager
 import com.example.manufacturer.base.controllers.ped.IPedController
 import com.example.manufacturer.base.controllers.ped.PedException
 import com.example.manufacturer.libraries.aisino.wrapper.AisinoPedController
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 object AisinoKeyManager : IKeyManager {
 
@@ -26,50 +28,79 @@ object AisinoKeyManager : IKeyManager {
         // Usa un Mutex para evitar condiciones de carrera si se llama desde múltiples corrutinas
         initializationMutex.withLock {
             if (isInitialized) {
-                Log.d(TAG, "AisinoKeyManager ya se encuentra inicializado.")
+                Log.i(TAG, ">>> AisinoKeyManager ya se encuentra inicializado. Omitiendo re-inicialización.")
                 return
             }
 
-            Log.d(TAG, "Inicializando AisinoKeyManager...")
-            try {
-                // 1. Crear la instancia del controlador específico de Aisino
-                // Se pasa el objeto 'application' directamente, que es del tipo correcto.
-                val controller = AisinoPedController(application)
+            Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
+            Log.i(TAG, "║ INICIANDO INICIALIZACIÓN DE AisinoKeyManager")
+            Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
 
-                // 2. Llamar a la inicialización interna del controlador
-                val sdkInitialized = controller.initializePed(application)
-                if (!sdkInitialized) {
-                    // Si initializePed falla, lanzará una excepción que será capturada abajo.
-                    // Este check es una salvaguarda adicional.
-                    throw PedException("Falló la inicialización interna de AisinoPedController.")
+            // CORRECCIÓN CRÍTICA: Ejecutar en Main Thread
+            // Los SDKs de hardware (Aisino, NewPOS) requieren Main Thread para:
+            // 1. Acceso a servicios del sistema Android
+            // 2. Registro de BroadcastReceivers para detección de dispositivos USB
+            // 3. Recepción de intents del sistema para cable keyreceiver
+            withContext(Dispatchers.Main) {
+                try {
+                    Log.d(TAG, "1/3 - Creando AisinoPedController...")
+                    // 1. Crear la instancia del controlador específico de Aisino
+                    // Se pasa el objeto 'application' directamente, que es del tipo correcto.
+                    val controller = AisinoPedController(application)
+                    Log.d(TAG, "    ✓ AisinoPedController instanciado")
+
+                    Log.d(TAG, "2/3 - Inicializando SDK de Aisino (SystemApi + SdkApi)...")
+                    // 2. Llamar a la inicialización interna del controlador
+                    val sdkInitialized = controller.initializePed(application)
+                    if (!sdkInitialized) {
+                        // Si initializePed falla, lanzará una excepción que será capturada abajo.
+                        // Este check es una salvaguarda adicional.
+                        throw PedException("Falló la inicialización interna de AisinoPedController.")
+                    }
+                    Log.d(TAG, "    ✓ SDK de Aisino inicializado correctamente")
+
+                    Log.d(TAG, "3/3 - Finalizando inicialización de AisinoKeyManager...")
+                    // 3. Asignar la instancia solo después de una inicialización exitosa
+                    pedControllerInstance = controller
+                    isInitialized = true
+                    Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
+                    Log.i(TAG, "║ ✅ AisinoKeyManager COMPLETAMENTE INICIALIZADO Y LISTO")
+                    Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
+
+                } catch (e: PedException) {
+                    Log.e(TAG, "❌ Fallo crítico al inicializar AisinoPedController: ${e.message}", e)
+                    pedControllerInstance = null
+                    isInitialized = false
+                    throw e // Relanzar para que el llamador se entere del fallo
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error inesperado durante la inicialización de AisinoKeyManager", e)
+                    pedControllerInstance = null
+                    isInitialized = false
+                    // Envuelve la excepción inesperada en una PedException para mantener la consistencia
+                    throw PedException("Error inesperado al inicializar AisinoKeyManager: ${e.message}", e)
                 }
-
-                // 3. Asignar la instancia solo después de una inicialización exitosa
-                pedControllerInstance = controller
-                isInitialized = true
-                Log.d(TAG, "AisinoKeyManager inicializado con éxito.")
-
-            } catch (e: PedException) {
-                Log.e(TAG, "Fallo crítico al inicializar AisinoPedController: ${e.message}", e)
-                pedControllerInstance = null
-                isInitialized = false
-                throw e // Relanzar para que el llamador se entere del fallo
-            } catch (e: Exception) {
-                Log.e(TAG, "Error inesperado durante la inicialización de AisinoKeyManager", e)
-                pedControllerInstance = null
-                isInitialized = false
-                // Envuelve la excepción inesperada en una PedException para mantener la consistencia
-                throw PedException("Error inesperado al inicializar AisinoKeyManager: ${e.message}", e)
             }
         }
+    }
+
+    /**
+     * Verifica si el AisinoKeyManager está completamente inicializado y listo para usar.
+     * Útil para consultas no-blocking sobre el estado de inicialización.
+     */
+    fun isReady(): Boolean {
+        Log.d(TAG, "isReady() called - Estado actual: isInitialized=$isInitialized, pedControllerInstance=${pedControllerInstance != null}")
+        return isInitialized && pedControllerInstance != null
     }
 
     override fun getPedController(): IPedController {
         if (!isInitialized || pedControllerInstance == null) {
             // Es preferible lanzar una excepción para forzar un flujo de código correcto.
             // Devolver null puede llevar a NullPointerExceptions en el código del llamador.
-            throw IllegalStateException("AisinoKeyManager no está inicializado. Llama a initialize() primero.")
+            val errorMsg = "AisinoKeyManager no está inicializado (isInitialized=$isInitialized, instance=${pedControllerInstance != null}). Llama a initialize() primero."
+            Log.e(TAG, errorMsg)
+            throw IllegalStateException(errorMsg)
         }
+        Log.d(TAG, "getPedController() retornando instancia exitosamente")
         return pedControllerInstance!!
     }
 
