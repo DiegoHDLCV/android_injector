@@ -1108,25 +1108,12 @@ class MainViewModel @Inject constructor(
                             CommLog.i(TAG, "🔌 ✅ CABLE USB CONECTADO - Listo para comunicación")
                             _snackbarEvent.emit("Cable USB detectado. Pulse 'Iniciar Escucha' para comenzar.")
                         } else {
-                            Log.w(TAG, "║ ⚠️  CABLE USB DESCONECTADO")
-                            CommLog.w(TAG, "⚠️ CABLE USB DESCONECTADO - Reconecte el cable")
-                            _snackbarEvent.emit("Cable USB desconectado")
-
-                            // Detener la escucha automáticamente cuando se desconecta el cable
-                            if (listeningJob?.isActive == true) {
-                                Log.i(TAG, "║ Deteniendo escucha automáticamente por desconexión del cable...")
-                                // Forzar estado a DISCONNECTED inmediatamente
-                                _connectionStatus.value = ConnectionStatus.DISCONNECTED
-                                // Cerrar el puerto directamente para forzar la desconexión
-                                try {
-                                    comController?.close()
-                                    Log.i(TAG, "║ Puerto cerrado forzadamente debido a desconexión del cable")
-                                } catch (e: Exception) {
-                                    Log.w(TAG, "║ Error al cerrar puerto: ${e.message}", e)
-                                }
-                                // Cancelar el job de escucha
-                                listeningJob?.cancel()
-                            }
+                            Log.w(TAG, "⚠️ CABLE USB DESCONECTADO (sin cancelar listening)")
+                            CommLog.w(TAG, "⚠️ CABLE USB DESCONECTADO - Pero listening continúa activo")
+                            // 🔴 CRÍTICO: NO cancelar el listening automáticamente
+                            // La detección de cable USB Aisino puede ser inconsistente/falsos positivos
+                            // Permitir que el listening continúe esperando datos
+                            // El usuario puede detener manualmente si es necesario
                         }
                     }
 
