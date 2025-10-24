@@ -19,6 +19,7 @@ import com.example.manufacturer.KeySDKManager
 import com.example.manufacturer.base.controllers.ped.IPedController
 import com.example.manufacturer.base.controllers.ped.PedKeyException
 import com.example.manufacturer.base.models.KeyAlgorithm
+import com.example.manufacturer.base.models.KeyAlgorithm as GenericKeyAlgorithm
 import com.example.manufacturer.base.models.PedKeyData
 import com.example.persistence.repository.InjectedKeyRepository
 import com.vigatec.keyreceiver.ui.events.UiEvent
@@ -754,20 +755,33 @@ class MainViewModel @Inject constructor(
                     // La IPEK se envía en texto plano al PED
                     // Este método es SOLO para testing - NO usar en producción
 
-                    // CONVERSIÓN KSN: Futurex usa 10 bytes (20 hex chars), NewPOS espera 12 bytes
-                    // Se agregan 2 bytes de ceros al inicio (padding)
+                    // CONVERSIÓN KSN: Futurex usa 10 bytes (20 hex chars)
+                    // Para AES: NewPOS espera 12 bytes (agrega 2 bytes de ceros al inicio)
+                    // Para 3DES: NewPOS espera 10 bytes (sin padding)
                     val ksnBytes = command.ksn.hexToByteArray()
-                    val ksnPadded = ByteArray(12)
-                    System.arraycopy(ksnBytes, 0, ksnPadded, 2, ksnBytes.size)
+                    val needsKsnPadding = genericAlgorithm in listOf(
+                        GenericKeyAlgorithm.AES_128,
+                        GenericKeyAlgorithm.AES_192,
+                        GenericKeyAlgorithm.AES_256
+                    )
 
-                    Log.d(TAG, "KSN Futurex: ${command.ksn} (${ksnBytes.size} bytes)")
-                    Log.d(TAG, "KSN Padded: ${ksnPadded.joinToString("") { "%02X".format(it) }} (${ksnPadded.size} bytes)")
+                    val ksnForInjection = if (needsKsnPadding) {
+                        val ksnPadded = ByteArray(12)
+                        System.arraycopy(ksnBytes, 0, ksnPadded, 2, ksnBytes.size)
+                        Log.d(TAG, "KSN Futurex: ${command.ksn} (${ksnBytes.size} bytes)")
+                        Log.d(TAG, "KSN Padded para AES: ${ksnPadded.joinToString("") { "%02X".format(it) }} (${ksnPadded.size} bytes)")
+                        ksnPadded
+                    } else {
+                        Log.d(TAG, "KSN Futurex: ${command.ksn} (${ksnBytes.size} bytes)")
+                        Log.d(TAG, "KSN sin padding para 3DES: ${ksnBytes.joinToString("") { "%02X".format(it) }} (${ksnBytes.size} bytes)")
+                        ksnBytes
+                    }
 
                     pedController!!.createDukptAESKey(
                         keyIndex = command.keySlot,
                         keyAlgorithm = genericAlgorithm,
                         ipekBytes = command.keyHex.hexToByteArray(),
-                        ksnBytes = ksnPadded,
+                        ksnBytes = ksnForInjection,
                         kcvBytes = if (command.keyChecksum.isNotBlank())
                             command.keyChecksum.hexToByteArray()
                         else
