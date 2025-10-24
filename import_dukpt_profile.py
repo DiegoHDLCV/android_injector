@@ -59,11 +59,12 @@ def create_dukpt_profile():
 def create_dukpt_profile_multikey():
     """
     Crea un perfil DUKPT con múltiples llaves (una por algoritmo).
+    Incluye AES y 3DES.
     """
 
     profile = {
         "name": "DUKPT Multi-Algorithm Test",
-        "description": "Perfil con llaves DUKPT AES-128/192/256 para pruebas",
+        "description": "Perfil con llaves DUKPT AES-128/192/256 y 3DES (2TDEA/3TDEA) para pruebas",
         "applicationType": "Retail",
         "useKEK": False,
         "selectedKEKKcv": "",
@@ -91,6 +92,74 @@ def create_dukpt_profile_multikey():
                 "selectedKey": "AB1234",  # AES-256
                 "injectionMethod": "auto",
                 "ksn": "FFFF9876543210000002"
+            },
+            {
+                "usage": "DUKPT",
+                "keyType": "DUKPT Initial Key (IPEK)",
+                "slot": "04",
+                "selectedKey": "3F8D42",  # 3DES 2TDEA
+                "injectionMethod": "auto",
+                "ksn": "FFFF9876543210000001"
+            },
+            {
+                "usage": "DUKPT",
+                "keyType": "DUKPT Initial Key (IPEK)",
+                "slot": "05",
+                "selectedKey": "7B5E9C",  # 3DES 3TDEA
+                "injectionMethod": "auto",
+                "ksn": "FFFF9876543210000002"
+            }
+        ]
+    }
+
+    return profile
+
+
+def create_dukpt_profile_2tdea():
+    """
+    Crea un perfil DUKPT con 3DES 2TDEA (Double-length).
+    """
+
+    profile = {
+        "name": "DUKPT 2TDEA Test",
+        "description": "Perfil para prueba de inyección DUKPT 2TDEA (TripleDES Double-length) con EncryptionType 05",
+        "applicationType": "Retail",
+        "useKEK": False,
+        "selectedKEKKcv": "",
+        "keyConfigurations": [
+            {
+                "usage": "DUKPT",
+                "keyType": "DUKPT Initial Key (IPEK)",
+                "slot": "01",
+                "selectedKey": "3F8D42",  # KCV de 3DES 2TDEA
+                "injectionMethod": "auto",
+                "ksn": "FFFF9876543210000001"
+            }
+        ]
+    }
+
+    return profile
+
+
+def create_dukpt_profile_3tdea():
+    """
+    Crea un perfil DUKPT con 3DES 3TDEA (Triple-length).
+    """
+
+    profile = {
+        "name": "DUKPT 3TDEA Test",
+        "description": "Perfil para prueba de inyección DUKPT 3TDEA (TripleDES Triple-length) con EncryptionType 05",
+        "applicationType": "Retail",
+        "useKEK": False,
+        "selectedKEKKcv": "",
+        "keyConfigurations": [
+            {
+                "usage": "DUKPT",
+                "keyType": "DUKPT Initial Key (IPEK)",
+                "slot": "01",
+                "selectedKey": "7B5E9C",  # KCV de 3DES 3TDEA
+                "injectionMethod": "auto",
+                "ksn": "FFFF9876543210000002"
             }
         ]
     }
@@ -116,7 +185,7 @@ def main():
     print()
 
     # Generar perfil multi-key
-    print("2️⃣  Generando perfil multi-key (AES-128/192/256)...")
+    print("2️⃣  Generando perfil multi-key (AES-128/192/256 + 3DES)...")
     multi_profile = create_dukpt_profile_multikey()
     multi_filename = "dukpt_multikey_profile.json"
     with open(multi_filename, 'w') as f:
@@ -124,11 +193,29 @@ def main():
     print(f"   ✅ {multi_filename}")
     print()
 
+    # Generar perfil 2TDEA
+    print("3️⃣  Generando perfil 2TDEA (TripleDES Double-length)...")
+    tdea2_profile = create_dukpt_profile_2tdea()
+    tdea2_filename = "dukpt_2tdea_profile.json"
+    with open(tdea2_filename, 'w') as f:
+        json.dump(tdea2_profile, f, indent=2)
+    print(f"   ✅ {tdea2_filename}")
+    print()
+
+    # Generar perfil 3TDEA
+    print("4️⃣  Generando perfil 3TDEA (TripleDES Triple-length)...")
+    tdea3_profile = create_dukpt_profile_3tdea()
+    tdea3_filename = "dukpt_3tdea_profile.json"
+    with open(tdea3_filename, 'w') as f:
+        json.dump(tdea3_profile, f, indent=2)
+    print(f"   ✅ {tdea3_filename}")
+    print()
+
     print("=" * 80)
     print("📱 INSTRUCCIONES DE IMPORTACIÓN:")
     print("=" * 80)
     print()
-    print("OPCIÓN 1: Perfil Simple (recomendado para primera prueba)")
+    print("OPCIÓN 1: Perfil Simple AES-128 (recomendado para primera prueba)")
     print("-" * 80)
     print("1. Abre la app Injector")
     print("2. Ve a: Profiles > Import Profile")
@@ -136,12 +223,28 @@ def main():
     print("4. El perfil se importará y estará listo para usar")
     print()
 
-    print("OPCIÓN 2: Perfil Multi-Algorithm")
+    print("OPCIÓN 2: Perfil Multi-Algorithm (5 algoritmos: AES-128/192/256 + 3DES)")
     print("-" * 80)
     print("1. Abre la app Injector")
     print("2. Ve a: Profiles > Import Profile")
     print("3. Selecciona:", multi_filename)
-    print("4. Permite probar 3 algoritmos diferentes en la misma prueba")
+    print("4. Permite probar 5 algoritmos diferentes en la misma prueba")
+    print()
+
+    print("OPCIÓN 3: Perfil Individual 2TDEA")
+    print("-" * 80)
+    print("1. Abre la app Injector")
+    print("2. Ve a: Profiles > Import Profile")
+    print("3. Selecciona:", tdea2_filename)
+    print("4. Para pruebas aisladas de 3DES Double-length")
+    print()
+
+    print("OPCIÓN 4: Perfil Individual 3TDEA")
+    print("-" * 80)
+    print("1. Abre la app Injector")
+    print("2. Ve a: Profiles > Import Profile")
+    print("3. Selecciona:", tdea3_filename)
+    print("4. Para pruebas aisladas de 3DES Triple-length")
     print()
 
     print("=" * 80)

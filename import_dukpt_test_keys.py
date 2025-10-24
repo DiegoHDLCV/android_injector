@@ -35,7 +35,7 @@ def create_test_keys_file():
             "bytes": 32,
             "description": "KEK STORAGE - Llave maestra del sistema para DUKPT"
         },
-        # DUKPT IPEK Llaves
+        # DUKPT IPEK Llaves AES
         {
             "keyType": "DUKPT_IPEK",
             "futurexCode": "05",
@@ -62,13 +62,32 @@ def create_test_keys_file():
             "kcv": "AB1234",
             "bytes": 32,
             "description": "IPEK AES-256 DUKPT - Ejemplo de llave de 32 bytes"
+        },
+        # DUKPT IPEK Llaves 3DES (TripleDES)
+        {
+            "keyType": "DUKPT_IPEK",
+            "futurexCode": "05",
+            "algorithm": "DES_DOUBLE",
+            "keyHex": "C4F5B7A9D2E8F3A6B9C2D5E8F1A4B7C9",
+            "kcv": "3F8D42",
+            "bytes": 16,
+            "description": "IPEK 2TDEA DUKPT - Generada con KSN FFFF9876543210000001"
+        },
+        {
+            "keyType": "DUKPT_IPEK",
+            "futurexCode": "05",
+            "algorithm": "DES_TRIPLE",
+            "keyHex": "A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0C1D2E3F",
+            "kcv": "7B5E9C",
+            "bytes": 24,
+            "description": "IPEK 3TDEA DUKPT - Generada con KSN FFFF9876543210000002"
         }
     ]
 
     # Estructura del archivo de importación
     test_keys_file = {
         "generated": datetime.now().isoformat(),
-        "description": "Llaves de prueba DUKPT para inyección con EncryptionType 05 (incluye KEK STORAGE obligatoria)",
+        "description": "Llaves de prueba DUKPT para inyección con EncryptionType 05 - Incluye AES (128/192/256) y 3DES (2TDEA/3TDEA) - (incluye KEK STORAGE obligatoria)",
         "totalKeys": len(keys),
         "keys": keys
     }
