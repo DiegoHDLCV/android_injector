@@ -124,6 +124,15 @@ class AisinoComController(private val comport: Int = 0) : IComController { // `c
                 return ERROR_CLOSE_FAILED
             }
 
+            // 🔧 IMPORTANTE: Resetear puerto después del cierre para recuperar estado consistente
+            // Esto evita que el puerto quede en estado "pegado" para futuras conexiones
+            try {
+                Rs232Api.PortReset_Api(comport)
+                Log.d(TAG, "✓ Puerto $comport reseteado después del cierre")
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Error al resetear puerto $comport después del cierre: ${e.message}")
+            }
+
             Log.d(TAG, "✓ Puerto $comport cerrado")
             return SUCCESS
 

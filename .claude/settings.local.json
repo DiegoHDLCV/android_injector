@@ -12,7 +12,9 @@
       "Read(//Users/diegoherreradelacalle/Library/CloudStorage/OneDrive-VIGATECS.A/Respaldos/**)",
       "Bash(find:*)",
       "Bash(/dev/null)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(awk:*)",
+      "Bash(xargs basename:*)"
     ],
     "deny": [],
     "ask": []
