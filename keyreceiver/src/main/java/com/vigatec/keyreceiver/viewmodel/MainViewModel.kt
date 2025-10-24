@@ -233,17 +233,6 @@ class MainViewModel @Inject constructor(
 
         listeningJob = viewModelScope.launch(Dispatchers.IO) {
             Log.i(TAG, "startListeningInternal: Lanzando job de escucha en Dispatchers.IO.")
-
-            // 🔧 CRÍTICO: Pausar detección de cable durante escucha activa
-            // La detección de cable interfiere cuando el Injector usa el mismo puerto
-            Log.i(TAG, "⏸️ Pausando detección de cable para evitar interferencia con comunicación...")
-            cableDetectionJob?.cancel()
-            try {
-                cableDetectionJob?.join()  // Esperar a que termine limpiamente
-            } catch (e: Exception) {
-                Log.w(TAG, "Advertencia al pausar detección de cable: ${e.message}")
-            }
-
             var readAttempts = 0  // Declare before try so it's accessible in finally
             try {
                 _connectionStatus.value = ConnectionStatus.INITIALIZING
@@ -383,11 +372,6 @@ class MainViewModel @Inject constructor(
                 if (_connectionStatus.value != ConnectionStatus.ERROR) {
                     _connectionStatus.value = ConnectionStatus.DISCONNECTED
                 }
-
-                // 🔧 CRÍTICO: Reanudar detección de cable después de cerrar la escucha
-                Log.i(TAG, "▶️ Reanudando detección de cable...")
-                startCableDetection()
-
                 Log.i(TAG, "Listening closed.")
             }
         }
