@@ -32,14 +32,13 @@ object SystemConfig {
     @Volatile var deviceRole: DeviceRole = DeviceRole.SUBPOS
 
     // --- NUEVO: Candidatos de puertos y baudios para Aisino (pueden ajustarse vía futura pantalla de settings) ---
-    // Los puertos 6, 7, 8 corresponden a:
-    // - 6: ttyGS0 (Gadget Serial)
-    // - 7: ttyUSB0 (USB Serial)
-    // - 8: ttyACM0 (ACM Serial - Communication Device Class)
-    // Estos son los mismos puertos que usa NewPOS, asegurando compatibilidad con el mismo hardware
-    var aisinoCandidatePorts: List<Int> = listOf(7, 8, 6)  // USB primero, luego ACM, luego Gadget (como NewPOS)
-    // Orden: intenta 115200 primero (velocidad estándar para cables PED), luego 9600
-    var aisinoCandidateBauds: List<Int> = listOf(115200, 9600)
+    // IMPORTANTE: Los puertos disponibles varían según el dispositivo:
+    // - A90 Pro: Solo puerto 0 está disponible
+    // - Otros dispositivos Aisino: Puertos 0, 1 o 6, 7, 8 según el modelo
+    // El puerto 0 es el más universal y es el que funciona en A90 Pro
+    var aisinoCandidatePorts: List<Int> = listOf(0, 1, 7, 8, 6)  // Puerto 0 primero (A90 Pro), luego alternativas
+    // Orden: intenta 9600 primero (velocidad más común en A90 Pro), luego 115200
+    var aisinoCandidateBauds: List<Int> = listOf(9600, 115200)
 
     // Helpers
     fun isMaster(): Boolean = deviceRole == DeviceRole.MASTER
