@@ -45,8 +45,7 @@ android {
 
 dependencies {
     implementation(fileTree(mapOf("dir" to "../shared-libs", "include" to listOf("*.jar"), "exclude" to listOf("core-3.2.1.jar"))))
-    // CH340 USB Serial Driver (Special Cable Support)
-    implementation(files("libs/CH34xUARTDriver.jar"))
+    // Note: CH34xUARTDriver.jar is already included via shared-libs fileTree
 
     implementation(project(":config"))
     implementation(":urovo-sdk-v1.0.20:@aar")

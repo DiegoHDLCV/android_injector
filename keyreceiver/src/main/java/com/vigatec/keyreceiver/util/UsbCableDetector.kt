@@ -4,10 +4,19 @@ import android.content.Context
 import android.hardware.usb.UsbManager
 import android.util.Log
 import com.example.communication.polling.CommLog
+import com.example.communication.libraries.ch340.CH340CableDetector
+import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
  * Helper class para detectar cable USB conectado usando múltiples métodos
+ *
+ * MÉTODOS SOPORTADOS:
+ * 1. UsbManager API (detección de dispositivos USB genéricos)
+ * 2. Device Nodes (/dev/) - puertos seriales virtuales
+ * 3. System Files (/sys/bus/usb) - información del kernel
+ * 4. TTY Class (/sys/class/tty) - puertos TTY USB
+ * 5. CH340 Cable Detection - cables especiales con chip CH340/CH341
  */
 class UsbCableDetector(private val context: Context) {
     
@@ -186,36 +195,73 @@ class UsbCableDetector(private val context: Context) {
     }
     
     /**
+     * MÉTODO 5: Detectar cable especial CH340 (chip USB-Serial embebido)
+     * Soporta cables especiales para comunicación Aisino-Aisino, Aisino-NewPOS, etc.
+     *
+     * El cable CH340 contiene un chip que se identifica por VID/PID específicos:
+     * - Vendor ID: 0x1A86 (WCH)
+     * - Product ID: 0x7523, 0x5523, 0x5512 (diferentes variantes)
+     */
+    fun detectUsingCH340Cable(): Boolean {
+        return try {
+            CommLog.i(TAG, "🔌 Método 5 (CH340): Detectando cable especial con chip CH340...")
+
+            // Usar el detector CH340 de forma síncrona
+            val ch340Detector = CH340CableDetector(context)
+
+            // runBlocking ejecuta la coroutine en el thread actual
+            val detected = runBlocking {
+                ch340Detector.detectCable()
+            }
+
+            if (detected) {
+                CommLog.i(TAG, "✓ Método 5 (CH340): Cable especial CH340 detectado")
+                CommLog.d(TAG, ch340Detector.getDeviceInfo())
+                true
+            } else {
+                CommLog.d(TAG, "✗ Método 5 (CH340): Cable CH340 no detectado")
+                false
+            }
+
+        } catch (e: Exception) {
+            CommLog.w(TAG, "⚠️ Método 5 (CH340) error: ${e.message}")
+            false
+        }
+    }
+
+    /**
      * MÉTODO COMBINADO: Usa múltiples métodos para mayor confiabilidad
      * Retorna true si AL MENOS UNO de los métodos detecta cable
      */
     fun detectCombined(): DetectionResult {
         CommLog.d(TAG, "═══ Iniciando detección combinada de cable USB ═══")
-        
+
         val method1 = detectUsingUsbManager()
         val method2 = detectUsingDeviceNodes()
         val method3 = detectUsingSystemFiles()
         val method4 = detectUsingTtyClass()
-        
-        val detected = method1 || method2 || method3 || method4
+        val method5 = detectUsingCH340Cable()
+
+        val detected = method1 || method2 || method3 || method4 || method5
         
         val result = DetectionResult(
             detected = detected,
             usbManagerDetected = method1,
             deviceNodesDetected = method2,
             systemFilesDetected = method3,
-            ttyClassDetected = method4
+            ttyClassDetected = method4,
+            ch340CableDetected = method5
         )
-        
+
         if (detected) {
-            CommLog.i(TAG, "✅ CABLE USB DETECTADO (${result.detectionCount()}/4 métodos)")
+            CommLog.i(TAG, "✅ CABLE USB DETECTADO (${result.detectionCount()}/5 métodos)")
         } else {
-            CommLog.w(TAG, "⚠️ CABLE USB NO DETECTADO (0/4 métodos)")
+            CommLog.w(TAG, "⚠️ CABLE USB NO DETECTADO (0/5 métodos)")
         }
-        
+
         return result
     }
-    
+
     /**
      * Clase de resultado con detalles de cada método
      */
@@ -224,7 +270,8 @@ class UsbCableDetector(private val context: Context) {
         val usbManagerDetected: Boolean,
         val deviceNodesDetected: Boolean,
         val systemFilesDetected: Boolean,
-        val ttyClassDetected: Boolean
+        val ttyClassDetected: Boolean,
+        val ch340CableDetected: Boolean = false
     ) {
         fun detectionCount(): Int {
             var count = 0
@@ -232,20 +279,22 @@ class UsbCableDetector(private val context: Context) {
             if (deviceNodesDetected) count++
             if (systemFilesDetected) count++
             if (ttyClassDetected) count++
+            if (ch340CableDetected) count++
             return count
         }
-        
+
         fun getDetectingMethods(): String {
             val methods = mutableListOf<String>()
             if (usbManagerDetected) methods.add("UsbManager")
             if (deviceNodesDetected) methods.add("/dev/")
             if (systemFilesDetected) methods.add("/sys/bus/usb")
             if (ttyClassDetected) methods.add("/sys/class/tty")
+            if (ch340CableDetected) methods.add("CH340 Cable")
             return methods.joinToString(", ")
         }
-        
+
         override fun toString(): String {
-            return "DetectionResult(detected=$detected, methods=${detectionCount()}/4: ${getDetectingMethods()})"
+            return "DetectionResult(detected=$detected, methods=${detectionCount()}/5: ${getDetectingMethods()})"
         }
     }
 }
