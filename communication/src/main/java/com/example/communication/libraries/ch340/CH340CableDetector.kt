@@ -69,13 +69,14 @@ class CH340CableDetector(private val context: Context) {
             Log.i(TAG, "║ CH340 CABLE DETECTION")
             Log.i(TAG, "╠═══════════════════════════════════════════════════════════════")
 
-            // Step 1: Check USB Host support
-            if (!hasUsbHostSupport()) {
-                Log.e(TAG, "║ ❌ Device does not support USB Host mode")
-                Log.d(TAG, "╚═══════════════════════════════════════════════════════════════")
-                return@withContext false
+            // Step 1: Check USB Host support (informative only, not blocking)
+            val hasHostSupport = hasUsbHostSupport()
+            if (hasHostSupport) {
+                Log.i(TAG, "║ ✓ USB Host mode supported")
+            } else {
+                Log.w(TAG, "║ ⚠️ USB Host mode not reported, but CH340 may still work")
+                Log.i(TAG, "║ ℹ️ Continuing with CH340 detection anyway...")
             }
-            Log.i(TAG, "║ ✓ USB Host mode supported")
 
             // Step 2: Create driver instance
             driver = CH34xUARTDriver(
