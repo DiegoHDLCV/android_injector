@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+    CH340 USB Serial Chip Device Filter Configuration
+
+    Detects CH340/CH341/CH342 USB-to-Serial chips for cable communication
+    between Android devices (e.g., Aisino-Aisino, Aisino-NewPOS, Urovo combinations)
+
+    Vendor ID: 0x1A86 (WCH - Nanjing Qinheng Microelectronics Co., Ltd.)
+
+    Supported Product IDs:
+    - 0x7523 (29987): CH340 USB-to-Serial chip (most common)
+    - 0x5523 (21795): CH341 USB-to-Serial/Parallel chip
+    - 0x5512 (21778): CH340 variant / CH342
+    -->
+
+    <!-- CH340 - Most common variant -->
+    <usb-device vendor-id="6790" product-id="29987" />
+
+    <!-- CH341 - USB-to-Serial/Parallel variant -->
+    <usb-device vendor-id="6790" product-id="21795" />
+
+    <!-- CH340 / CH342 variant -->
+    <usb-device vendor-id="6790" product-id="21778" />
+
+</resources>

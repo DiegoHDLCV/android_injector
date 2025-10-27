@@ -14,7 +14,15 @@
       "Bash(/dev/null)",
       "Bash(tree:*)",
       "Bash(awk:*)",
-      "Bash(xargs basename:*)"
+      "Bash(xargs basename:*)",
+      "Bash(unrar x:*)",
+      "Bash(unar:*)",
+      "Bash(brew install:*)",
+      "Bash(unzip:*)",
+      "Bash(javap:*)",
+      "Read(//private/tmp/**)",
+      "Bash(bsdtar:*)",
+      "Bash(jar tf:*)"
     ],
     "deny": [],
     "ask": []
