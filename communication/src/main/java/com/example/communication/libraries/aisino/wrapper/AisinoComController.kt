@@ -75,6 +75,10 @@ class AisinoComController(
     private var usbController: AisinoUsbComController? = null
     private var usingUsbHost: Boolean = false
 
+    // Para cable CH340 especial (NUEVO)
+    private var ch340Detector: com.example.communication.libraries.ch340.CH340CableDetector? = null
+    private var usingCH340Cable: Boolean = false
+
     private fun mapBaudRate(baudRate: EnumCommConfBaudRate): Int {
         return when (baudRate) {
             EnumCommConfBaudRate.BPS_1200 -> 1200
@@ -221,6 +225,13 @@ class AisinoComController(
 
         try {
             return when {
+                usingCH340Cable -> {
+                    val bytesWritten = ch340Detector?.writeData(data) ?: ERROR_NOT_OPEN
+                    if (bytesWritten > 0) {
+                        Log.i(TAG, "📤 TX cable CH340: $bytesWritten bytes")
+                    }
+                    bytesWritten
+                }
                 usingUsbHost -> usbController?.write(data, timeout) ?: ERROR_NOT_OPEN
                 usingVirtualPort -> {
                     virtualPortOutputStream?.write(data)
@@ -256,6 +267,18 @@ class AisinoComController(
 
         try {
             return when {
+                usingCH340Cable -> {
+                    val data = ch340Detector?.readData(expectedLen)
+                    if (data != null && data.isNotEmpty()) {
+                        val bytesRead = minOf(data.size, buffer.size)
+                        data.copyInto(buffer, 0, 0, bytesRead)
+                        val hexData = buffer.take(bytesRead).joinToString("") { "%02X".format(it) }
+                        Log.i(TAG, "📥 RX cable CH340: $bytesRead bytes - $hexData")
+                        bytesRead
+                    } else {
+                        0
+                    }
+                }
                 usingUsbHost -> usbController?.readData(expectedLen, buffer, timeout)
                     ?: ERROR_NOT_OPEN
                 usingVirtualPort -> {
@@ -289,6 +312,7 @@ class AisinoComController(
 
     /**
      * Intentar abrir mediante USB Host API
+     * Incluye detección de cables CH340 especiales
      *
      * @return SUCCESS si se abre correctamente, ERROR_OPEN_FAILED si falla
      */
@@ -300,6 +324,11 @@ class AisinoComController(
 
             if (devices.isEmpty()) {
                 Log.d(TAG, "║ ⚠️ No hay dispositivos Aisino USB")
+                // NUEVO: Si no hay dispositivos Aisino, intentar detectar cable CH340
+                Log.d(TAG, "║ Intentando detectar cable especial CH340...")
+                if (tryDetectCH340Cable()) {
+                    return SUCCESS
+                }
                 return ERROR_OPEN_FAILED
             }
 
@@ -339,6 +368,40 @@ class AisinoComController(
     }
 
     /**
+     * Detectar y usar cable especial CH340 (NUEVO)
+     * Esto permite comunicación Aisino-Aisino a través de cable con chip CH340
+     */
+    private fun tryDetectCH340Cable(): Boolean {
+        return try {
+            Log.d(TAG, "║ Detectando cable CH340...")
+            // Crear instancia de CH340CableDetector
+            ch340Detector = com.example.communication.libraries.ch340.CH340CableDetector(context!!)
+
+            // Ejecutar detección de forma síncrona
+            val detected = kotlinx.coroutines.runBlocking {
+                ch340Detector!!.detectCable()
+            }
+
+            if (detected) {
+                Log.i(TAG, "║ ✅ Cable CH340 detectado y listo")
+                // Configurar UART según parámetros almacenados
+                ch340Detector!!.configure(storedBaudRate, storedDataBits, storedStopBits, storedParity, 0)
+
+                usingCH340Cable = true
+                isOpen = true
+                Log.i(TAG, "║ ✓ CH340 configurado: ${storedBaudRate}bps ${storedDataBits}N${storedStopBits}")
+                return true
+            } else {
+                Log.d(TAG, "║ ✗ Cable CH340 no encontrado")
+                return false
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "║ Error detectando CH340: ${e.message}")
+            false
+        }
+    }
+
+    /**
      * Cerrar puerto, delegando según el tipo
      */
     override fun close(): Int {
@@ -348,6 +411,18 @@ class AisinoComController(
 
         return try {
             when {
+                usingCH340Cable -> {
+                    try {
+                        ch340Detector?.close()
+                        Log.d(TAG, "✓ Cable CH340 cerrado")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "⚠️ Error al cerrar cable CH340: ${e.message}")
+                    }
+                    ch340Detector = null
+                    usingCH340Cable = false
+                    isOpen = false
+                    SUCCESS
+                }
                 usingUsbHost -> {
                     usbController?.close() ?: SUCCESS
                 }
