@@ -97,7 +97,7 @@ object AisinoCommunicationManager : ICommunicationManager {
             val availablePorts = mutableListOf<Int>()
             for (portNum in 0..15) {
                 try {
-                    val testController = AisinoComController(comport = portNum)
+                    val testController = AisinoComController(comport = portNum, context = applicationContext)
                     testController.init(
                         com.example.communication.base.EnumCommConfBaudRate.BPS_115200,
                         com.example.communication.base.EnumCommConfParity.NOPAR,
@@ -116,7 +116,7 @@ object AisinoCommunicationManager : ICommunicationManager {
             for (p in ports) {
                 for (b in bauds) {
                     try {
-                        val temp = AisinoComController(comport = p)
+                        val temp = AisinoComController(comport = p, context = applicationContext)
                         temp.init(
                             when (b) {
                                 115200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_115200
@@ -177,7 +177,7 @@ object AisinoCommunicationManager : ICommunicationManager {
         if (comControllerInstance == null) {
             Log.d(TAG, "Creando nueva instancia de AisinoComController para el puerto $selectedPort...")
             try {
-                comControllerInstance = AisinoComController(comport = selectedPort)
+                comControllerInstance = AisinoComController(comport = selectedPort, context = applicationContext)
                 // Aplicar init con baud seleccionado
                 val baudEnum = when (selectedBaud) {
                     115200 -> com.example.communication.base.EnumCommConfBaudRate.BPS_115200
