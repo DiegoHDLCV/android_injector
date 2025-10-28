@@ -6,6 +6,7 @@ import android.util.Log
 import com.example.communication.polling.CommLog
 import com.example.communication.libraries.ch340.CH340CableDetector
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
 /**
@@ -201,17 +202,27 @@ class UsbCableDetector(private val context: Context) {
      * El cable CH340 contiene un chip que se identifica por VID/PID específicos:
      * - Vendor ID: 0x1A86 (WCH)
      * - Product ID: 0x7523, 0x5523, 0x5512 (diferentes variantes)
+     *
+     * NOTA: Implementado con timeout para evitar bloqueos prolongados
+     * Si CH340 detection tarda más de 1 segundo, asume que no está disponible
      */
     fun detectUsingCH340Cable(): Boolean {
         return try {
-            CommLog.i(TAG, "🔌 Método 5 (CH340): Detectando cable especial con chip CH340...")
+            CommLog.d(TAG, "🔌 Método 5 (CH340): Detectando cable especial con timeout (1s)...")
 
-            // Usar el detector CH340 de forma síncrona
+            // Usar el detector CH340 con timeout para evitar bloqueos
             val ch340Detector = CH340CableDetector(context)
 
-            // runBlocking ejecuta la coroutine en el thread actual
+            // Usar timeout de 1 segundo - si no completa en ese tiempo, asume no detectado
             val detected = runBlocking {
-                ch340Detector.detectCable()
+                try {
+                    kotlinx.coroutines.withTimeoutOrNull(1000) {
+                        ch340Detector.detectCable()
+                    } ?: false
+                } catch (e: Exception) {
+                    CommLog.w(TAG, "⚠️ Método 5 (CH340) timeout: ${e.message}")
+                    false
+                }
             }
 
             if (detected) {

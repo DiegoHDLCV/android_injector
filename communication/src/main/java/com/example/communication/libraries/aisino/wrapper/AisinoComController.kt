@@ -12,23 +12,36 @@ import com.vanstone.trans.api.Rs232Api
 import java.io.InputStream
 import java.io.OutputStream
 import java.io.File
+import kotlinx.coroutines.*
+import kotlinx.coroutines.selects.select
 
 /**
- * AisinoComController HÍBRIDO con triple estrategia
+ * AisinoComController HÍBRIDO con detección PARALELA de múltiples estrategias
  *
- * ESTRATEGIA:
- * 1. Intenta puertos virtuales Linux (ttyUSB0/ttyACM0/ttyGS0)
- *    → Permite acceso compartido (Aisino-Aisino paralelo) ✅
+ * ESTRATEGIA PARALELA (Race Condition):
+ * Lanza simultáneamente 3 métodos de detección y usa el primero que tenga éxito:
  *
- * 2. Intenta USB Host API si contexto disponible
- *    → Detección automática de dispositivos ✅
+ * 1. Puertos virtuales Linux (ttyUSB0/ttyACM0/ttyGS0)
+ *    → Compatible con Newpos y dispositivos USB-serial estándar ✅
+ *    → Permite acceso compartido (múltiples procesos) ✅
+ *
+ * 2. Cable CH340 especial (Vendor ID: 0x1A86)
+ *    → Para comunicación Aisino-Aisino con cable especial ✅
+ *    → Detección automática del chip CH340 ✅
+ *
+ * 3. USB Host API (dispositivos Aisino estándar)
+ *    → Detección automática por Vendor ID ✅
  *    → Estándar USB (no propietario) ✅
  *
- * 3. Fallback a Rs232Api (comportamiento original)
- *    → Compatible con todos los Aisino ✅
+ * 4. Fallback a Rs232Api (comportamiento original)
+ *    → Solo si todas las estrategias paralelas fallan
  *    → Acceso exclusivo (limitación)
  *
- * VENTAJA: Combina lo mejor de cada estrategia
+ * VENTAJAS:
+ * - Detección automática sin configuración manual
+ * - El primer método exitoso gana la "carrera"
+ * - Soporta tanto Aisino-Aisino (CH340) como Aisino-Newpos (USB OTG)
+ * - Máxima velocidad de detección
  */
 class AisinoComController(
     private val comport: Int = 0,
@@ -123,8 +136,8 @@ class AisinoComController(
     }
 
     /**
-     * Intenta abrir un puerto virtual Linux como NewPOS
-     * Si todos fallan, fallback a Rs232Api.PortOpen_Api(comport)
+     * Intenta abrir puerto usando detección paralela de múltiples estrategias
+     * Si todas fallan, fallback a Rs232Api.PortOpen_Api(comport)
      */
     override fun open(): Int {
         if (isOpen) {
@@ -133,54 +146,29 @@ class AisinoComController(
         }
 
         try {
-            // PASO 1: Intentar puertos virtuales Linux (como NewPOS)
             Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
-            Log.i(TAG, "║ AISINO COM OPEN - Intentando puertos virtuales")
+            Log.i(TAG, "║ AISINO COM OPEN - Detección Paralela")
             Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
 
-            for ((portPath, portName) in VIRTUAL_PORTS) {
-                Log.i(TAG, "║ 🔍 Intentando $portName...")
-                try {
-                    val portFile = File(portPath)
-                    if (portFile.exists() && portFile.canRead() && portFile.canWrite()) {
-                        Log.i(TAG, "║ ✓ Puerto virtual encontrado: $portPath")
-
-                        // Abrir puerto virtual como FileInputStream/OutputStream
-                        virtualPortInputStream = portFile.inputStream()
-                        virtualPortOutputStream = portFile.outputStream()
-
-                        usingVirtualPort = true
-                        virtualPortPath = portPath
-                        isOpen = true
-
-                        Log.i(TAG, "║ ✅ Puerto virtual abierto exitosamente")
-                        Log.i(TAG, "║ ✓ Usando puerto virtual: $portName ($portPath)")
-                        Log.i(TAG, "║ ✅ VENTAJA: Acceso compartido permitido (múltiples procesos)")
-                        Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
-
-                        return SUCCESS
-                    }
-                } catch (e: Exception) {
-                    Log.d(TAG, "║ ⚠️ $portName no disponible: ${e.message}")
-                }
+            // ESTRATEGIA PARALELA: Intentar las 3 estrategias simultáneamente
+            val parallelSuccess = runBlocking {
+                tryOpenParallel()
             }
 
-            // PASO 2: Intentar USB Host API si contexto disponible
-            if (context != null) {
-                Log.i(TAG, "║ [2/3] Intentando USB Host API...")
-                val usbResult = tryOpenUsbHost()
-                if (usbResult == SUCCESS) {
-                    Log.i(TAG, "║ ✅ Usando USB Host API")
-                    Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
-                    return SUCCESS
+            if (parallelSuccess) {
+                Log.i(TAG, "║ ✅ Puerto abierto exitosamente mediante detección paralela")
+                when {
+                    usingVirtualPort -> Log.i(TAG, "║ ✓ Modo: Puerto Virtual ($virtualPortPath)")
+                    usingCH340Cable -> Log.i(TAG, "║ ✓ Modo: Cable CH340")
+                    usingUsbHost -> Log.i(TAG, "║ ✓ Modo: USB Host API")
                 }
-            } else {
-                Log.d(TAG, "║ [2/3] Omitiendo USB Host (sin contexto)")
+                Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
+                return SUCCESS
             }
 
-            // PASO 3: Si todos fallan, fallback a Rs232Api (comportamiento original)
-            Log.i(TAG, "║ [3/3] Intentando fallback Rs232Api...")
-            Log.i(TAG, "║ Intentando Puerto 0 (Rs232Api.PortOpen_Api)...")
+            // FALLBACK: Si todas las estrategias paralelas fallan, usar Rs232Api
+            Log.i(TAG, "║ Todas las estrategias paralelas fallaron")
+            Log.i(TAG, "║ Intentando fallback Rs232Api (Puerto $comport)...")
 
             var result = Rs232Api.PortOpen_Api(comport)
             if (result != AISINO_SUCCESS) {
@@ -200,10 +188,11 @@ class AisinoComController(
             }
 
             usingVirtualPort = false
+            usingUsbHost = false
+            usingCH340Cable = false
             isOpen = true
             Log.i(TAG, "║ ✓ Puerto Rs232 $comport abierto (${storedBaudRate}bps)")
-            Log.i(TAG, "║ ⚠️ Advertencia: Usando Puerto 0 (acceso exclusivo, sin compartir)")
-            Log.i(TAG, "║ NOTA: Para Aisino-Aisino, considere usar puertos virtuales")
+            Log.i(TAG, "║ ⚠️ Advertencia: Usando Puerto 0 (acceso exclusivo)")
             Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
             return SUCCESS
 
@@ -268,7 +257,8 @@ class AisinoComController(
         try {
             return when {
                 usingCH340Cable -> {
-                    val data = ch340Detector?.readData(expectedLen)
+                    // Pass timeout to CH340 read with default of 50ms polling
+                    val data = ch340Detector?.readData(expectedLen, timeout)
                     if (data != null && data.isNotEmpty()) {
                         val bytesRead = minOf(data.size, buffer.size)
                         data.copyInto(buffer, 0, 0, bytesRead)
@@ -311,93 +301,205 @@ class AisinoComController(
     }
 
     /**
-     * Intentar abrir mediante USB Host API
-     * Incluye detección de cables CH340 especiales
+     * Estrategia de detección paralela con race condition
+     * Lanza las 3 estrategias simultáneamente y usa la primera que tenga éxito
      *
-     * @return SUCCESS si se abre correctamente, ERROR_OPEN_FAILED si falla
+     * Estrategias en paralelo:
+     * 1. Puertos virtuales (para Newpos y USB-serial estándar)
+     * 2. Cable CH340 (para Aisino-Aisino con cable especial)
+     * 3. USB Host API (para dispositivos Aisino estándar)
      */
-    private fun tryOpenUsbHost(): Int {
-        return try {
-            val usbManager = context!!.getSystemService(Context.USB_SERVICE) as UsbManager
-            val deviceManager = AisinoUsbDeviceManager(context!!)
-            val devices = deviceManager.findAisinoDevices()
+    private suspend fun tryOpenParallel(): Boolean {
+        return coroutineScope {
+            Log.i(TAG, "║ Iniciando detección paralela de puertos...")
 
-            if (devices.isEmpty()) {
-                Log.d(TAG, "║ ⚠️ No hay dispositivos Aisino USB")
-                // NUEVO: Si no hay dispositivos Aisino, intentar detectar cable CH340
-                Log.d(TAG, "║ Intentando detectar cable especial CH340...")
-                if (tryDetectCH340Cable()) {
-                    return SUCCESS
+            // Lanzar las 3 estrategias en paralelo
+            val virtualPortDeferred = async { tryOpenVirtualPortsAsync() }
+            val ch340Deferred = async {
+                // Solo intentar CH340 si hay contexto
+                if (context != null) tryDetectCH340CableAsync() else false
+            }
+            val usbHostDeferred = async {
+                // Solo intentar USB Host si hay contexto
+                if (context != null) tryOpenUsbHostAsync() else false
+            }
+
+            // Esperar a que cualquiera de las 3 termine con éxito
+            // Usar select para race condition
+            val result = select<Boolean> {
+                virtualPortDeferred.onAwait { success ->
+                    if (success) {
+                        Log.i(TAG, "║ 🏆 GANADOR: Puerto Virtual")
+                        // Cancelar las otras tareas
+                        ch340Deferred.cancel()
+                        usbHostDeferred.cancel()
+                        true
+                    } else {
+                        false
+                    }
                 }
-                return ERROR_OPEN_FAILED
+
+                ch340Deferred.onAwait { success ->
+                    if (success) {
+                        Log.i(TAG, "║ 🏆 GANADOR: Cable CH340")
+                        // Cancelar las otras tareas
+                        virtualPortDeferred.cancel()
+                        usbHostDeferred.cancel()
+                        true
+                    } else {
+                        false
+                    }
+                }
+
+                usbHostDeferred.onAwait { success ->
+                    if (success) {
+                        Log.i(TAG, "║ 🏆 GANADOR: USB Host API")
+                        // Cancelar las otras tareas
+                        virtualPortDeferred.cancel()
+                        ch340Deferred.cancel()
+                        true
+                    } else {
+                        false
+                    }
+                }
             }
 
-            val device = devices[0].device
-            if (!deviceManager.hasPermission(device)) {
-                Log.d(TAG, "║ ⚠️ Sin permiso USB para ${device.deviceName}")
-                return ERROR_OPEN_FAILED
-            }
-
-            usbController = deviceManager.createController(device)
-            val result = usbController!!.init(
-                EnumCommConfBaudRate.BPS_115200,
-                EnumCommConfParity.NOPAR,
-                EnumCommConfDataBits.DB_8
-            )
-
-            if (result != SUCCESS) {
-                Log.d(TAG, "║ ⚠️ Error inicializando controlador USB")
-                return ERROR_OPEN_FAILED
-            }
-
-            val openResult = usbController!!.open()
-            if (openResult == SUCCESS) {
-                usingUsbHost = true
-                isOpen = true
-                Log.i(TAG, "║ ✓ USB Host: ${device.deviceName}")
-                SUCCESS
+            // Si select no encontró ganador, esperar a que todas terminen
+            if (!result) {
+                val allResults = awaitAll(virtualPortDeferred, ch340Deferred, usbHostDeferred)
+                Log.d(TAG, "║ Resultados finales: Virtual=${allResults[0]}, CH340=${allResults[1]}, USB=${allResults[2]}")
+                allResults.any { it }
             } else {
-                Log.d(TAG, "║ ⚠️ Error abriendo USB: $openResult")
-                ERROR_OPEN_FAILED
+                result
             }
-
-        } catch (e: Exception) {
-            Log.d(TAG, "║ ⚠️ Excepción USB: ${e.message}")
-            ERROR_GENERAL_EXCEPTION
         }
     }
 
     /**
-     * Detectar y usar cable especial CH340 (NUEVO)
+     * Intentar abrir mediante USB Host API (VERSIÓN ASYNC SIN CH340)
+     * Solo detecta dispositivos Aisino estándar por vendor ID
+     */
+    private suspend fun tryOpenUsbHostAsync(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "║ [USB] Detectando dispositivos USB Aisino...")
+                val usbManager = context!!.getSystemService(Context.USB_SERVICE) as UsbManager
+                val deviceManager = AisinoUsbDeviceManager(context!!)
+                val devices = deviceManager.findAisinoDevices()
+
+                if (devices.isEmpty()) {
+                    Log.d(TAG, "║ [USB] ✗ No hay dispositivos Aisino USB")
+                    return@withContext false
+                }
+
+                val device = devices[0].device
+                if (!deviceManager.hasPermission(device)) {
+                    Log.d(TAG, "║ [USB] ✗ Sin permiso USB para ${device.deviceName}")
+                    return@withContext false
+                }
+
+                val controller = deviceManager.createController(device)
+                val initResult = controller.init(
+                    EnumCommConfBaudRate.BPS_115200,
+                    EnumCommConfParity.NOPAR,
+                    EnumCommConfDataBits.DB_8
+                )
+
+                if (initResult != SUCCESS) {
+                    Log.d(TAG, "║ [USB] ✗ Error inicializando controlador USB")
+                    return@withContext false
+                }
+
+                val openResult = controller.open()
+                if (openResult == SUCCESS) {
+                    usbController = controller
+                    usingUsbHost = true
+                    isOpen = true
+                    Log.i(TAG, "║ [USB] ✅ USB Host abierto: ${device.deviceName}")
+                    true
+                } else {
+                    Log.d(TAG, "║ [USB] ✗ Error abriendo USB: $openResult")
+                    false
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "║ [USB] Error general: ${e.message}")
+                false
+            }
+        }
+    }
+
+    /**
+     * Intentar abrir puertos virtuales Linux (VERSIÓN ASYNC)
+     * Compatible con Newpos y otros dispositivos USB-serial estándar
+     */
+    private suspend fun tryOpenVirtualPortsAsync(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "║ [VIRTUAL] Detectando puertos virtuales...")
+
+                for ((portPath, portName) in VIRTUAL_PORTS) {
+                    try {
+                        val portFile = File(portPath)
+                        if (portFile.exists() && portFile.canRead() && portFile.canWrite()) {
+                            Log.i(TAG, "║ [VIRTUAL] ✓ Puerto encontrado: $portPath")
+
+                            // Abrir puerto virtual como FileInputStream/OutputStream
+                            virtualPortInputStream = portFile.inputStream()
+                            virtualPortOutputStream = portFile.outputStream()
+
+                            usingVirtualPort = true
+                            virtualPortPath = portPath
+                            isOpen = true
+
+                            Log.i(TAG, "║ [VIRTUAL] ✅ Puerto virtual abierto: $portName")
+                            return@withContext true
+                        }
+                    } catch (e: Exception) {
+                        Log.d(TAG, "║ [VIRTUAL] ✗ $portName no disponible: ${e.message}")
+                    }
+                }
+
+                Log.d(TAG, "║ [VIRTUAL] ✗ No hay puertos virtuales disponibles")
+                false
+            } catch (e: Exception) {
+                Log.d(TAG, "║ [VIRTUAL] Error general: ${e.message}")
+                false
+            }
+        }
+    }
+
+    /**
+     * Detectar y usar cable especial CH340 (VERSIÓN ASYNC)
      * Esto permite comunicación Aisino-Aisino a través de cable con chip CH340
      */
-    private fun tryDetectCH340Cable(): Boolean {
-        return try {
-            Log.d(TAG, "║ Detectando cable CH340...")
-            // Crear instancia de CH340CableDetector
-            ch340Detector = com.example.communication.libraries.ch340.CH340CableDetector(context!!)
+    private suspend fun tryDetectCH340CableAsync(): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "║ [CH340] Detectando cable CH340...")
+                // Crear instancia de CH340CableDetector
+                val detector = com.example.communication.libraries.ch340.CH340CableDetector(context!!)
 
-            // Ejecutar detección de forma síncrona
-            val detected = kotlinx.coroutines.runBlocking {
-                ch340Detector!!.detectCable()
+                // Ejecutar detección de forma asíncrona
+                val detected = detector.detectCable()
+
+                if (detected) {
+                    Log.i(TAG, "║ [CH340] ✅ Cable CH340 detectado y listo")
+                    // Configurar UART según parámetros almacenados
+                    detector.configure(storedBaudRate, storedDataBits, storedStopBits, storedParity, 0)
+
+                    ch340Detector = detector
+                    usingCH340Cable = true
+                    isOpen = true
+                    Log.i(TAG, "║ [CH340] ✓ Configurado: ${storedBaudRate}bps ${storedDataBits}N${storedStopBits}")
+                    true
+                } else {
+                    Log.d(TAG, "║ [CH340] ✗ Cable CH340 no encontrado")
+                    false
+                }
+            } catch (e: Exception) {
+                Log.d(TAG, "║ [CH340] Error detectando: ${e.message}")
+                false
             }
-
-            if (detected) {
-                Log.i(TAG, "║ ✅ Cable CH340 detectado y listo")
-                // Configurar UART según parámetros almacenados
-                ch340Detector!!.configure(storedBaudRate, storedDataBits, storedStopBits, storedParity, 0)
-
-                usingCH340Cable = true
-                isOpen = true
-                Log.i(TAG, "║ ✓ CH340 configurado: ${storedBaudRate}bps ${storedDataBits}N${storedStopBits}")
-                return true
-            } else {
-                Log.d(TAG, "║ ✗ Cable CH340 no encontrado")
-                return false
-            }
-        } catch (e: Exception) {
-            Log.d(TAG, "║ Error detectando CH340: ${e.message}")
-            false
         }
     }
 

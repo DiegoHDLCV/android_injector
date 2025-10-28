@@ -762,19 +762,63 @@ class MainViewModel @Inject constructor(
                         throw PedKeyException("KSN inválido o vacío para DUKPT: ${command.ksn}")
                     }
 
-                    // VALIDACIÓN LONGITUD IPEK SEGÚN ALGORITMO
+                    // VALIDACIÓN DE COMPATIBILIDAD CON EL DISPOSITIVO
+                    // Aisino PED solo soporta 3DES DUKPT (16 bytes), NO soporta AES DUKPT
+                    val pedControllerName = pedController!!::class.simpleName
+                    var effectiveAlgorithm = genericAlgorithm
                     val ipekBytes = command.keyHex.hexToByteArray()
-                    val expectedLength = when (genericAlgorithm) {
+
+                    if (pedControllerName?.contains("Aisino") == true &&
+                        genericAlgorithm in listOf(
+                            GenericKeyAlgorithm.AES_128,
+                            GenericKeyAlgorithm.AES_192,
+                            GenericKeyAlgorithm.AES_256
+                        )) {
+
+                        // VALIDACIÓN CRÍTICA: Rechazar claves más grandes que 16 bytes
+                        // Nunca truncar silenciosamente - es un riesgo de seguridad
+                        if (ipekBytes.size > 16) {
+                            Log.e(TAG, "❌ INCOMPATIBILIDAD CRÍTICA DE SEGURIDAD")
+                            Log.e(TAG, "   Dispositivo Aisino: Solo soporta 3DES (16 bytes máximo)")
+                            Log.e(TAG, "   Clave solicitada: $genericAlgorithm (${ipekBytes.size} bytes)")
+                            Log.e(TAG, "   Slot: ${command.keySlot}")
+                            Log.e(TAG, "   RAZÓN DEL RECHAZO:")
+                            Log.e(TAG, "   - Truncar la clave causaría pérdida de entropía")
+                            Log.e(TAG, "   - Violaría políticas de seguridad PCI-DSS")
+                            Log.e(TAG, "   - Cambiaría el algoritmo original sin auditoría clara")
+                            Log.e(TAG, "   SOLUCIÓN:")
+                            Log.e(TAG, "   - Generar nuevas claves en tamaño compatible (16 bytes)")
+                            Log.e(TAG, "   - O usar dispositivo que soporte $genericAlgorithm")
+                            throw PedKeyException(
+                                "❌ INYECCIÓN RECHAZADA - INCOMPATIBILIDAD CRÍTICA\n\n" +
+                                "Dispositivo: Aisino PED (solo soporta 3DES / 16 bytes)\n" +
+                                "Clave solicitada: $genericAlgorithm (${ipekBytes.size} bytes)\n" +
+                                "Slot: ${command.keySlot}\n\n" +
+                                "NO se pueden truncar claves silenciosamente por razones de seguridad.\n" +
+                                "Genere nuevas claves en formato 3DES (16 bytes) o use otro dispositivo."
+                            )
+                        }
+
+                        // Solo convertir si tamaño es compatible (16 bytes)
+                        Log.w(TAG, "⚠️ ADVERTENCIA: Aisino PED NO soporta AES DUKPT")
+                        Log.w(TAG, "   Se convertirá automáticamente a 3DES DUKPT (DES_TRIPLE)")
+                        Log.w(TAG, "   Algoritmo solicitado: $genericAlgorithm (${ipekBytes.size} bytes)")
+                        Log.w(TAG, "   Algoritmo a usar: DES_TRIPLE (16 bytes)")
+                        effectiveAlgorithm = GenericKeyAlgorithm.DES_TRIPLE
+                    }
+
+                    // VALIDACIÓN LONGITUD IPEK SEGÚN ALGORITMO
+                    val expectedLength = when (effectiveAlgorithm) {
                         GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> 16 // Ambos 3DES usan 16 bytes para DUKPT
                         GenericKeyAlgorithm.AES_128 -> 16
                         GenericKeyAlgorithm.AES_192 -> 24
                         GenericKeyAlgorithm.AES_256 -> 32
-                        else -> throw PedKeyException("Algoritmo no soportado para DUKPT: $genericAlgorithm")
+                        else -> throw PedKeyException("Algoritmo no soportado para DUKPT: $effectiveAlgorithm")
                     }
 
                     if (ipekBytes.size != expectedLength) {
                         throw PedKeyException(
-                            "Longitud de IPEK incorrecta para $genericAlgorithm: " +
+                            "Longitud de IPEK incorrecta para $effectiveAlgorithm: " +
                             "recibido ${ipekBytes.size} bytes, esperado $expectedLength bytes. " +
                             "Para DUKPT 3DES (2TDEA y 3TDEA) siempre se usan 16 bytes."
                         )
@@ -786,9 +830,9 @@ class MainViewModel @Inject constructor(
 
                     // CONVERSIÓN KSN: Futurex usa 10 bytes (20 hex chars)
                     // Para AES: NewPOS espera 12 bytes (agrega 2 bytes de ceros al inicio)
-                    // Para 3DES: NewPOS espera 10 bytes (sin padding)
+                    // Para 3DES: ambos esperan 10 bytes (sin padding)
                     val ksnBytes = command.ksn.hexToByteArray()
-                    val needsKsnPadding = genericAlgorithm in listOf(
+                    val needsKsnPadding = effectiveAlgorithm in listOf(
                         GenericKeyAlgorithm.AES_128,
                         GenericKeyAlgorithm.AES_192,
                         GenericKeyAlgorithm.AES_256
@@ -806,18 +850,39 @@ class MainViewModel @Inject constructor(
                         ksnBytes
                     }
 
-                    pedController!!.createDukptAESKey(
-                        keyIndex = command.keySlot,
-                        keyAlgorithm = genericAlgorithm,
-                        ipekBytes = ipekBytes,
-                        ksnBytes = ksnForInjection,
-                        kcvBytes = if (command.keyChecksum.isNotBlank())
-                            command.keyChecksum.hexToByteArray()
-                        else
-                            null
-                    )
+                    // Seleccionar el método correcto según el algoritmo efectivo
+                    // Para AES: usar createDukptAESKey (NewPOS)
+                    // Para DES: usar writeDukptInitialKey (ambos Aisino y Newpos)
+                    if (effectiveAlgorithm in listOf(GenericKeyAlgorithm.AES_128, GenericKeyAlgorithm.AES_192, GenericKeyAlgorithm.AES_256)) {
+                        // Usar createDukptAESKey para algoritmos AES
+                        pedController!!.createDukptAESKey(
+                            keyIndex = command.keySlot,
+                            keyAlgorithm = effectiveAlgorithm,
+                            ipekBytes = ipekBytes,
+                            ksnBytes = ksnForInjection,
+                            kcvBytes = if (command.keyChecksum.isNotBlank())
+                                command.keyChecksum.hexToByteArray()
+                            else
+                                null
+                        )
+                    } else {
+                        // Usar writeDukptInitialKey para algoritmos DES (3DES, etc)
+                        pedController!!.writeDukptInitialKey(
+                            groupIndex = command.keySlot,
+                            keyAlgorithm = effectiveAlgorithm,
+                            keyBytes = ipekBytes,
+                            initialKsn = ksnForInjection,
+                            keyChecksum = if (command.keyChecksum.isNotBlank())
+                                command.keyChecksum
+                            else
+                                null
+                        )
+                    }
 
                     Log.d(TAG, "✓ IPEK DUKPT inyectada exitosamente en slot ${command.keySlot}")
+                    if (effectiveAlgorithm != genericAlgorithm) {
+                        Log.w(TAG, "⚠️ NOTA: Algoritmo convertido de $genericAlgorithm a $effectiveAlgorithm (compatibilidad con dispositivo)")
+                    }
                     Log.w(TAG, "⚠️ ADVERTENCIA: IPEK enviada en plaintext - SOLO USAR PARA TESTING")
                 }
                 else -> throw PedKeyException("Tipo de encriptación '${command.encryptionType}' no soportado.")
@@ -1128,42 +1193,64 @@ class MainViewModel @Inject constructor(
     private fun startCableDetection() {
         Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
         Log.i(TAG, "║ INICIANDO DETECCIÓN AUTOMÁTICA DE CABLE USB")
+        Log.i(TAG, "║ Estrategia: Hysteresis para evitar falsos positivos")
         Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
 
         cableDetectionJob = viewModelScope.launch(Dispatchers.IO) {
+            var consecutiveDetectionsToChange = 0
+            val HYSTERESIS_THRESHOLD = 2 // Requiere 2 detecciones consistentes para cambiar estado
+            val DETECTION_INTERVAL_CONNECTED = 3000L // 3s cuando hay cable
+            val DETECTION_INTERVAL_DISCONNECTED = 5000L // 5s cuando no hay cable (menos sensible)
+
             while (isActive) {
                 try {
                     val detected = detectCableConnection()
+                    val currentState = _cableConnected.value
 
-                    if (detected != _cableConnected.value) {
-                        _cableConnected.value = detected
+                    // Si la detección coincide con el estado actual, resetear contador
+                    if (detected == currentState) {
+                        consecutiveDetectionsToChange = 0
+                    } else {
+                        // Si cambia, incrementar contador
+                        consecutiveDetectionsToChange++
 
-                        if (detected) {
-                            Log.i(TAG, "║ ✅ CABLE USB DETECTADO!")
-                            Log.i(TAG, "║    El usuario puede iniciar la escucha manualmente")
-                            CommLog.i(TAG, "🔌 ✅ CABLE USB CONECTADO - Listo para comunicación")
-                            _snackbarEvent.emit("Cable USB detectado. Pulse 'Iniciar Escucha' para comenzar.")
+                        // Solo cambiar estado si alcanza hysteresis threshold
+                        if (consecutiveDetectionsToChange >= HYSTERESIS_THRESHOLD) {
+                            _cableConnected.value = detected
+                            consecutiveDetectionsToChange = 0
+
+                            if (detected) {
+                                Log.i(TAG, "║ ✅ CABLE USB DETECTADO (confirmado $HYSTERESIS_THRESHOLD veces)!")
+                                Log.i(TAG, "║    El usuario puede iniciar la escucha manualmente")
+                                CommLog.i(TAG, "🔌 ✅ CABLE USB CONECTADO - Listo para comunicación")
+                                _snackbarEvent.emit("Cable USB detectado. Pulse 'Iniciar Escucha' para comenzar.")
+                            } else {
+                                Log.w(TAG, "⚠️ CABLE USB DESCONECTADO (confirmado $HYSTERESIS_THRESHOLD veces)")
+                                CommLog.w(TAG, "⚠️ CABLE USB DESCONECTADO - Pero listening continúa activo")
+                                // 🔴 CRÍTICO: NO cancelar el listening automáticamente
+                                // La detección de cable USB Aisino puede ser inconsistente/falsos positivos
+                                // Permitir que el listening continúe esperando datos
+                                // El usuario puede detener manualmente si es necesario
+                            }
                         } else {
-                            Log.w(TAG, "⚠️ CABLE USB DESCONECTADO (sin cancelar listening)")
-                            CommLog.w(TAG, "⚠️ CABLE USB DESCONECTADO - Pero listening continúa activo")
-                            // 🔴 CRÍTICO: NO cancelar el listening automáticamente
-                            // La detección de cable USB Aisino puede ser inconsistente/falsos positivos
-                            // Permitir que el listening continúe esperando datos
-                            // El usuario puede detener manualmente si es necesario
+                            // Registro de transición pendiente (no se hizo el cambio aún)
+                            Log.d(TAG, "║ 🔄 Detección transitoria (${consecutiveDetectionsToChange}/$HYSTERESIS_THRESHOLD): $detected != $currentState")
                         }
                     }
 
-                    // Chequear cada 3 segundos
-                    kotlinx.coroutines.delay(3000)
+                    // Adaptable interval: más frecuente si no hay cable, menos frecuente si hay cable
+                    val delay = if (currentState) DETECTION_INTERVAL_CONNECTED else DETECTION_INTERVAL_DISCONNECTED
+                    kotlinx.coroutines.delay(delay)
 
                 } catch (e: Exception) {
                     Log.e(TAG, "║ ❌ Error en detección de cable", e)
+                    consecutiveDetectionsToChange = 0 // Resetear contador en error
                     kotlinx.coroutines.delay(5000) // Esperar más tiempo si hay error
                 }
             }
         }
 
-        Log.i(TAG, "║ ✓ Job de detección de cable iniciado")
+        Log.i(TAG, "║ ✓ Job de detección de cable iniciado (hysteresis mode)")
         Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
     }
 

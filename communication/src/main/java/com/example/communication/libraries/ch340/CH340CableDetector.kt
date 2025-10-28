@@ -213,6 +213,17 @@ class CH340CableDetector(private val context: Context) {
      * @return ByteArray of data read, empty array if no data or timeout
      */
     fun readData(bufferSize: Int = 256): ByteArray {
+        return readData(bufferSize, 0) // Default: no timeout
+    }
+
+    /**
+     * Read data from cable with optional timeout
+     *
+     * @param bufferSize Maximum bytes to read
+     * @param timeout Timeout in milliseconds (0 = no timeout, immediate return)
+     * @return ByteArray with data read (empty if timeout or no data)
+     */
+    fun readData(bufferSize: Int = 256, timeout: Int = 0): ByteArray {
         if (!isConnected || driver == null) {
             Log.e(TAG, "❌ Cable not connected, cannot read")
             return ByteArray(0)
@@ -220,7 +231,26 @@ class CH340CableDetector(private val context: Context) {
 
         return try {
             val buffer = ByteArray(bufferSize)
-            val bytesRead = driver!!.ReadData(buffer, bufferSize)
+            val startTime = System.currentTimeMillis()
+            var bytesRead = 0
+
+            // If timeout > 0, retry reading until timeout or data received
+            if (timeout > 0) {
+                while (System.currentTimeMillis() - startTime < timeout) {
+                    bytesRead = driver!!.ReadData(buffer, bufferSize)
+                    if (bytesRead > 0) {
+                        break // Data received, exit loop
+                    } else if (bytesRead < 0) {
+                        // Actual error, don't retry
+                        break
+                    }
+                    // No data yet, wait a bit before retrying
+                    Thread.sleep(50)
+                }
+            } else {
+                // No timeout: single read attempt
+                bytesRead = driver!!.ReadData(buffer, bufferSize)
+            }
 
             if (bytesRead > 0) {
                 val data = buffer.copyOf(bytesRead)
