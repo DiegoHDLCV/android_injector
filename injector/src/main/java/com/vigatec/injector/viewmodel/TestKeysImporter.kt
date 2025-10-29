@@ -4,6 +4,7 @@ import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.example.persistence.repository.InjectedKeyRepository
+import com.vigatec.utils.security.StorageKeyManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -99,7 +100,33 @@ object TestKeysImporter {
                     val customName = if (isKEK) "KEK Storage Sistema" else "Test Key ${testKey.algorithm}"
                     
                     Log.d(TAG, "Importando llave: ${testKey.keyType} (${testKey.algorithm}) - KCV: ${testKey.kcv}")
-                    
+
+                    // Si es KEK_STORAGE, también guardar en Android Keystore
+                    if (isKEK && testKey.keyType == "KEK_STORAGE") {
+                        try {
+                            // Validar que sea AES-256 (32 bytes)
+                            if (testKey.keyHex.length != 64) { // 64 hex chars = 32 bytes
+                                Log.w(TAG, "⚠️ KEK_STORAGE debe ser AES-256 (32 bytes). Recibido: ${testKey.keyHex.length / 2} bytes")
+                                Log.w(TAG, "  → Guardando solo en BD sin inicializar Keystore")
+                            } else {
+                                Log.d(TAG, "Inicializando KEK Storage en Android Keystore...")
+                                try {
+                                    StorageKeyManager.initializeFromCeremony(
+                                        ceremonyKeyHex = testKey.keyHex,
+                                        replaceIfExists = true // Permitir reemplazar si ya existe
+                                    )
+                                    Log.i(TAG, "✓ KEK Storage inicializada en Android Keystore exitosamente")
+                                } catch (e: Exception) {
+                                    Log.e(TAG, "⚠️ Error al inicializar KEK Storage en Keystore: ${e.message}")
+                                    Log.i(TAG, "  → Continuando: Llave guardada en BD, pero no en Keystore")
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error procesando KEK_STORAGE: ${e.message}")
+                            // Continuar de todas formas
+                        }
+                    }
+
                     // Guardar en BD
                     repository.recordKeyInjectionWithData(
                         keySlot = -1, // Sin slot asignado (será asignado durante la inyección)
@@ -112,7 +139,7 @@ object TestKeysImporter {
                         kekType = kekType,
                         customName = customName
                     )
-                    
+
                     imported++
                     
                 } catch (e: Exception) {
