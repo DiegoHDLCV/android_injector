@@ -56,9 +56,21 @@ object DatabaseModule {
         override fun migrate(database: SupportSQLiteDatabase) {
             // Eliminar el índice único en KCV
             database.execSQL("DROP INDEX IF EXISTS index_injected_keys_kcv")
-            
+
             // Crear el nuevo índice único en KCV + kekType
             database.execSQL("CREATE UNIQUE INDEX index_injected_keys_kcv_kekType ON injected_keys (kcv, kekType)")
+        }
+    }
+
+    /**
+     * Migración de versión 13 a 14: Agrega campo deviceType a tabla profiles
+     * - deviceType: Tipo de dispositivo (AISINO, NEWPOS)
+     * - Valor por defecto: AISINO
+     * - Permite validaciones específicas por dispositivo (ej: slots DUKPT 1-10 en Aisino)
+     */
+    private val MIGRATION_13_14 = object : Migration(13, 14) {
+        override fun migrate(database: SupportSQLiteDatabase) {
+            database.execSQL("ALTER TABLE profiles ADD COLUMN deviceType TEXT NOT NULL DEFAULT 'AISINO'")
         }
     }
 
@@ -70,7 +82,8 @@ object DatabaseModule {
             AppDatabase::class.java,
             "pos_database"
         )
-            .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
+            .addMigrations(MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+            .fallbackToDestructiveMigration()
             .build()
     }
 

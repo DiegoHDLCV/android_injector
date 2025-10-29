@@ -25,7 +25,7 @@ import com.example.persistence.entities.ProfileEntity
         InjectedKeyEntity::class,
         ProfileEntity::class
     ],
-    version = 13, // Versión 13: Cambia índice único de KCV a KCV + kekType para permitir KCVs duplicados con diferentes propósitos
+    version = 14, //
     exportSchema = true
 )
 @TypeConverters(Converters::class)

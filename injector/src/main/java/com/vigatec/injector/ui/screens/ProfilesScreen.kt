@@ -43,6 +43,8 @@ import com.vigatec.injector.viewmodel.ProfileFormData
 import com.vigatec.injector.viewmodel.ProfileViewModel
 import com.vigatec.injector.viewmodel.KeyInjectionViewModel
 import com.vigatec.injector.viewmodel.InjectionStatus
+import com.example.config.SystemConfig
+import com.example.config.EnumManufacturer
 import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1051,6 +1053,114 @@ fun CreateProfileModal(
                         }
                     }
 
+                    // --- Configuración del Dispositivo ---
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "📱 Dispositivo de Destino",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Selector de dispositivo
+                                var deviceExpanded by remember { mutableStateOf(false) }
+                                ExposedDropdownMenuBox(
+                                    expanded = deviceExpanded,
+                                    onExpandedChange = { deviceExpanded = !deviceExpanded }
+                                ) {
+                                    OutlinedTextField(
+                                        value = formData.deviceType,
+                                        onValueChange = {}, // evita escribir
+                                        readOnly = true,
+                                        label = { Text("Fabricante/Dispositivo") },
+                                        trailingIcon = {
+                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = deviceExpanded)
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .menuAnchor(),
+                                        supportingText = {
+                                            Text(
+                                                "Selecciona el dispositivo para ajustar las validaciones (ej: rango de slots DUKPT)",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                    )
+
+                                    // Menú de dispositivos
+                                    ExposedDropdownMenu(
+                                        expanded = deviceExpanded,
+                                        onDismissRequest = { deviceExpanded = false },
+                                        modifier = Modifier.heightIn(max = 200.dp)
+                                    ) {
+                                        listOf("AISINO", "NEWPOS").forEach { device ->
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = when (device) {
+                                                                "AISINO" -> "🏭"
+                                                                "NEWPOS" -> "💻"
+                                                                else -> "📱"
+                                                            }
+                                                        )
+                                                        Text(device)
+                                                    }
+                                                },
+                                                onClick = {
+                                                    onFormDataChange(formData.copy(deviceType = device))
+                                                    deviceExpanded = false
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Información sobre el dispositivo seleccionado
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = when (formData.deviceType) {
+                                                "AISINO" -> "Aisino/Vanstone: DUKPT slots 1-10, 3DES máximo"
+                                                "NEWPOS" -> "NewPOS: Soporta rangos más amplios de slots"
+                                                else -> "Dispositivo desconocido"
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // --- Configuración de Cifrado KTK ---
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
@@ -1277,6 +1387,7 @@ fun CreateProfileModal(
                                     KeyConfigurationItem(
                                         config = config,
                                         availableKeys = availableKeys,
+                                        deviceType = formData.deviceType,
                                         onUpdate = { id, field, value -> onUpdateKeyConfig(id, field, value) },
                                         onRemove = { onRemoveKeyConfig(config.id) }
                                     )
@@ -1322,6 +1433,7 @@ fun CreateProfileModal(
 fun KeyConfigurationItem(
     config: KeyConfiguration,
     availableKeys: List<InjectedKeyEntity>,
+    deviceType: String = "AISINO",
     onUpdate: (Long, String, String) -> Unit,
     onRemove: () -> Unit
 ) {
@@ -1593,30 +1705,82 @@ fun KeyConfigurationItem(
                         // Slot se mueve aquí
                     }
 
-                    // Slot (validación suave HEX 2 dígitos)
+                    // Slot (validación con restricción DUKPT 1-10 para Aisino según deviceType del perfil)
+                    val isDukptKey = config.keyType.contains("DUKPT", ignoreCase = true)
+                    val isDukptAisino = isDukptKey && deviceType == "AISINO"
+
+                    // Calcular si el slot está fuera de rango para DUKPT en Aisino
+                    val slotDecimal = if (config.slot.isNotEmpty()) config.slot.toIntOrNull(16) else null
+                    val isDukptSlotOutOfRange = isDukptAisino && slotDecimal != null && (slotDecimal < 1 || slotDecimal > 10)
+
                     OutlinedTextField(
                         value = config.slot,
                         onValueChange = { raw ->
                             val filtered = raw.uppercase()
                                 .filter { it in "0123456789ABCDEF" }
                                 .take(2)
-                            onUpdate(config.id, "slot", filtered)
+
+                            // Validar rango para DUKPT en Aisino
+                            if (isDukptAisino && filtered.isNotEmpty()) {
+                                val decimal = filtered.toIntOrNull(16) ?: 0
+                                if (decimal >= 1 && decimal <= 10) {
+                                    onUpdate(config.id, "slot", filtered)
+                                }
+                                // Si está fuera de rango, no actualizar (rechazar silenciosamente)
+                            } else {
+                                onUpdate(config.id, "slot", filtered)
+                            }
                         },
                         label = { Text("Slot (HEX)") },
-                        placeholder = { Text("01") },
+                        placeholder = { Text(if (isDukptAisino) "01-0A" else "01") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                         supportingText = {
                             Text(
-                                "Máx. 2 dígitos hexadecimales",
-                                style = MaterialTheme.typography.labelSmall
+                                if (isDukptAisino) {
+                                    "DUKPT en Aisino: slots 01-0A (1-10 decimal)"
+                                } else {
+                                    "Máx. 2 dígitos hexadecimales"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isDukptSlotOutOfRange) MaterialTheme.colorScheme.error
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
+                        isError = isDukptSlotOutOfRange,
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    // Advertencia si slot está fuera de rango para DUKPT en Aisino
+                    if (isDukptSlotOutOfRange) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "❌ Slot ${slotDecimal} fuera de rango. DUKPT en Aisino solo soporta slots 1-10 (0x01-0x0A)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+
                     // Campo KSN (solo visible para llaves DUKPT)
-                    val isDukptKey = config.keyType.contains("DUKPT", ignoreCase = true)
                     if (isDukptKey) {
                         OutlinedTextField(
                             value = config.ksn,
@@ -1634,7 +1798,7 @@ fun KeyConfigurationItem(
                                 Text(
                                     "Exactamente 20 dígitos hexadecimales para DUKPT",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (config.ksn.length == 20) MaterialTheme.colorScheme.primary 
+                                    color = if (config.ksn.length == 20) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.error
                                 )
                             },
@@ -1800,30 +1964,82 @@ fun KeyConfigurationItem(
                         }
                     }
 
-                    // Slot (validación suave HEX 2 dígitos)
+                    // Slot (validación con restricción DUKPT 1-10 para Aisino según deviceType del perfil)
+                    val isDukptKeyMobile = config.keyType.contains("DUKPT", ignoreCase = true)
+                    val isDukptAisinoMobile = isDukptKeyMobile && deviceType == "AISINO"
+
+                    // Calcular si el slot está fuera de rango para DUKPT en Aisino
+                    val slotDecimalMobile = if (config.slot.isNotEmpty()) config.slot.toIntOrNull(16) else null
+                    val isDukptSlotOutOfRangeMobile = isDukptAisinoMobile && slotDecimalMobile != null && (slotDecimalMobile < 1 || slotDecimalMobile > 10)
+
                     OutlinedTextField(
                         value = config.slot,
                         onValueChange = { raw ->
                             val filtered = raw.uppercase()
                                 .filter { it in "0123456789ABCDEF" }
                                 .take(2)
-                            onUpdate(config.id, "slot", filtered)
+
+                            // Validar rango para DUKPT en Aisino
+                            if (isDukptAisinoMobile && filtered.isNotEmpty()) {
+                                val decimal = filtered.toIntOrNull(16) ?: 0
+                                if (decimal >= 1 && decimal <= 10) {
+                                    onUpdate(config.id, "slot", filtered)
+                                }
+                                // Si está fuera de rango, no actualizar (rechazar silenciosamente)
+                            } else {
+                                onUpdate(config.id, "slot", filtered)
+                            }
                         },
                         label = { Text("Slot (HEX)") },
-                        placeholder = { Text("01") },
+                        placeholder = { Text(if (isDukptAisinoMobile) "01-0A" else "01") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         supportingText = {
                             Text(
-                                "Máx. 2 dígitos hexadecimales",
-                                style = MaterialTheme.typography.labelSmall
+                                if (isDukptAisinoMobile) {
+                                    "DUKPT en Aisino: slots 01-0A (1-10 decimal)"
+                                } else {
+                                    "Máx. 2 dígitos hexadecimales"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isDukptSlotOutOfRangeMobile) MaterialTheme.colorScheme.error
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
+                        isError = isDukptSlotOutOfRangeMobile,
                         modifier = Modifier.fillMaxWidth()
                     )
 
+                    // Advertencia si slot está fuera de rango para DUKPT en Aisino
+                    if (isDukptSlotOutOfRangeMobile) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "❌ Slot ${slotDecimalMobile} fuera de rango. DUKPT en Aisino solo soporta slots 1-10 (0x01-0x0A)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+
                     // Campo KSN (solo visible para llaves DUKPT)
-                    val isDukptKey = config.keyType.contains("DUKPT", ignoreCase = true)
                     if (isDukptKey) {
                         OutlinedTextField(
                             value = config.ksn,
@@ -1841,7 +2057,7 @@ fun KeyConfigurationItem(
                                 Text(
                                     "Exactamente 20 dígitos hexadecimales para DUKPT",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = if (config.ksn.length == 20) MaterialTheme.colorScheme.primary 
+                                    color = if (config.ksn.length == 20) MaterialTheme.colorScheme.primary
                                            else MaterialTheme.colorScheme.error
                                 )
                             },

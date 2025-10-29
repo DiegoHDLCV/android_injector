@@ -42,7 +42,8 @@ data class ProfileFormData(
     val keyConfigurations: List<KeyConfiguration> = emptyList(),
     val useKTK: Boolean = false,
     val selectedKTKKcv: String = "",
-    val currentKTK: InjectedKeyEntity? = null // KTK activa del almacén
+    val currentKTK: InjectedKeyEntity? = null, // KTK activa del almacén
+    val deviceType: String = "AISINO" // AISINO o NEWPOS
 )
 
 @HiltViewModel
@@ -118,12 +119,14 @@ class ProfileViewModel @Inject constructor(
                     keyConfigurations = profile.keyConfigurations,
                     useKTK = profile.useKEK,
                     selectedKTKKcv = currentKTK?.kcv ?: profile.selectedKEKKcv, // Usar la KTK activa si existe
-                    currentKTK = currentKTK
+                    currentKTK = currentKTK,
+                    deviceType = profile.deviceType
                 )
             } else {
                 ProfileFormData(
                     currentKTK = currentKTK,
-                    selectedKTKKcv = currentKTK?.kcv ?: "" // Auto-seleccionar KTK activa si existe
+                    selectedKTKKcv = currentKTK?.kcv ?: "", // Auto-seleccionar KTK activa si existe
+                    deviceType = "AISINO" // Por defecto AISINO
                 )
             }
 
@@ -208,7 +211,8 @@ class ProfileViewModel @Inject constructor(
                 applicationType = formData.appType,
                 keyConfigurations = formData.keyConfigurations,
                 useKEK = formData.useKTK,
-                selectedKEKKcv = formData.selectedKTKKcv
+                selectedKEKKcv = formData.selectedKTKKcv,
+                deviceType = formData.deviceType
             )
             
             try {

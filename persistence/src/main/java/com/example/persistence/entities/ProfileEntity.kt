@@ -14,7 +14,10 @@ data class ProfileEntity(
 
     // Configuración de cifrado KEK
     val useKEK: Boolean = false,          // Activar cifrado con KEK
-    val selectedKEKKcv: String = ""       // KCV de la KEK seleccionada
+    val selectedKEKKcv: String = "",       // KCV de la KEK seleccionada
+
+    // Configuración del dispositivo/fabricante
+    val deviceType: String = "AISINO"     // AISINO, NEWPOS, etc.
 )
 
 data class KeyConfiguration(

@@ -26,7 +26,8 @@
       "Bash(timeout 120 ./gradlew:*)",
       "Bash(timeout 30 bash -c \"grep -r ''UsbCableDetector'' injector/src/main/java/com/vigatec/injector/viewmodel/KeyInjectionViewModel.kt\")",
       "Bash(findstr:*)",
-      "Bash(timeout 180 ./gradlew:*)"
+      "Bash(timeout 180 ./gradlew:*)",
+      "Bash(timeout 300 ./gradlew:*)"
     ],
     "deny": [],
     "ask": []

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.injector.viewmodel.CeremonyViewModel
+import com.vigatec.injector.ui.components.HexadecimalTextField
 import com.vigatec.injector.viewmodel.KeyAlgorithmType
 import com.example.persistence.entities.KEKType
 
@@ -380,29 +381,15 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        OutlinedTextField(
+        HexadecimalTextField(
             value = state.component,
             onValueChange = { viewModel.onComponentChange(it) },
-            label = { Text("Componente de Llave (Hex)") },
-            visualTransformation = if (state.showComponent) VisualTransformation.None else PasswordVisualTransformation(),
-            trailingIcon = {
-                IconButton(onClick = { viewModel.onToggleShowComponent() }) {
-                    Icon(
-                        if (state.showComponent) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = "Toggle visibility"
-                    )
-                }
-            },
+            label = "Componente de Llave (Hex)",
+            maxLength = state.selectedKeyType.bytesRequired * 2, // Cada byte = 2 caracteres hex
             isError = state.componentError != null,
-            supportingText = {
-                if (state.componentError != null) {
-                    Text(
-                        text = state.componentError!!,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
+            errorMessage = state.componentError,
+            isPasswordVisible = state.showComponent,
+            onPasswordVisibilityChange = { viewModel.onToggleShowComponent() }
         )
         Spacer(modifier = Modifier.height(8.dp))
         Button(onClick = { viewModel.addComponent() }, enabled = state.component.isNotBlank()) {

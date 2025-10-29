@@ -824,6 +824,27 @@ class MainViewModel @Inject constructor(
                         )
                     }
 
+                    // ✓ VALIDACIÓN CRÍTICA: Rango de slots DUKPT (1-10 para Aisino/Vanstone)
+                    val dukptSlot = command.keySlot
+                    if (pedControllerName?.contains("Aisino") == true || pedControllerName?.contains("Vanstone") == true) {
+                        if (dukptSlot < 1 || dukptSlot > 10) {
+                            Log.e(TAG, "❌ SLOT DUKPT FUERA DE RANGO SOPORTADO")
+                            Log.e(TAG, "   Slot solicitado: $dukptSlot")
+                            Log.e(TAG, "   Rango soportado para Aisino/Vanstone: 1-10")
+                            Log.e(TAG, "   Documento oficial: PedDukptWriteTIK_Api parámetro GroupIdx: '1-10, DUKPT key group index'")
+                            throw PedKeyException(
+                                "❌ SLOT DUKPT INVÁLIDO\n\n" +
+                                "Dispositivo: Aisino/Vanstone PED\n" +
+                                "Slot solicitado: $dukptSlot\n" +
+                                "Rango permitido: 1-10\n\n" +
+                                "Los slots DUKPT en Aisino/Vanstone solo pueden estar en el rango 1-10.\n" +
+                                "Revise el slot de inyección. Si usa slot 20 o superior, " +
+                                "asigne el DUKPT a un slot entre 1-10 en su lugar."
+                            )
+                        }
+                        Log.i(TAG, "✓ Slot DUKPT válido: $dukptSlot (dentro del rango 1-10)")
+                    }
+
                     // INYECCIÓN DUKPT PLAINTEXT:
                     // La IPEK se envía en texto plano al PED
                     // Este método es SOLO para testing - NO usar en producción
