@@ -42,6 +42,11 @@ data class ExportImportState(
     val importedKeyCount: Int = 0,
     val skippedDuplicates: Int = 0,
 
+    // Drag & Drop
+    val isDraggingFile: Boolean = false,
+    val draggedFileName: String? = null,
+    val importFileContent: String? = null,
+
     // Estado general
     val hasKEKStorage: Boolean = false,
     val totalKeysInVault: Int = 0,
@@ -460,4 +465,166 @@ class ExportImportViewModel @Inject constructor(
             importPassphraseError = null
         )
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DRAG & DROP - Manejo de archivos arrastrados
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Marca que el usuario está arrastrando un archivo sobre el área de drop
+     */
+    fun setDraggingFile(isDragging: Boolean) {
+        _uiState.value = _uiState.value.copy(isDraggingFile = isDragging)
+    }
+
+    /**
+     * Procesa un archivo JSON arrastrado
+     * Realiza validación y carga el contenido del archivo
+     */
+    fun handleDroppedFile(fileName: String, fileContent: String) {
+        Log.d(TAG, "=== ARCHIVO ARRASTRADO ===")
+        Log.d(TAG, "Nombre: $fileName")
+        Log.d(TAG, "Tamaño: ${fileContent.length} caracteres")
+
+        // Reiniciar estados previos
+        _uiState.value = _uiState.value.copy(
+            isDraggingFile = false,
+            errorMessage = null,
+            importPassphraseError = null
+        )
+
+        // Validar que sea archivo JSON
+        if (!fileName.endsWith(".json", ignoreCase = true)) {
+            Log.w(TAG, "❌ Archivo no es JSON: $fileName")
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "El archivo debe ser JSON. Recibido: $fileName"
+            )
+            return
+        }
+
+        // Validar estructura JSON
+        val validationResult = validateJsonStructure(fileContent)
+        if (!validationResult.isValid) {
+            Log.w(TAG, "❌ JSON inválido: ${validationResult.errorMessage}")
+            _uiState.value = _uiState.value.copy(
+                errorMessage = validationResult.errorMessage ?: "Archivo JSON inválido"
+            )
+            return
+        }
+
+        // Éxito - guardar información del archivo
+        Log.i(TAG, "✓ Archivo JSON válido cargado")
+        _uiState.value = _uiState.value.copy(
+            draggedFileName = fileName,
+            importFileContent = fileContent,
+            selectedImportFile = fileName,
+            importSuccess = false,
+            importPassphrase = "" // Limpiar passphrase anterior
+        )
+    }
+
+    /**
+     * Valida la estructura del archivo JSON exportado
+     * Verifica que tenga los campos requeridos
+     */
+    private fun validateJsonStructure(fileContent: String): ValidationResult {
+        return try {
+            // Parsear JSON
+            val json = org.json.JSONObject(fileContent)
+
+            // Verificar campos requeridos del nivel externo
+            val requiredFields = listOf("version", "encryptedPayload", "salt", "iv", "authTag")
+            for (field in requiredFields) {
+                if (!json.has(field)) {
+                    return ValidationResult(
+                        isValid = false,
+                        errorMessage = "Campo obligatorio faltante: $field"
+                    )
+                }
+            }
+
+            // Validar versión
+            val version = json.getInt("version")
+            if (version != 1) {
+                return ValidationResult(
+                    isValid = false,
+                    errorMessage = "Versión no soportada: $version (se espera versión 1)"
+                )
+            }
+
+            // Validar que encryptedPayload sea válido HEX
+            val encryptedPayload = json.getString("encryptedPayload")
+            if (!encryptedPayload.matches(Regex("^[0-9A-Fa-f]*$"))) {
+                return ValidationResult(
+                    isValid = false,
+                    errorMessage = "encryptedPayload no es válido hexadecimal"
+                )
+            }
+
+            ValidationResult(isValid = true)
+        } catch (e: org.json.JSONException) {
+            Log.e(TAG, "Error parsing JSON: ${e.message}")
+            ValidationResult(
+                isValid = false,
+                errorMessage = "JSON malformado: ${e.message}"
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error validating JSON: ${e.message}")
+            ValidationResult(
+                isValid = false,
+                errorMessage = "Error validando archivo: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Inicia el proceso de importación usando el archivo cargado vía drag & drop
+     */
+    fun importFromDroppedFile() {
+        val fileContent = _uiState.value.importFileContent
+        val passphrase = _uiState.value.importPassphrase
+
+        if (fileContent == null) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "No hay archivo cargado"
+            )
+            return
+        }
+
+        if (passphrase.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                importPassphraseError = "Ingrese la contraseña"
+            )
+            return
+        }
+
+        // Actualizar el state con el contenido del archivo
+        // Para que importKeys() pueda procesarlo
+        _uiState.value = _uiState.value.copy(
+            selectedImportFile = _uiState.value.draggedFileName ?: "dropped_file.json"
+        )
+
+        // Delegar a la función de importación existente
+        importKeys()
+    }
+
+    /**
+     * Limpia el archivo arrastrado
+     */
+    fun clearDroppedFile() {
+        _uiState.value = _uiState.value.copy(
+            draggedFileName = null,
+            importFileContent = null,
+            selectedImportFile = null,
+            isDraggingFile = false
+        )
+    }
+
+    /**
+     * Resultado de validación de JSON
+     */
+    private data class ValidationResult(
+        val isValid: Boolean = false,
+        val errorMessage: String? = null
+    )
 }

@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -47,7 +48,8 @@ data class KeyInjectionState(
     val progress: Float = 0f,
     val log: String = "",
     val error: String? = null,
-    val showInjectionModal: Boolean = false
+    val showInjectionModal: Boolean = false,
+    val cableConnected: Boolean = false  // Nuevo: estado de conexión de cable
 )
 
 @HiltViewModel
@@ -77,6 +79,9 @@ class KeyInjectionViewModel @Inject constructor(
     
     // Username del usuario actual para los logs
     private var currentUsername: String = "system"
+
+    // Detección de cable USB
+    private var cableDetectionJob: kotlinx.coroutines.Job? = null
 
     init {
         Log.d(TAG, "Inicializando KeyInjectionViewModel")
@@ -117,15 +122,18 @@ class KeyInjectionViewModel @Inject constructor(
         profile.keyConfigurations.forEachIndexed { index, config ->
             Log.i(TAG, "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
         }
-        
+
         currentUsername = username
-        
+
         _state.value = _state.value.copy(
             showInjectionModal = true,
             currentProfile = profile,
             totalSteps = profile.keyConfigurations.size
         )
-        
+
+        // Iniciar monitoreo de cable
+        startCableDetection()
+
         Log.i(TAG, "✓ Modal de inyección mostrado")
         Log.i(TAG, "================================================")
     }
@@ -1556,5 +1564,104 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - ¿Es DUKPT Plaintext?: $isDukptPlaintext")
 
         return isDukptPlaintext
+    }
+
+    /**
+     * Inicia el monitoreo de detección de cable USB con hysteresis
+     * Similar a la implementación en MainViewModel.kt del módulo keyreceiver
+     */
+    private fun startCableDetection() {
+        // Cancelar job anterior si existe
+        cableDetectionJob?.cancel()
+
+        cableDetectionJob = viewModelScope.launch(Dispatchers.IO) {
+            var consecutiveDetectionsToChange = 0
+            val HYSTERESIS_THRESHOLD = 2              // Requiere 2 detecciones para cambiar
+            val DETECTION_INTERVAL_CONNECTED = 3000L  // 3s cuando hay cable
+            val DETECTION_INTERVAL_DISCONNECTED = 5000L // 5s cuando no hay cable
+
+            Log.i(TAG, "🔌 Iniciando monitoreo de cable USB...")
+
+            while (isActive) {
+                try {
+                    val detected = detectCableConnection()
+                    val currentState = _state.value.cableConnected
+
+                    // Si cambia → incrementar contador
+                    if (detected != currentState) {
+                        consecutiveDetectionsToChange++
+                        Log.d(TAG, "Cambio de estado detectado: $consecutiveDetectionsToChange/$HYSTERESIS_THRESHOLD")
+
+                        if (consecutiveDetectionsToChange >= HYSTERESIS_THRESHOLD) {
+                            _state.value = _state.value.copy(cableConnected = detected)
+                            Log.i(TAG, if (detected)
+                                "✅ CABLE USB DETECTADO - Listo para inyección"
+                            else
+                                "⚠️ CABLE USB DESCONECTADO"
+                            )
+                        }
+                    } else {
+                        consecutiveDetectionsToChange = 0
+                    }
+
+                    // Ajustar intervalo según estado del cable
+                    val delay = if (detected) DETECTION_INTERVAL_CONNECTED else DETECTION_INTERVAL_DISCONNECTED
+                    kotlinx.coroutines.delay(delay)
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error en detección de cable: ${e.message}")
+                    kotlinx.coroutines.delay(DETECTION_INTERVAL_DISCONNECTED)
+                }
+            }
+        }
+    }
+
+    /**
+     * Detecta si hay un cable USB conectado verificando puertos seriales del sistema
+     * Métodos múltiples para mayor confiabilidad:
+     * 1. Buscar archivos de dispositivo USB (/dev/ttyUSB*, /dev/ttyACM*, etc.)
+     * 2. Verificar información del sistema (/sys/bus/usb/devices)
+     */
+    private fun detectCableConnection(): Boolean {
+        return try {
+            // Método 1: Verificar archivos de dispositivo USB
+            val usbDevices = arrayOf(
+                "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2",
+                "/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyACM2",
+                "/dev/ttyGS0"
+            )
+
+            val hasDeviceNode = usbDevices.any { devicePath ->
+                val file = java.io.File(devicePath)
+                file.exists()
+            }
+
+            if (hasDeviceNode) {
+                Log.d(TAG, "✓ Cable USB detectado (dispositivo)")
+                return true
+            }
+
+            // Método 2: Verificar información del kernel en /sys
+            val sysPath = "/sys/bus/usb/devices"
+            val sysDir = java.io.File(sysPath)
+            val hasUsbDevices = sysDir.exists() && sysDir.listFiles()?.isNotEmpty() == true
+
+            if (hasUsbDevices) {
+                Log.d(TAG, "✓ Cable USB detectado (kernel)")
+                return true
+            }
+
+            Log.d(TAG, "⚠️ Cable USB no detectado")
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error detectando cable: ${e.message}")
+            false
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        // Detener monitoreo de cable al limpiar el ViewModel
+        cableDetectionJob?.cancel()
+        Log.d(TAG, "KeyInjectionViewModel cleared")
     }
 }

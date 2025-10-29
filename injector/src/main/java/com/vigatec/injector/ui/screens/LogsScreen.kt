@@ -194,6 +194,7 @@ fun FilterSection(
             )
 
             // Filtro por usuario
+
             var expandedUsername by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
                 expanded = expandedUsername,

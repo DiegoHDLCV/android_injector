@@ -403,10 +403,10 @@ fun ImportJsonDialog(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 OutlinedTextField(
                     value = jsonContent,
-                    onValueChange = { 
+                    onValueChange = {
                         jsonContent = it
                         showError = false
                     },
@@ -417,7 +417,7 @@ fun ImportJsonDialog(
                     maxLines = 12,
                     isError = showError
                 )
-                
+
                 if (showError) {
                     Text(
                         text = errorMessage,

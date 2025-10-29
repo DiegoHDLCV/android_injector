@@ -6,6 +6,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,8 +28,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vigatec.injector.viewmodel.ExportImportState
 import com.vigatec.injector.viewmodel.ExportImportViewModel
 import java.io.File
 
@@ -253,7 +257,7 @@ private fun SystemInfoCard(
 
 @Composable
 private fun ExportTab(
-    state: com.vigatec.injector.viewmodel.ExportImportState,
+    state: ExportImportState,
     onPassphraseChange: (String) -> Unit,
     onPassphraseConfirmChange: (String) -> Unit,
     onToggleVisibility: () -> Unit,
@@ -398,7 +402,7 @@ private fun ExportTab(
 
 @Composable
 private fun ImportTab(
-    state: com.vigatec.injector.viewmodel.ExportImportState,
+    state: ExportImportState,
     onPassphraseChange: (String) -> Unit,
     onToggleVisibility: () -> Unit,
     onSelectFile: () -> Unit,
@@ -746,7 +750,7 @@ private fun ExportSuccessDialog(
 private fun shareExportFile(context: Context, filePath: String) {
     val file = File(filePath)
     if (file.exists()) {
-        val uri = androidx.core.content.FileProvider.getUriForFile(
+        val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.provider",
             file
@@ -820,6 +824,128 @@ private fun ErrorDialog(
             }
         }
     )
+}
+
+/**
+ * Componente DropZoneArea para arrastrar y soltar archivos JSON
+ * Muestra un área visual para que el usuario arrastre archivos
+ */
+@Composable
+private fun DropZoneArea(
+    isDragging: Boolean,
+    fileName: String?,
+    onDragEnter: () -> Unit,
+    onDragExit: () -> Unit,
+    onFileDrop: (fileName: String, content: String) -> Unit,
+    onClear: () -> Unit
+) {
+    val context = LocalContext.current
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 16.dp)
+            .animateContentSize()
+            .border(
+                width = 2.dp,
+                color = if (isDragging)
+                    MaterialTheme.colorScheme.primary
+                else if (fileName != null)
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                else
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(12.dp)
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isDragging)
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+            else if (fileName != null)
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            else
+                MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            if (fileName == null) {
+                // Estado vacío - mostrar instrucciones de drag & drop
+                Icon(
+                    imageVector = Icons.Default.CloudUpload,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp),
+                    tint = if (isDragging)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Arrastra un archivo JSON aquí",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isDragging)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "O desde Vysor, Google Drive, etc.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            } else {
+                // Estado con archivo cargado
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Archivo cargado",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = fileName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Button(
+                    onClick = onClear,
+                    modifier = Modifier.size(width = 120.dp, height = 36.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.2f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "Limpiar",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        }
+    }
 }
 
 private fun createFilePickerIntent(): Intent {

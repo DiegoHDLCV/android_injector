@@ -301,12 +301,19 @@ class AisinoPedController(private val application: Application) : IPedController
             throw PedKeyException("Plaintext loading via writeKeyPlain is only for MASTER_KEY or TRANSPORT_KEY. Received: $keyType")
         }
 
+        // Aisino SDK key modes for plaintext injection:
+        // Mode 0x01: Single DES (8 bytes)
+        // Mode 0x03: Triple DES double-length (16 bytes, DES_DOUBLE) and triple-length (24 bytes, DES_TRIPLE)
+        // Both DES_DOUBLE (3DES-112 with K1=K3) and DES_TRIPLE (3DES-168) use mode 0x03
         val aisinoMode = when (keyAlgorithm) {
             GenericKeyAlgorithm.DES_SINGLE -> 0x01
-            GenericKeyAlgorithm.DES_TRIPLE -> 0x03
+            GenericKeyAlgorithm.DES_DOUBLE, GenericKeyAlgorithm.DES_TRIPLE -> 0x03
             else -> throw PedKeyException("Unsupported algorithm for plaintext Master/Transport Key: $keyAlgorithm")
         }
-        Log.d(TAG, "Mapped generic algorithm '$keyAlgorithm' to Aisino mode '$aisinoMode'.")
+        Log.d(TAG, "Mapped generic algorithm '$keyAlgorithm' to Aisino mode '0x${aisinoMode.toString(16).uppercase()}'.")
+        if (keyAlgorithm == GenericKeyAlgorithm.DES_DOUBLE) {
+            Log.d(TAG, "Note: DES_DOUBLE (3DES-112, double-length 16 bytes with K1=K3) uses Aisino mode 0x03 per SDK documentation")
+        }
 
         // Verificar si ya existe una clave en ese índice
         try {

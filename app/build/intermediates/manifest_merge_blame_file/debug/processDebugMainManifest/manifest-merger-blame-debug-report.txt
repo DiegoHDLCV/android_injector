@@ -1,0 +1,266 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.vigatec.android_injector"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+9        android:targetSdkVersion="35" />
+10
+11    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+11-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:5:5-82
+11-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:5:22-79
+12
+13    <uses-feature
+13-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:7:5-86
+14        android:name="android.hardware.usb.host"
+14-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:7:19-59
+15        android:required="true" />
+15-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:7:60-83
+16    <uses-feature
+16-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:9:5-88
+17        android:name="android.hardware.telephony"
+17-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:9:19-60
+18        android:required="false" />
+18-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:9:61-85
+19
+20    <uses-permission android:name="android.permission.INTERNET" />
+20-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:10:5-67
+20-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:10:22-64
+21    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+21-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:11:5-79
+21-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:11:22-76
+22    <uses-permission android:name="android.permission.NFC" />
+22-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:12:5-61
+22-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:12:22-59
+23
+24    <uses-feature
+24-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:13:5-80
+25        android:name="android.hardware.nfc"
+25-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:13:19-54
+26        android:required="true" />
+26-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:13:55-78
+27
+28    <uses-permission android:name="android.permission.MODIFY_PHONE_STATE" />
+28-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:14:5-15:47
+28-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:14:22-74
+29    <uses-permission android:name="android.permission.INTERNET" />
+29-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:10:5-67
+29-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:10:22-64
+30    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+30-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:15:111-181
+30-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:15:128-179
+31    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+31-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:15:182-252
+31-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:15:199-250
+32    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+32-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:15:253-322
+32-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:15:270-320
+33    <uses-permission
+33-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:16:5-17:38
+34        android:name="android.permission.READ_EXTERNAL_STORAGE"
+34-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:16:22-77
+35        android:maxSdkVersion="32" />
+35-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:17:9-35
+36    <uses-permission
+36-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:18:5-19:38
+37        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+37-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:18:22-78
+38        android:maxSdkVersion="32" />
+38-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:19:9-35
+39    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+39-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:20:5-77
+39-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:20:22-75
+40    <uses-permission android:name="android.permission.SYSTEM_OVERLAY_WINDOW" />
+40-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:21:5-80
+40-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:21:22-77
+41    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+41-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:22:5-72
+41-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:22:22-70
+42    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+42-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:24:5-79
+42-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:24:22-76
+43    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+43-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:25:5-81
+43-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:25:22-78
+44    <uses-permission
+44-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:26:5-28:32
+45        android:name="android.permission.NEARBY_WIFI_DEVICES"
+45-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:26:22-75
+46        android:usesPermissionFlags="neverForLocation" />
+46-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:27:9-55
+47
+48    <permission
+48-->[androidx.core:core:1.12.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1f2eb3c606f37787756c776978d05ea6\transformed\core-1.12.0\AndroidManifest.xml:22:5-24:47
+49        android:name="com.vigatec.android_injector.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+49-->[androidx.core:core:1.12.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1f2eb3c606f37787756c776978d05ea6\transformed\core-1.12.0\AndroidManifest.xml:23:9-81
+50        android:protectionLevel="signature" />
+50-->[androidx.core:core:1.12.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1f2eb3c606f37787756c776978d05ea6\transformed\core-1.12.0\AndroidManifest.xml:24:9-44
+51
+52    <uses-permission android:name="com.vigatec.android_injector.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+52-->[androidx.core:core:1.12.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1f2eb3c606f37787756c776978d05ea6\transformed\core-1.12.0\AndroidManifest.xml:26:5-97
+52-->[androidx.core:core:1.12.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1f2eb3c606f37787756c776978d05ea6\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
+53    <uses-permission android:name="android.permission.HIDE_UNINSTALL_PACKAGES" />
+53-->[:urovo-sdk-v1.0.20:] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\2cc870f7d19825583b677b512d7d54f1\transformed\urovo-sdk-v1.0.20\AndroidManifest.xml:14:5-82
+53-->[:urovo-sdk-v1.0.20:] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\2cc870f7d19825583b677b512d7d54f1\transformed\urovo-sdk-v1.0.20\AndroidManifest.xml:14:22-79
+54    <uses-permission android:name="android.permission.HIDE_INSTALL_PACKAGES" />
+54-->[:urovo-sdk-v1.0.20:] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\2cc870f7d19825583b677b512d7d54f1\transformed\urovo-sdk-v1.0.20\AndroidManifest.xml:15:5-80
+54-->[:urovo-sdk-v1.0.20:] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\2cc870f7d19825583b677b512d7d54f1\transformed\urovo-sdk-v1.0.20\AndroidManifest.xml:15:22-77
+55    <uses-permission android:name="android.permission.CAMERA" />
+55-->[:urovo-sdk-v1.0.20:] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\2cc870f7d19825583b677b512d7d54f1\transformed\urovo-sdk-v1.0.20\AndroidManifest.xml:17:5-65
+55-->[:urovo-sdk-v1.0.20:] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\2cc870f7d19825583b677b512d7d54f1\transformed\urovo-sdk-v1.0.20\AndroidManifest.xml:17:22-62
+56
+57    <application
+57-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:31:5-57:19
+58        android:name="com.vigatec.android_injector.App"
+58-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:32:9-28
+59        android:allowBackup="true"
+59-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:33:9-35
+60        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+60-->[androidx.core:core:1.12.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1f2eb3c606f37787756c776978d05ea6\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
+61        android:debuggable="true"
+62        android:extractNativeLibs="false"
+63        android:icon="@mipmap/ic_launcher"
+63-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:34:9-43
+64        android:label="@string/app_name"
+64-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:35:9-41
+65        android:roundIcon="@mipmap/ic_launcher_round"
+65-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:36:9-54
+66        android:supportsRtl="true"
+66-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:37:9-35
+67        android:testOnly="true"
+68        android:theme="@style/Theme.Android_injector" >
+68-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:38:9-54
+69        <uses-library
+69-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:39:9-79
+70            android:name="com.pos.device"
+70-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:39:23-52
+71            android:required="false" />
+71-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:39:53-77
+72
+73        <activity
+73-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:40:9-47:20
+74            android:name="com.vigatec.android_injector.MainActivity"
+74-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:41:13-41
+75            android:exported="true" >
+75-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:42:13-36
+76            <intent-filter>
+76-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:43:13-46:29
+77                <action android:name="android.intent.action.MAIN" />
+77-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:44:17-69
+77-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:44:25-66
+78
+79                <category android:name="android.intent.category.LAUNCHER" />
+79-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:45:17-77
+79-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:45:27-74
+80            </intent-filter>
+81        </activity>
+82
+83        <provider
+84            android:name="androidx.core.content.FileProvider"
+84-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:49:13-62
+85            android:authorities="com.vigatec.android_injector.provider"
+85-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:50:13-60
+86            android:exported="false"
+86-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:51:13-37
+87            android:grantUriPermissions="true" >
+87-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:52:13-47
+88            <meta-data
+88-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:53:13-55:54
+89                android:name="android.support.FILE_PROVIDER_PATHS"
+89-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:54:17-67
+90                android:resource="@xml/file_paths" />
+90-->C:\Users\dherrera\OneDrive - VIGATEC S.A\Documentos\ANDROID POS\Proyectos\android_injector\app\src\main\AndroidManifest.xml:55:17-51
+91        </provider>
+92
+93        <activity
+93-->[androidx.compose.ui:ui-tooling-android:1.6.2] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\75d12d198c51a4c4f5b5e14027780089\transformed\ui-tooling-release\AndroidManifest.xml:23:9-25:39
+94            android:name="androidx.compose.ui.tooling.PreviewActivity"
+94-->[androidx.compose.ui:ui-tooling-android:1.6.2] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\75d12d198c51a4c4f5b5e14027780089\transformed\ui-tooling-release\AndroidManifest.xml:24:13-71
+95            android:exported="true" />
+95-->[androidx.compose.ui:ui-tooling-android:1.6.2] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\75d12d198c51a4c4f5b5e14027780089\transformed\ui-tooling-release\AndroidManifest.xml:25:13-36
+96        <activity
+96-->[androidx.compose.ui:ui-test-manifest:1.6.2] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\df6ae6de6821449c6e5b8271d953adec\transformed\ui-test-manifest-1.6.2\AndroidManifest.xml:23:9-25:39
+97            android:name="androidx.activity.ComponentActivity"
+97-->[androidx.compose.ui:ui-test-manifest:1.6.2] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\df6ae6de6821449c6e5b8271d953adec\transformed\ui-test-manifest-1.6.2\AndroidManifest.xml:24:13-63
+98            android:exported="true" />
+98-->[androidx.compose.ui:ui-test-manifest:1.6.2] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\df6ae6de6821449c6e5b8271d953adec\transformed\ui-test-manifest-1.6.2\AndroidManifest.xml:25:13-36
+99
+100        <provider
+100-->[androidx.emoji2:emoji2:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1ce14550029cd952ac7d27aac61f4cbb\transformed\emoji2-1.3.0\AndroidManifest.xml:24:9-32:20
+101            android:name="androidx.startup.InitializationProvider"
+101-->[androidx.emoji2:emoji2:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1ce14550029cd952ac7d27aac61f4cbb\transformed\emoji2-1.3.0\AndroidManifest.xml:25:13-67
+102            android:authorities="com.vigatec.android_injector.androidx-startup"
+102-->[androidx.emoji2:emoji2:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1ce14550029cd952ac7d27aac61f4cbb\transformed\emoji2-1.3.0\AndroidManifest.xml:26:13-68
+103            android:exported="false" >
+103-->[androidx.emoji2:emoji2:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1ce14550029cd952ac7d27aac61f4cbb\transformed\emoji2-1.3.0\AndroidManifest.xml:27:13-37
+104            <meta-data
+104-->[androidx.emoji2:emoji2:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1ce14550029cd952ac7d27aac61f4cbb\transformed\emoji2-1.3.0\AndroidManifest.xml:29:13-31:52
+105                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+105-->[androidx.emoji2:emoji2:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1ce14550029cd952ac7d27aac61f4cbb\transformed\emoji2-1.3.0\AndroidManifest.xml:30:17-75
+106                android:value="androidx.startup" />
+106-->[androidx.emoji2:emoji2:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\1ce14550029cd952ac7d27aac61f4cbb\transformed\emoji2-1.3.0\AndroidManifest.xml:31:17-49
+107            <meta-data
+107-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\4563c8c599e89023e0b79d0e364f038c\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:29:13-31:52
+108                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+108-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\4563c8c599e89023e0b79d0e364f038c\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:30:17-78
+109                android:value="androidx.startup" />
+109-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\4563c8c599e89023e0b79d0e364f038c\transformed\lifecycle-process-2.7.0\AndroidManifest.xml:31:17-49
+110            <meta-data
+110-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:29:13-31:52
+111                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+111-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:30:17-85
+112                android:value="androidx.startup" />
+112-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:31:17-49
+113        </provider>
+114
+115        <service
+115-->[androidx.room:room-runtime:2.6.1] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\0987cc61eb3e44ff2c0600ccdbd0be16\transformed\room-runtime-2.6.1\AndroidManifest.xml:24:9-28:63
+116            android:name="androidx.room.MultiInstanceInvalidationService"
+116-->[androidx.room:room-runtime:2.6.1] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\0987cc61eb3e44ff2c0600ccdbd0be16\transformed\room-runtime-2.6.1\AndroidManifest.xml:25:13-74
+117            android:directBootAware="true"
+117-->[androidx.room:room-runtime:2.6.1] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\0987cc61eb3e44ff2c0600ccdbd0be16\transformed\room-runtime-2.6.1\AndroidManifest.xml:26:13-43
+118            android:exported="false" />
+118-->[androidx.room:room-runtime:2.6.1] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\0987cc61eb3e44ff2c0600ccdbd0be16\transformed\room-runtime-2.6.1\AndroidManifest.xml:27:13-37
+119
+120        <receiver
+120-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:34:9-52:20
+121            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+121-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:35:13-76
+122            android:directBootAware="false"
+122-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:36:13-44
+123            android:enabled="true"
+123-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:37:13-35
+124            android:exported="true"
+124-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:38:13-36
+125            android:permission="android.permission.DUMP" >
+125-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:39:13-57
+126            <intent-filter>
+126-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:40:13-42:29
+127                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+127-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:17-91
+127-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:41:25-88
+128            </intent-filter>
+129            <intent-filter>
+129-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:43:13-45:29
+130                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+130-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:17-85
+130-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:44:25-82
+131            </intent-filter>
+132            <intent-filter>
+132-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:46:13-48:29
+133                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+133-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:17-88
+133-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:47:25-85
+134            </intent-filter>
+135            <intent-filter>
+135-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:49:13-51:29
+136                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+136-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:17-95
+136-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\dherrera\.gradle\caches\8.10.2\transforms\d8924f2e5fa90a89b85de58bdea4ec95\transformed\profileinstaller-1.3.0\AndroidManifest.xml:50:25-92
+137            </intent-filter>
+138        </receiver>
+139    </application>
+140
+141</manifest>
