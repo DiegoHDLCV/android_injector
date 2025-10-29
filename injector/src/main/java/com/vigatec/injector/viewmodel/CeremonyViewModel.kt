@@ -59,6 +59,14 @@ class CeremonyViewModel @Inject constructor(
 
     init {
         // Verificar si existe KEK Storage y cargar usuario actual
+        refreshCeremonyState()
+    }
+
+    /**
+     * Reinicializa el estado de la ceremonia verificando KEK Storage e isAdmin
+     * Se usa tanto en init como cuando se cancela/completa una ceremonia
+     */
+    private fun refreshCeremonyState() {
         checkKEKStorageExists()
         loadCurrentUser()
     }
@@ -361,8 +369,10 @@ class CeremonyViewModel @Inject constructor(
                             throw IllegalStateException("KEK Storage debe ser AES-256")
                         }
 
+                        val kekStorageExistaAntes = _uiState.value.hasKEKStorage
+
                         // Si ya existe una KEK Storage, rotar las llaves
-                        if (_uiState.value.hasKEKStorage) {
+                        if (kekStorageExistaAntes) {
                             addToLog("")
                             addToLog("=== ROTACIÓN DE KEK STORAGE ===")
                             addToLog("Se detectó una KEK Storage existente")
@@ -505,13 +515,15 @@ class CeremonyViewModel @Inject constructor(
                     customName = _uiState.value.customName // Nombre personalizado
                 )
 
-
+                // Si se acaba de crear una KEK Storage, actualizar el estado para reflejar que ahora existe
+                val shouldUpdateKEKStorageFlag = _uiState.value.selectedKEKType == KEKType.KEK_STORAGE
 
                 _uiState.value = _uiState.value.copy(
                     currentStep = 3,
                     finalKCV = finalKcv,
                     isCeremonyFinished = true,
-                    isLoading = false
+                    isLoading = false,
+                    hasKEKStorage = shouldUpdateKEKStorageFlag || _uiState.value.hasKEKStorage // Actualizar si se creó una KEK Storage
                 )
 
 
@@ -524,7 +536,17 @@ class CeremonyViewModel @Inject constructor(
     }
 
     fun cancelCeremony() {
-        _uiState.value = CeremonyState() // Resetea al estado inicial
+        android.util.Log.d("CeremonyViewModel", "Cancelando ceremonia - reinicializando estado")
+        // Resetea al estado inicial pero preservando los datos de KEK Storage e isAdmin
+        _uiState.value = CeremonyState(
+            component = "E59D620E1A6D311F19342054AB01ABF7",
+            hasKEKStorage = _uiState.value.hasKEKStorage, // Preservar estado actual de KEK
+            isAdmin = _uiState.value.isAdmin, // Preservar estado actual de admin
+            canCreateKEK = _uiState.value.canCreateKEK,
+            canCreateOperational = _uiState.value.canCreateOperational
+        )
+        // Recarga el estado de KEK Storage (por si cambió durante la ceremonia)
+        refreshCeremonyState()
     }
 
     fun clearKekValidationError() {
