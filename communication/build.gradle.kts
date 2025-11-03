@@ -13,6 +13,12 @@ android {
         }
     }
 
+    packaging {
+        resources {
+            excludes += setOf("META-INF/**")
+        }
+    }
+
     defaultConfig {
         minSdk = 24
 
@@ -44,8 +50,11 @@ android {
 }
 
 dependencies {
-    implementation(fileTree(mapOf("dir" to "../shared-libs", "include" to listOf("*.jar"), "exclude" to listOf("core-3.2.1.jar"))))
-    // Note: CH34xUARTDriver.jar is already included via shared-libs fileTree
+    implementation(fileTree(mapOf("dir" to "../shared-libs", "include" to listOf("*.jar"), "exclude" to listOf("core-3.2.1.jar", "CH34xUARTDriver.jar"))))
+    // Note: Using usb-serial-for-android instead of legacy CH34xUARTDriver
+
+    // USB Serial for Android - Modern CH340 support with proper Android 12+ PendingIntent handling
+    implementation("com.github.mik3y:usb-serial-for-android:3.9.0")
 
     implementation(project(":config"))
     implementation(":urovo-sdk-v1.0.20:@aar")

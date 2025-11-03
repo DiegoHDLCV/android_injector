@@ -3,6 +3,7 @@
     package="com.vigatec.keyreceiver">
 
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.USB_PERMISSION" />
 
     <!-- USB Configuration: keyreceiver acts as SubPOS (DEVICE/PERIPHERAL mode) -->
     <!-- USB Host es OPCIONAL - permite conectarse a otros dispositivos pero no es requerido -->
@@ -51,6 +52,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- BroadcastReceiver para otorgación automática de permisos USB -->
+        <receiver
+            android:name=".receiver.UsbPermissionReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"

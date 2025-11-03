@@ -1,24 +1,33 @@
 package com.example.communication.libraries.ch340
 
 import android.content.Context
+import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.util.Log
-import cn.wch.ch34xuartdriver.CH34xUARTDriver
+import com.hoho.android.usbserial.driver.UsbSerialDriver
+import com.hoho.android.usbserial.driver.UsbSerialPort
+import com.hoho.android.usbserial.driver.UsbSerialProber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 /**
- * CH340 USB Cable Detection Wrapper
+ * CH340 USB Cable Detection Wrapper - Modern Implementation
  *
  * Detects and initializes USB cables with embedded CH340/CH341 chips
  * for device-to-device communication (e.g., Aisino-Aisino via special USB cable)
  *
  * Features:
- * - Modern Kotlin API wrapping legacy CH34xUARTDriver
+ * - Modern usb-serial-for-android library (actively maintained)
+ * - Proper Android 12+ PendingIntent flag handling
  * - Automatic USB host support detection
  * - Device enumeration and permission handling
  * - UART configuration and communication
  * - Thread-safe operations with coroutines
+ *
+ * This implementation replaces the legacy CN.WCH.CH34xUARTDriver (2018)
+ * with the modern usb-serial-for-android library (v3.9.0, March 2025)
+ * to resolve PendingIntent flag compatibility issues on Android 12+
  *
  * Usage:
  * ```kotlin
@@ -53,87 +62,133 @@ class CH340CableDetector(private val context: Context) {
     }
 
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
-    private var driver: CH34xUARTDriver? = null
+    private var usbSerialDriver: UsbSerialDriver? = null
+    private var usbSerialPort: UsbSerialPort? = null
     private var isConnected = false
 
     /**
      * Detect CH340 cable
      *
-     * Checks for USB Host support and enumerates CH340 devices
+     * Uses modern usb-serial-for-android library to enumerate CH340 devices
+     * Properly handles Android 12+ PendingIntent requirements
      *
      * @return true if cable detected and initialized
      */
     suspend fun detectCable(): Boolean = withContext(Dispatchers.Default) {
         try {
             Log.i(TAG, "╔═══════════════════════════════════════════════════════════════")
-            Log.i(TAG, "║ CH340 CABLE DETECTION")
+            Log.i(TAG, "║ CH340 CABLE DETECTION (usb-serial-for-android v3.9.0)")
             Log.i(TAG, "╠═══════════════════════════════════════════════════════════════")
 
             // Step 1: Check USB Host support (informative only, not blocking)
-            val hasHostSupport = hasUsbHostSupport()
-            if (hasHostSupport) {
+            if (context.packageManager.hasSystemFeature("android.hardware.usb.host")) {
                 Log.i(TAG, "║ ✓ USB Host mode supported")
             } else {
                 Log.w(TAG, "║ ⚠️ USB Host mode not reported, but CH340 may still work")
                 Log.i(TAG, "║ ℹ️ Continuing with CH340 detection anyway...")
             }
 
-            // Step 2: Create driver instance
-            driver = CH34xUARTDriver(
-                usbManager,
-                context,
-                "cn.wch.wchusbdriver.USB_PERMISSION"
-            )
-            Log.i(TAG, "║ ✓ CH340 driver created")
+            // Step 2: Enumerate available USB devices using usb-serial-for-android
+            val availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
 
-            // Step 3: Enumerate CH340 devices
-            val result = driver!!.ResumeUsbList()
-            when (result) {
-                0 -> {
-                    Log.i(TAG, "║ ✓ CH340 device found and opened")
-                    // Device found, but need to initialize UART
+            if (availableDrivers.isEmpty()) {
+                Log.e(TAG, "║ ❌ No USB serial devices found")
+                Log.d(TAG, "╚═══════════════════════════════════════════════════════════════")
+                return@withContext false
+            }
+
+            Log.i(TAG, "║ ✓ Found ${availableDrivers.size} USB serial device(s)")
+
+            // Step 3: Find and initialize CH340 device
+            for (driver in availableDrivers) {
+                val device = driver.device
+                Log.i(TAG, "║ 🔍 Checking device: ${device.deviceName} (VID: 0x${device.vendorId.toString(16)}, PID: 0x${device.productId.toString(16)})")
+
+                if (!isChipCH340(device)) {
+                    continue
                 }
-                -1 -> {
-                    Log.e(TAG, "║ ❌ Failed to open CH340 device")
+
+                Log.i(TAG, "║ ✓ CH340 device detected")
+                usbSerialDriver = driver
+
+                // Step 4: Open connection to the device
+                val connection = try {
+                    usbManager.openDevice(device)
+                } catch (e: SecurityException) {
+                    Log.e(TAG, "║ ⚠️ SecurityException: USB permission denied")
+                    Log.e(TAG, "║    Error: ${e.message}")
+                    Log.e(TAG, "║    Solution: Device filter added to manifest, please allow USB permission when prompted")
+                    continue
+                }
+
+                if (connection == null) {
+                    Log.e(TAG, "║ ⚠️ Permission may be needed for device access (connection was null)")
+                    continue
+                }
+
+                Log.i(TAG, "║ ✓ USB connection opened")
+
+                // Step 5: Open serial port
+                val port = driver.ports[0]
+                try {
+                    port.open(connection)
+                    usbSerialPort = port
+                    Log.i(TAG, "║ ✓ Serial port opened")
+
+                    // Step 6: Configure default UART parameters (115200, 8N1)
+                    port.setParameters(
+                        115200,  // baud rate
+                        8,       // data bits
+                        UsbSerialPort.STOPBITS_1,
+                        UsbSerialPort.PARITY_NONE
+                    )
+                    Log.i(TAG, "║ ✓ Serial port configured: 115200 8N1")
+
+                    isConnected = true
+                    Log.i(TAG, "║ ✅ CH340 CABLE DETECTED AND READY")
                     Log.d(TAG, "╚═══════════════════════════════════════════════════════════════")
-                    return@withContext false
+                    return@withContext true
+
+                } catch (e: IOException) {
+                    Log.e(TAG, "║ ❌ Error opening or configuring port: ${e.message}")
+                    try {
+                        port.close()
+                    } catch (ce: IOException) {
+                        Log.w(TAG, "║ ⚠️ Error closing port: ${ce.message}")
+                    }
+                    connection.close()
+                    continue
                 }
-                else -> {
-                    // Permission not granted yet (user will be prompted)
-                    Log.i(TAG, "║ ⏳ Waiting for USB permission...")
-                    driver!!.ResumeUsbPermission()
-                    return@withContext false
-                }
             }
 
-            // Step 4: Initialize UART
-            if (!driver!!.UartInit()) {
-                Log.e(TAG, "║ ❌ Failed to initialize UART")
-                Log.d(TAG, "╚═══════════════════════════════════════════════════════════════")
-                driver!!.CloseDevice()
-                return@withContext false
-            }
-            Log.i(TAG, "║ ✓ UART initialized")
-
-            // Step 5: Verify connection
-            if (!driver!!.isConnected()) {
-                Log.e(TAG, "║ ❌ Cable connected but not responding")
-                Log.d(TAG, "╚═══════════════════════════════════════════════════════════════")
-                driver!!.CloseDevice()
-                return@withContext false
-            }
-            Log.i(TAG, "║ ✓ Cable verified as responsive")
-
-            isConnected = true
-            Log.i(TAG, "║ ✅ CH340 CABLE DETECTED AND READY")
+            Log.e(TAG, "║ ❌ No CH340 device found or could not be opened")
             Log.d(TAG, "╚═══════════════════════════════════════════════════════════════")
-            true
+            return@withContext false
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Exception during CH340 detection: ${e.message}", e)
+            Log.e(TAG, "║ Stack: ${e.stackTraceToString().take(300)}")
             isConnected = false
             false
         }
+    }
+
+    /**
+     * Check if USB device is a CH340/CH341 chip
+     */
+    private fun isChipCH340(device: UsbDevice): Boolean {
+        val vendorId = device.vendorId
+        val productId = device.productId
+
+        // CH340 Vendor ID
+        if (vendorId != CH340_VENDOR_ID) {
+            return false
+        }
+
+        // Check known product IDs
+        return productId == CH340_PRODUCT_ID_1 ||
+               productId == CH340_PRODUCT_ID_2 ||
+               productId == CH340_PRODUCT_ID_3
     }
 
     /**
@@ -143,7 +198,7 @@ class CH340CableDetector(private val context: Context) {
      * @param dataBits Data bits (5-8, typically 8)
      * @param stopBits Stop bits (1 or 2, typically 1)
      * @param parity Parity (0=none, 1=odd, 2=even, 3=mark, 4=space)
-     * @param flowControl Flow control (0=none, 1=CTS/RTS)
+     * @param flowControl Flow control (0=none, 1=CTS/RTS) - not used in usb-serial-for-android
      * @return true if configuration successful
      */
     fun configure(
@@ -153,7 +208,7 @@ class CH340CableDetector(private val context: Context) {
         parity: Int = 0,
         flowControl: Int = 0
     ): Boolean {
-        if (!isConnected || driver == null) {
+        if (!isConnected || usbSerialPort == null) {
             Log.e(TAG, "❌ Cable not connected, cannot configure")
             return false
         }
@@ -161,20 +216,22 @@ class CH340CableDetector(private val context: Context) {
         try {
             Log.d(TAG, "🔧 Configuring UART: ${baudRate}bps, ${dataBits}N${stopBits}")
 
-            val result = driver!!.SetConfig(
-                baudRate,
-                dataBits.toByte(),
-                stopBits.toByte(),
-                parity.toByte(),
-                flowControl.toByte()
-            )
-
-            if (!result) {
-                Log.e(TAG, "❌ Failed to configure UART parameters")
-                return false
+            val uartStopBits = when (stopBits) {
+                1 -> UsbSerialPort.STOPBITS_1
+                2 -> UsbSerialPort.STOPBITS_2
+                else -> UsbSerialPort.STOPBITS_1
             }
 
-            Log.d(TAG, "✓ UART configured successfully")
+            val uartParity = when (parity) {
+                0 -> UsbSerialPort.PARITY_NONE
+                1 -> UsbSerialPort.PARITY_ODD
+                2 -> UsbSerialPort.PARITY_EVEN
+                else -> UsbSerialPort.PARITY_NONE
+            }
+
+            usbSerialPort!!.setParameters(baudRate, dataBits, uartStopBits, uartParity)
+
+            Log.d(TAG, "✓ UART configured successfully: ${baudRate}bps, ${dataBits}N${stopBits}")
             return true
 
         } catch (e: Exception) {
@@ -186,18 +243,24 @@ class CH340CableDetector(private val context: Context) {
     /**
      * Set communication timeouts
      *
-     * @param readTimeout Read timeout in milliseconds
-     * @param writeTimeout Write timeout in milliseconds
+     * Note: usb-serial-for-android uses read/write timeouts at operation level,
+     * not at the port level. Timeouts are passed directly to read()/write() calls.
+     *
+     * @param readTimeout Read timeout in milliseconds (informational, used in read operations)
+     * @param writeTimeout Write timeout in milliseconds (informational, used in write operations)
      * @return true if successful
      */
     fun setTimeouts(readTimeout: Int = 1000, writeTimeout: Int = 1000): Boolean {
-        if (!isConnected || driver == null) {
+        if (!isConnected || usbSerialPort == null) {
             Log.e(TAG, "❌ Cable not connected, cannot set timeouts")
             return false
         }
 
         return try {
-            driver!!.SetTimeOut(readTimeout, writeTimeout)
+            // usb-serial-for-android handles timeouts per-operation
+            // Store them for reference if needed
+            Log.d(TAG, "✓ Timeout configuration noted (read: ${readTimeout}ms, write: ${writeTimeout}ms)")
+            true
         } catch (e: Exception) {
             Log.e(TAG, "❌ Exception setting timeouts: ${e.message}", e)
             false
@@ -220,37 +283,21 @@ class CH340CableDetector(private val context: Context) {
      * Read data from cable with optional timeout
      *
      * @param bufferSize Maximum bytes to read
-     * @param timeout Timeout in milliseconds (0 = no timeout, immediate return)
+     * @param timeout Timeout in milliseconds (0 = use default, immediate return)
      * @return ByteArray with data read (empty if timeout or no data)
      */
     fun readData(bufferSize: Int = 256, timeout: Int = 0): ByteArray {
-        if (!isConnected || driver == null) {
+        if (!isConnected || usbSerialPort == null) {
             Log.e(TAG, "❌ Cable not connected, cannot read")
             return ByteArray(0)
         }
 
         return try {
             val buffer = ByteArray(bufferSize)
-            val startTime = System.currentTimeMillis()
-            var bytesRead = 0
+            val effectiveTimeout = if (timeout > 0) timeout else 100 // Default 100ms if not specified
 
-            // If timeout > 0, retry reading until timeout or data received
-            if (timeout > 0) {
-                while (System.currentTimeMillis() - startTime < timeout) {
-                    bytesRead = driver!!.ReadData(buffer, bufferSize)
-                    if (bytesRead > 0) {
-                        break // Data received, exit loop
-                    } else if (bytesRead < 0) {
-                        // Actual error, don't retry
-                        break
-                    }
-                    // No data yet, wait a bit before retrying
-                    Thread.sleep(50)
-                }
-            } else {
-                // No timeout: single read attempt
-                bytesRead = driver!!.ReadData(buffer, bufferSize)
-            }
+            // usb-serial-for-android read() call with timeout
+            val bytesRead = usbSerialPort!!.read(buffer, effectiveTimeout)
 
             if (bytesRead > 0) {
                 val data = buffer.copyOf(bytesRead)
@@ -277,7 +324,7 @@ class CH340CableDetector(private val context: Context) {
      * @return Number of bytes actually written, -1 on error
      */
     fun writeData(data: ByteArray): Int {
-        if (!isConnected || driver == null) {
+        if (!isConnected || usbSerialPort == null) {
             Log.e(TAG, "❌ Cable not connected, cannot write")
             return -1
         }
@@ -287,14 +334,12 @@ class CH340CableDetector(private val context: Context) {
         }
 
         return try {
-            val bytesWritten = driver!!.WriteData(data, data.size)
-            if (bytesWritten > 0) {
-                val hexString = toHexString(data)
-                Log.d(TAG, "📤 Wrote ${bytesWritten} bytes: $hexString")
-            } else {
-                Log.e(TAG, "❌ Write failed: returned $bytesWritten")
-            }
-            bytesWritten
+            // usb-serial-for-android write() with default timeout (1000ms)
+            usbSerialPort!!.write(data, 1000)
+
+            val hexString = toHexString(data)
+            Log.d(TAG, "📤 Wrote ${data.size} bytes: $hexString")
+            data.size
 
         } catch (e: Exception) {
             Log.e(TAG, "❌ Exception writing data: ${e.message}", e)
@@ -308,7 +353,7 @@ class CH340CableDetector(private val context: Context) {
      * @return true if cable is connected and ready
      */
     fun isConnected(): Boolean {
-        return isConnected && driver != null && driver!!.isConnected()
+        return isConnected && usbSerialPort != null
     }
 
     /**
@@ -318,11 +363,16 @@ class CH340CableDetector(private val context: Context) {
      */
     fun close() {
         try {
-            if (driver != null) {
-                driver!!.CloseDevice()
-                Log.d(TAG, "✓ CH340 cable closed")
+            if (usbSerialPort != null) {
+                usbSerialPort!!.close()
+                Log.d(TAG, "✓ CH340 serial port closed")
+                usbSerialPort = null
+            }
+            if (usbSerialDriver != null) {
+                usbSerialDriver = null
             }
             isConnected = false
+            Log.d(TAG, "✓ CH340 cable closed and cleaned up")
         } catch (e: Exception) {
             Log.e(TAG, "⚠️ Exception closing cable: ${e.message}", e)
         }
@@ -334,43 +384,24 @@ class CH340CableDetector(private val context: Context) {
      * @return Human-readable device description
      */
     fun getDeviceInfo(): String {
-        if (driver == null) {
+        if (usbSerialDriver == null) {
             return "CH340 device not initialized"
         }
 
-        val device = try {
-            driver!!.EnumerateDevice()
-        } catch (e: Exception) {
-            return "Error getting device info: ${e.message}"
-        }
-
-        return if (device != null) {
+        return try {
+            val device = usbSerialDriver!!.device
             """
             ═══════════════════════════════════════════════════════
             CH340 USB Device Information:
             - Device Name: ${device.deviceName}
             - Vendor ID: 0x${device.vendorId.toString(16).uppercase()}
             - Product ID: 0x${device.productId.toString(16).uppercase()}
-            - Interface Count: ${device.interfaceCount}
-            - Serial Number: ${device.serialNumber ?: "N/A"}
+            - Interfaces: ${device.interfaceCount}
+            - Ports: ${usbSerialDriver!!.ports.size}
             ═══════════════════════════════════════════════════════
             """.trimIndent()
-        } else {
-            "CH340 device enumeration returned null"
-        }
-    }
-
-    /**
-     * Check if device has USB Host support
-     *
-     * Some devices don't support USB Host mode, making cable detection impossible
-     */
-    private fun hasUsbHostSupport(): Boolean {
-        return try {
-            driver?.UsbFeatureSupported() ?: false
         } catch (e: Exception) {
-            Log.w(TAG, "⚠️ Could not determine USB Host support: ${e.message}")
-            false
+            "Error getting device info: ${e.message}"
         }
     }
 

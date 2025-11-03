@@ -84,6 +84,8 @@ class NewposComController(private val context: Context? = null) : IComController
 
     /**
      * Intentar detectar y usar cable CH340
+     *
+     * Usa usb-serial-for-android v3.9.0 para soporte CH340 compatible con Android 12+
      */
     private fun tryCH340(): Boolean {
         return try {
@@ -108,7 +110,10 @@ class NewposComController(private val context: Context? = null) : IComController
                 false
             }
         } catch (e: Exception) {
-            Log.d(TAG, "║ [CH340] Error: ${e.message}")
+            Log.e(TAG, "║ [CH340] ❌ Error durante detección/configuración", e)
+            Log.e(TAG, "║    Tipo: ${e.javaClass.simpleName}")
+            Log.e(TAG, "║    Mensaje: ${e.message}")
+            Log.e(TAG, "║    Stack: ${e.stackTraceToString().take(400)}")
             false
         }
     }
@@ -212,7 +217,7 @@ class NewposComController(private val context: Context? = null) : IComController
         return try {
             val readBytes = if (usingCH340Cable) {
                 Log.i(TAG, "║ Leyendo desde cable CH340...")
-                val data = ch340Detector?.readData(expectedLen)
+                val data = ch340Detector?.readData(expectedLen, timeout)
                 if (data != null && data.isNotEmpty()) {
                     val bytesRead = minOf(data.size, buffer.size)
                     data.copyInto(buffer, 0, 0, bytesRead)
@@ -225,7 +230,7 @@ class NewposComController(private val context: Context? = null) : IComController
                     Log.e(TAG, "║ ✗ ERROR: InputStream es NULL")
                     return -1
                 }
-                inputStream.read(buffer)
+                inputStream.read(buffer, 0, minOf(expectedLen, buffer.size))
             }
 
             if (readBytes > 0) {
