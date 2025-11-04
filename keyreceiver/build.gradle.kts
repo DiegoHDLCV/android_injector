@@ -150,41 +150,45 @@ jacoco {
     toolVersion = "0.8.12"
 }
 
-tasks.register<JacocoReport>("jacocoTestReport") {
-    description = "Generate JaCoCo coverage report for debug unit tests"
-    group = "verification"
-    dependsOn("testDebugUnitTest")
+// Create JaCoCo tasks for each flavor
+listOf("dev", "qa", "prod").forEach { flavor ->
+    val flavorCapitalized = flavor.replaceFirstChar { it.uppercase() }
+    tasks.register<JacocoReport>("jacoco${flavorCapitalized}TestReport") {
+        description = "Generate JaCoCo coverage report for $flavor flavor debug unit tests"
+        group = "verification"
+        dependsOn("test${flavorCapitalized}DebugUnitTest")
 
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/testDebugUnitTest/testDebugUnitTest.xml"))
+        reports {
+            xml.required.set(true)
+            html.required.set(true)
+            xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/test${flavorCapitalized}DebugUnitTest/test${flavorCapitalized}DebugUnitTest.xml"))
+        }
+
+        val fileFilter = listOf(
+            "**/R.class", "**/R\$*.class", "**/BuildConfig.*",
+            "**/Manifest*.*", "**/*Test*.*", "android/**/*.*",
+            "**/*\$ViewInjector*.*", "**/*Dagger*.*",
+            "**/*MembersInjector*.*", "**/*_Factory.*",
+            "**/*_Provide*Factory*.*", "**/*_ViewBinding*.*",
+            "**/AutoValue_*.*", "**/R2.class", "**/R2\$*.class",
+            "**/*Directions\$*", "**/*Directions.class",
+            "**/*Binding.*",
+            "**/com/vigatec/keyreceiver/data/model/**",
+            "**/MainActivity*.class"
+        )
+
+        val debugTree = fileTree("${project.layout.buildDirectory.get()}/tmp/kotlin-classes/${flavor}Debug") {
+            exclude(fileFilter)
+        }
+
+        val mainSrc = "${project.projectDir}/src/main/java"
+
+        sourceDirectories.setFrom(files(mainSrc))
+        classDirectories.setFrom(files(debugTree))
+        executionData.setFrom(fileTree(project.layout.buildDirectory.get()) {
+            include("jacoco/test${flavorCapitalized}DebugUnitTest.exec", "outputs/unit_test_code_coverage/${flavor}DebugUnitTest/test${flavorCapitalized}DebugUnitTest.exec")
+        })
     }
-
-    val fileFilter = listOf(
-        "**/R.class", "**/R\$*.class", "**/BuildConfig.*",
-        "**/Manifest*.*", "**/*Test*.*", "android/**/*.*",
-        "**/*\$ViewInjector*.*", "**/*Dagger*.*",
-        "**/*MembersInjector*.*", "**/*_Factory.*",
-        "**/*_Provide*Factory*.*", "**/*_ViewBinding*.*",
-        "**/AutoValue_*.*", "**/R2.class", "**/R2\$*.class",
-        "**/*Directions\$*", "**/*Directions.class",
-        "**/*Binding.*",
-        "**/com/vigatec/keyreceiver/data/model/**",
-        "**/MainActivity*.class"
-    )
-
-    val debugTree = fileTree("${project.layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
-        exclude(fileFilter)
-    }
-
-    val mainSrc = "${project.projectDir}/src/main/java"
-
-    sourceDirectories.setFrom(files(mainSrc))
-    classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(fileTree(project.layout.buildDirectory.get()) {
-        include("jacoco/testDebugUnitTest.exec", "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
-    })
 }
 
 tasks.withType<Test> {

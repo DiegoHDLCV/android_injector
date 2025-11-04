@@ -19,53 +19,60 @@ fi
 # Make gradlew executable
 chmod +x ./gradlew
 
+# Use prod flavor by default (most suitable for analysis)
+FLAVOR=${FLAVOR:-prod}
+FLAVOR_CAPS=$(echo "$FLAVOR" | tr '[:lower:]' '[:upper:]' | head -c 1)$(echo "$FLAVOR" | tail -c +2)
+
+echo "Using flavor: $FLAVOR"
+echo ""
+
 # Step 1: Generate Lint reports
 echo "Step 1: Generating Lint reports..."
-echo "  - Generating Lint report for injector..."
-./gradlew :injector:lintDebug --continue 2>&1 | grep -E "(lintDebug|BUILD|FAILURE)" || true
+echo "  - Generating Lint report for injector ($FLAVOR flavor)..."
+./gradlew ":injector:lint${FLAVOR_CAPS}Debug" --continue 2>&1 | grep -E "(lint|BUILD|FAILURE)" || true
 
-echo "  - Generating Lint report for keyreceiver..."
-./gradlew :keyreceiver:lintDebug --continue 2>&1 | grep -E "(lintDebug|BUILD|FAILURE)" || true
+echo "  - Generating Lint report for keyreceiver ($FLAVOR flavor)..."
+./gradlew ":keyreceiver:lint${FLAVOR_CAPS}Debug" --continue 2>&1 | grep -E "(lint|BUILD|FAILURE)" || true
 
 echo "✓ Lint reports generated"
 echo ""
 
 # Step 2: Run unit tests
 echo "Step 2: Running unit tests..."
-echo "  - Running tests for injector..."
-./gradlew :injector:testDebugUnitTest --continue 2>&1 | grep -E "(testDebugUnitTest|BUILD|Tests|passed)" || true
+echo "  - Running tests for injector ($FLAVOR flavor)..."
+./gradlew ":injector:test${FLAVOR_CAPS}DebugUnitTest" --continue 2>&1 | grep -E "(test|BUILD|Tests|passed)" || true
 
-echo "  - Running tests for keyreceiver..."
-./gradlew :keyreceiver:testDebugUnitTest --continue 2>&1 | grep -E "(testDebugUnitTest|BUILD|Tests|passed)" || true
+echo "  - Running tests for keyreceiver ($FLAVOR flavor)..."
+./gradlew ":keyreceiver:test${FLAVOR_CAPS}DebugUnitTest" --continue 2>&1 | grep -E "(test|BUILD|Tests|passed)" || true
 
 echo "✓ Unit tests completed"
 echo ""
 
 # Step 3: Generate JaCoCo reports
 echo "Step 3: Generating JaCoCo coverage reports..."
-echo "  - Generating JaCoCo report for injector..."
-./gradlew :injector:jacocoTestReport --continue 2>&1 | grep -E "(jacocoTestReport|BUILD)" || true
+echo "  - Generating JaCoCo report for injector ($FLAVOR flavor)..."
+./gradlew ":injector:jacoco${FLAVOR_CAPS}TestReport" --continue 2>&1 | grep -E "(jacoco|BUILD)" || true
 
-echo "  - Generating JaCoCo report for keyreceiver..."
-./gradlew :keyreceiver:jacocoTestReport --continue 2>&1 | grep -E "(jacocoTestReport|BUILD)" || true
+echo "  - Generating JaCoCo report for keyreceiver ($FLAVOR flavor)..."
+./gradlew ":keyreceiver:jacoco${FLAVOR_CAPS}TestReport" --continue 2>&1 | grep -E "(jacoco|BUILD)" || true
 
 echo "✓ JaCoCo reports generated"
 echo ""
 
 # Step 4: Report locations
 echo "============================================"
-echo "Report Locations:"
+echo "Report Locations (for $FLAVOR flavor):"
 echo "============================================"
 echo ""
 echo "Injector Module:"
-echo "  - Lint Report: ./injector/build/reports/lint-results-debug.html"
-echo "  - JaCoCo Report: ./injector/build/reports/jacoco/testDebugUnitTest/html/index.html"
-echo "  - Coverage XML: ./injector/build/reports/jacoco/testDebugUnitTest/testDebugUnitTest.xml"
+echo "  - Lint Report: ./injector/build/reports/lint-results-${FLAVOR}Debug.html"
+echo "  - JaCoCo Report: ./injector/build/reports/jacoco/test${FLAVOR_CAPS}DebugUnitTest/html/index.html"
+echo "  - Coverage XML: ./injector/build/reports/jacoco/test${FLAVOR_CAPS}DebugUnitTest/test${FLAVOR_CAPS}DebugUnitTest.xml"
 echo ""
 echo "KeyReceiver Module:"
-echo "  - Lint Report: ./keyreceiver/build/reports/lint-results-debug.html"
-echo "  - JaCoCo Report: ./keyreceiver/build/reports/jacoco/testDebugUnitTest/html/index.html"
-echo "  - Coverage XML: ./keyreceiver/build/reports/jacoco/testDebugUnitTest/testDebugUnitTest.xml"
+echo "  - Lint Report: ./keyreceiver/build/reports/lint-results-${FLAVOR}Debug.html"
+echo "  - JaCoCo Report: ./keyreceiver/build/reports/jacoco/test${FLAVOR_CAPS}DebugUnitTest/html/index.html"
+echo "  - Coverage XML: ./keyreceiver/build/reports/jacoco/test${FLAVOR_CAPS}DebugUnitTest/test${FLAVOR_CAPS}DebugUnitTest.xml"
 echo ""
 
 # Step 5: Instructions for running SonarQube analysis

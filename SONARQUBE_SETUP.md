@@ -21,6 +21,28 @@ SonarQube has been integrated into the android_injector project to provide code 
 - **Injector Project Key**: `android_injector_injector`
 - **KeyReceiver Project Key**: `android_injector_keyreceiver`
 
+## Quick Start
+
+1. **Edit your token file**:
+```bash
+nano gradle.properties.local  # Add your SonarQube token
+```
+
+2. **Generate reports**:
+```bash
+./generate-reports.sh
+```
+
+3. **Run SonarQube analysis**:
+```bash
+./sonar-wrapper.sh sonarInjector      # Analyze injector module
+./sonar-wrapper.sh sonarKeyReceiver   # Analyze keyreceiver module
+```
+
+4. **View results**: `http://100.65.127.12:9000`
+
+---
+
 ### Module Flavors
 
 Both application modules (injector and keyreceiver) now support three flavors:
@@ -58,76 +80,56 @@ Both application modules (injector and keyreceiver) now support three flavors:
 
 ### 2. Configure Local Token
 
-You have two options to provide your SonarQube token:
+The `gradle.properties.local` file is used to store your SonarQube token locally.
 
-#### Option A: Environment Variable
-
-```bash
-export SONAR_TOKEN_LOCAL=your_token_here
-```
-
-Then run analysis:
-```bash
-./gradlew sonarInjector
-./gradlew sonarKeyReceiver
-```
-
-#### Option B: gradle.properties.local File
-
-1. Copy the example file:
-```bash
-cp gradle.properties.local.example gradle.properties.local
-```
-
-2. Edit `gradle.properties.local` and add your token:
+1. Edit `gradle.properties.local` and add your token:
 ```properties
 SONAR_TOKEN_LOCAL=your_actual_token_here
 ```
 
-3. Run analysis:
-```bash
-./gradlew sonarInjector
-./gradlew sonarKeyReceiver
-```
+2. The file is already ignored by git (.gitignore) and should never be committed.
 
 **Important**: `gradle.properties.local` is ignored by git and should never be committed.
 
 ## Running Analysis
 
-### Generate Reports and Run Analysis
+### Generate Reports First
 
-Use the provided script to generate all reports and optionally run SonarQube analysis:
+Use the provided script to generate all reports (Lint, JaCoCo, etc.):
 
 ```bash
 ./generate-reports.sh
 ```
 
 This script will:
-1. Generate Lint reports for both modules
+1. Generate Lint reports for both modules (prod flavor)
 2. Run unit tests
 3. Generate JaCoCo coverage reports
 4. Display the locations of all generated reports
-5. Show instructions for running SonarQube analysis
 
-### Manual Analysis - Individual Modules
+### Run SonarQube Analysis
+
+After generating reports, use the `sonar-wrapper.sh` script which automatically loads your token from `gradle.properties.local`:
 
 #### Analyze Injector Module Only
 
 ```bash
-./gradlew sonarInjector
+./sonar-wrapper.sh sonarInjector
 ```
 
 #### Analyze KeyReceiver Module Only
 
 ```bash
-./gradlew sonarKeyReceiver
+./sonar-wrapper.sh sonarKeyReceiver
 ```
 
 #### Analyze Both Modules (Combined)
 
 ```bash
-./gradlew sonar
+./sonar-wrapper.sh sonar
 ```
+
+**Note**: The `sonar-wrapper.sh` script automatically reads your token from `gradle.properties.local`, so you don't need to set environment variables manually.
 
 ### CI/CD Pipeline
 
