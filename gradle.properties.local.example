@@ -1,0 +1,14 @@
+# SonarQube Configuration
+# Copy this file to gradle.properties.local and fill in the values
+# DO NOT commit gradle.properties.local to version control
+
+# SonarQube Token (get from http://100.65.127.12:9000)
+SONAR_TOKEN_LOCAL=your_sonar_token_here_replace_me
+
+# Optional: Override SonarQube host URL if needed
+# SONAR_HOST_URL=http://100.65.127.12:9000
+
+# Optional: Build Flavor (default is prod)
+# FLAVOR=dev
+# FLAVOR=qa
+# FLAVOR=prod
