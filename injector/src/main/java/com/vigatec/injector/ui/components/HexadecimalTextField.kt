@@ -5,7 +5,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 
 /**
@@ -16,8 +15,8 @@ import androidx.compose.ui.unit.dp
  * @param maxLength Longitud máxima de caracteres (según el algoritmo de la llave)
  * @param isError Si hay error de validación
  * @param errorMessage Mensaje de error a mostrar
- * @param isPasswordVisible Si el contenido debe mostrarse o ocultarse
- * @param onPasswordVisibilityChange Callback cuando cambia la visibilidad
+ * @param onCancel Callback cuando se cancela (botón X del teclado)
+ * @param onVerifyKCV Callback cuando se verifica el KCV (botón OK del teclado)
  */
 @Composable
 fun HexadecimalTextField(
@@ -27,8 +26,8 @@ fun HexadecimalTextField(
     maxLength: Int = Int.MAX_VALUE,
     isError: Boolean = false,
     errorMessage: String? = null,
-    isPasswordVisible: Boolean = false,
-    onPasswordVisibilityChange: () -> Unit = {},
+    onCancel: () -> Unit = {},
+    onVerifyKCV: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -38,7 +37,7 @@ fun HexadecimalTextField(
             onValueChange = {}, // No permitir edición manual
             label = { Text(label) },
             enabled = false, // Campo deshabilitado para forzar uso del teclado
-            visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            visualTransformation = PasswordVisualTransformation(),
             isError = isError,
             supportingText = {
                 if (errorMessage != null) {
@@ -75,8 +74,8 @@ fun HexadecimalTextField(
             onClear = {
                 onValueChange("")
             },
-            onToggleVisibility = onPasswordVisibilityChange,
-            isPasswordVisible = isPasswordVisible,
+            onCancel = onCancel,
+            onVerifyKCV = onVerifyKCV,
             maxLength = maxLength,
             currentLength = value.length
         )

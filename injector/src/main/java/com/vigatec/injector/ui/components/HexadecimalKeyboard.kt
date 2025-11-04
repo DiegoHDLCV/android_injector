@@ -2,9 +2,7 @@ package com.vigatec.injector.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backspace
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -15,8 +13,8 @@ import androidx.compose.ui.unit.dp
  * @param onKeyPressed Callback cuando se presiona un botón de carácter
  * @param onBackspace Callback cuando se presiona borrar
  * @param onClear Callback cuando se presiona limpiar todo
- * @param onToggleVisibility Callback cuando se cambia la visibilidad
- * @param isPasswordVisible Estado de visibilidad de la contraseña
+ * @param onCancel Callback cuando se cancela la ceremonia (botón X)
+ * @param onVerifyKCV Callback cuando se verifica el KCV (botón OK)
  * @param maxLength Longitud máxima de caracteres permitidos (para deshabilitar botones si se alcanza)
  * @param currentLength Longitud actual del texto
  */
@@ -25,8 +23,8 @@ fun HexadecimalKeyboard(
     onKeyPressed: (Char) -> Unit,
     onBackspace: () -> Unit,
     onClear: () -> Unit,
-    onToggleVisibility: () -> Unit,
-    isPasswordVisible: Boolean = false,
+    onCancel: () -> Unit,
+    onVerifyKCV: () -> Unit,
     maxLength: Int = Int.MAX_VALUE,
     currentLength: Int = 0
 ) {
@@ -101,12 +99,12 @@ fun HexadecimalKeyboard(
             ) {
                 Icon(
                     imageVector = Icons.Filled.Backspace,
-                    contentDescription = "Borrar",
+                    contentDescription = "Borrar último carácter",
                     modifier = Modifier.size(20.dp)
                 )
             }
 
-            // Botón Limpiar todo
+            // Botón Limpiar (Trash)
             OutlinedButton(
                 onClick = onClear,
                 modifier = Modifier
@@ -119,27 +117,48 @@ fun HexadecimalKeyboard(
                     contentColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Text(
-                    text = "Limpiar",
-                    style = MaterialTheme.typography.labelSmall
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Limpiar todo",
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
-            // Botón Mostrar/Ocultar
+            // Botón Cancelar (X)
             OutlinedButton(
-                onClick = onToggleVisibility,
+                onClick = onCancel,
                 modifier = Modifier
                     .weight(1f)
                     .height(48.dp),
                 shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.outlinedButtonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
-                    contentColor = MaterialTheme.colorScheme.secondary
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                    contentColor = MaterialTheme.colorScheme.error
                 )
             ) {
                 Icon(
-                    imageVector = if (isPasswordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = if (isPasswordVisible) "Ocultar" else "Mostrar",
+                    imageVector = Icons.Filled.Close,
+                    contentDescription = "Cancelar ceremonia",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Botón Verificar KCV (OK)
+            OutlinedButton(
+                onClick = onVerifyKCV,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp),
+                enabled = currentLength > 0,
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = "Verificar KCV",
                     modifier = Modifier.size(20.dp)
                 )
             }

@@ -30,6 +30,7 @@ data class CeremonyState(
     val components: List<String> = emptyList(),
     val showComponent: Boolean = false,
     val partialKCV: String = "",
+    val showKcvModal: Boolean = false,        // Mostrar modal de verificación de KCV
     val finalKCV: String = "",
     val isLoading: Boolean = false,
     val isCeremonyInProgress: Boolean = false,
@@ -149,11 +150,6 @@ class CeremonyViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(component = component)
     }
 
-    fun onToggleShowComponent() {
-        _uiState.value = _uiState.value.copy(showComponent = !_uiState.value.showComponent)
-    }
-
-
     fun onCustomNameChange(name: String) {
         _uiState.value = _uiState.value.copy(customName = name)
     }
@@ -266,7 +262,7 @@ class CeremonyViewModel @Inject constructor(
 
     fun addComponent() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, partialKCV = "", componentError = null)
+            _uiState.value = _uiState.value.copy(isLoading = true, componentError = null)
             try {
                 val component = _uiState.value.component
 
@@ -282,7 +278,12 @@ class CeremonyViewModel @Inject constructor(
                 }
 
                 val kcv = KcvCalculator.calculateKcv(component)
-                _uiState.value = _uiState.value.copy(partialKCV = kcv, isLoading = false, componentError = null)
+                _uiState.value = _uiState.value.copy(
+                    partialKCV = kcv,
+                    isLoading = false,
+                    componentError = null,
+                    showKcvModal = true  // Abrir el modal de KCV
+                )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(isLoading = false, componentError = e.message)
             }
@@ -532,6 +533,33 @@ class CeremonyViewModel @Inject constructor(
                 e.printStackTrace()
                 _uiState.value = _uiState.value.copy(isLoading = false)
             }
+        }
+    }
+
+    /**
+     * Cierra el modal de verificación de KCV sin avanzar a la siguiente acción
+     */
+    fun dismissKcvModal() {
+        _uiState.value = _uiState.value.copy(showKcvModal = false)
+    }
+
+    /**
+     * Verifica el KCV y procede:
+     * - Si no es el último custodio: avanza automáticamente al siguiente
+     * - Si es el último custodio: finaliza la ceremonia automáticamente
+     */
+    fun confirmKcvAndProceed() {
+        val isLastCustodian = _uiState.value.currentCustodian == _uiState.value.numCustodians
+
+        // Cerrar el modal
+        _uiState.value = _uiState.value.copy(showKcvModal = false)
+
+        if (isLastCustodian) {
+            // Es el último custodio, finalizar la ceremonia
+            finalizeCeremony()
+        } else {
+            // No es el último, pasar al siguiente custodio
+            nextCustodian()
         }
     }
 
