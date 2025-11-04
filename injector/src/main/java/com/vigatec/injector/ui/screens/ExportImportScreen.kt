@@ -33,6 +33,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vigatec.injector.viewmodel.ExportImportState
 import com.vigatec.injector.viewmodel.ExportImportViewModel
+import com.vigatec.injector.ui.components.SystemInfoCard
+import com.vigatec.injector.ui.components.InstructionsCard
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -201,61 +203,6 @@ fun ExportImportScreen(
 }
 
 @Composable
-private fun SystemInfoCard(
-    hasKEKStorage: Boolean,
-    totalKeys: Int,
-    isAdmin: Boolean
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (hasKEKStorage)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.errorContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 8.dp)
-            ) {
-                Icon(
-                    imageVector = if (hasKEKStorage) Icons.Default.CheckCircle else Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = if (hasKEKStorage)
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    else
-                        MaterialTheme.colorScheme.onErrorContainer
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (hasKEKStorage) "KEK Storage: Disponible" else "KEK Storage: No disponible",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            Text(
-                text = "Llaves en almacén: $totalKeys",
-                style = MaterialTheme.typography.bodyMedium
-            )
-            if (isAdmin) {
-                Text(
-                    text = "Permisos: Administrador",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun ExportTab(
     state: ExportImportState,
     onPassphraseChange: (String) -> Unit,
@@ -270,43 +217,13 @@ private fun ExportTab(
             .padding(16.dp)
     ) {
         // Instrucciones
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = "Instrucciones de Exportación",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "• Las llaves se exportarán cifradas con su KEK actual\n" +
-                                "• El archivo se protegerá con una passphrase adicional\n" +
-                                "• Mínimo 16 caracteres, incluir mayúsculas, minúsculas y números\n" +
-                                "• El archivo se guardará en la carpeta Descargas",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
-            }
-        }
+        InstructionsCard(
+            title = "Instrucciones de Exportación",
+            instructions = "• Las llaves se exportarán cifradas con su KEK actual\n" +
+                    "• El archivo se protegerá con una passphrase adicional\n" +
+                    "• Mínimo 16 caracteres, incluir mayúsculas, minúsculas y números\n" +
+                    "• El archivo se guardará en la carpeta Descargas"
+        )
 
         // Passphrase
         OutlinedTextField(
@@ -415,43 +332,13 @@ private fun ImportTab(
             .padding(16.dp)
     ) {
         // Instrucciones
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.Top
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = "Instrucciones de Importación",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "• Seleccione el archivo JSON exportado\n" +
-                                "• Ingrese la passphrase usada en la exportación\n" +
-                                "• Las llaves duplicadas (mismo KCV) serán omitidas\n" +
-                                "• Debe existir KEK Storage en este dispositivo",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                    )
-                }
-            }
-        }
+        InstructionsCard(
+            title = "Instrucciones de Importación",
+            instructions = "• Seleccione el archivo JSON exportado\n" +
+                    "• Ingrese la passphrase usada en la exportación\n" +
+                    "• Las llaves duplicadas (mismo KCV) serán omitidas\n" +
+                    "• Debe existir KEK Storage en este dispositivo"
+        )
 
         // Selector de archivo
         OutlinedButton(

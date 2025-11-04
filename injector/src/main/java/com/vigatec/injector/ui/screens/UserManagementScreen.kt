@@ -10,12 +10,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.viewmodel.UserManagementViewModel
+import com.vigatec.injector.ui.components.PasswordTextField
+import com.vigatec.injector.ui.components.PasswordConfirmationFields
+import com.vigatec.injector.ui.components.RoleSelector
+import com.vigatec.injector.ui.components.PermissionsSelector
+import com.vigatec.injector.ui.components.AdminInfoCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -244,7 +247,6 @@ fun CreateUserDialog(
     var password by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
     var role by remember { mutableStateOf("USER") }
-    var passwordVisible by remember { mutableStateOf(false) }
     var selectedPermissions by remember { mutableStateOf(setOf<String>()) }
 
     AlertDialog(
@@ -262,24 +264,10 @@ fun CreateUserDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
+                PasswordTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("Contraseña") },
-                    singleLine = true,
-                    visualTransformation = if (passwordVisible)
-                        VisualTransformation.None
-                    else
-                        PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                if (passwordVisible) Icons.Default.Visibility
-                                else Icons.Default.VisibilityOff,
-                                "Mostrar contraseña"
-                            )
-                        }
-                    },
+                    label = "Contraseña",
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -292,94 +280,24 @@ fun CreateUserDialog(
                 )
 
                 // Selector de rol
-                Column {
-                    Text("Rol:", style = MaterialTheme.typography.labelMedium)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = role == "USER",
-                                onClick = { role = "USER" }
-                            )
-                            Text("Usuario")
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = role == "ADMIN",
-                                onClick = { role = "ADMIN" }
-                            )
-                            Text("Administrador")
-                        }
-                    }
-                }
-                
+                RoleSelector(
+                    selectedRole = role,
+                    onRoleChange = { role = it }
+                )
+
                 // Sección de permisos
-                if (role == "ADMIN") {
-                    // Para ADMIN, mostrar mensaje informativo
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
-                    ) {
-                        Text(
-                            text = "Los administradores tienen todos los permisos automáticamente",
-                            modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                } else {
-                    // Para USER, mostrar checkboxes de permisos
-                    Column {
-                        Text(
-                            "Permisos:",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(bottom = 4.dp)
-                        )
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                        ) {
-                            LazyColumn(
-                                modifier = Modifier.padding(8.dp)
-                            ) {
-                                items(allPermissions) { permission ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Checkbox(
-                                            checked = selectedPermissions.contains(permission.id),
-                                            onCheckedChange = { checked ->
-                                                selectedPermissions = if (checked) {
-                                                    selectedPermissions + permission.id
-                                                } else {
-                                                    selectedPermissions - permission.id
-                                                }
-                                            }
-                                        )
-                                        Column(modifier = Modifier.padding(start = 8.dp)) {
-                                            Text(
-                                                text = permission.name,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                            Text(
-                                                text = permission.description,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                PermissionsSelector(
+                    allPermissions = allPermissions,
+                    selectedPermissions = selectedPermissions,
+                    onPermissionChange = { permissionId, checked ->
+                        selectedPermissions = if (checked) {
+                            selectedPermissions + permissionId
+                        } else {
+                            selectedPermissions - permissionId
                         }
-                    }
-                }
+                    },
+                    isAdmin = role == "ADMIN"
+                )
             }
         },
         confirmButton = {
@@ -412,7 +330,7 @@ fun EditUserDialog(
     var showPasswordDialog by remember { mutableStateOf(false) }
     var selectedPermissions by remember { mutableStateOf(setOf<String>()) }
     var permissionsLoaded by remember { mutableStateOf(false) }
-    
+
     // Cargar permisos del usuario al abrir el diálogo
     LaunchedEffect(user.id) {
         val userPerms = viewModel.getUserPermissions(user.id)
@@ -444,95 +362,25 @@ fun EditUserDialog(
                 )
 
                 // Selector de rol
-                Column {
-                    Text("Rol:", style = MaterialTheme.typography.labelMedium)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = role == "USER",
-                                onClick = { role = "USER" }
-                            )
-                            Text("Usuario")
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = role == "ADMIN",
-                                onClick = { role = "ADMIN" }
-                            )
-                            Text("Administrador")
-                        }
-                    }
-                }
-                
+                RoleSelector(
+                    selectedRole = role,
+                    onRoleChange = { role = it }
+                )
+
                 // Sección de permisos
                 if (permissionsLoaded) {
-                    if (role == "ADMIN") {
-                        // Para ADMIN, mostrar mensaje informativo
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        ) {
-                            Text(
-                                text = "Los administradores tienen todos los permisos automáticamente",
-                                modifier = Modifier.padding(12.dp),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
-                    } else {
-                        // Para USER, mostrar checkboxes de permisos
-                        Column {
-                            Text(
-                                "Permisos:",
-                                style = MaterialTheme.typography.labelMedium,
-                                modifier = Modifier.padding(bottom = 4.dp)
-                            )
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(200.dp)
-                            ) {
-                                LazyColumn(
-                                    modifier = Modifier.padding(8.dp)
-                                ) {
-                                    items(allPermissions) { permission ->
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Checkbox(
-                                                checked = selectedPermissions.contains(permission.id),
-                                                onCheckedChange = { checked ->
-                                                    selectedPermissions = if (checked) {
-                                                        selectedPermissions + permission.id
-                                                    } else {
-                                                        selectedPermissions - permission.id
-                                                    }
-                                                }
-                                            )
-                                            Column(modifier = Modifier.padding(start = 8.dp)) {
-                                                Text(
-                                                    text = permission.name,
-                                                    style = MaterialTheme.typography.bodyMedium
-                                                )
-                                                Text(
-                                                    text = permission.description,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
+                    PermissionsSelector(
+                        allPermissions = allPermissions,
+                        selectedPermissions = selectedPermissions,
+                        onPermissionChange = { permissionId, checked ->
+                            selectedPermissions = if (checked) {
+                                selectedPermissions + permissionId
+                            } else {
+                                selectedPermissions - permissionId
                             }
-                        }
-                    }
+                        },
+                        isAdmin = role == "ADMIN"
+                    )
                 }
 
                 Button(
@@ -579,7 +427,6 @@ fun ChangePasswordDialog(
 ) {
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -588,46 +435,16 @@ fun ChangePasswordDialog(
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedTextField(
-                    value = newPassword,
-                    onValueChange = { newPassword = it },
-                    label = { Text("Nueva contraseña") },
-                    singleLine = true,
-                    visualTransformation = if (passwordVisible)
-                        VisualTransformation.None
-                    else
-                        PasswordVisualTransformation(),
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                if (passwordVisible) Icons.Default.Visibility
-                                else Icons.Default.VisibilityOff,
-                                "Mostrar contraseña"
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                PasswordConfirmationFields(
+                    password = newPassword,
+                    onPasswordChange = { newPassword = it },
+                    confirmPassword = confirmPassword,
+                    onConfirmPasswordChange = { confirmPassword = it },
+                    passwordLabel = "Nueva contraseña",
+                    confirmLabel = "Confirmar contraseña",
+                    modifier = Modifier.fillMaxWidth(),
+                    showMismatchError = true
                 )
-
-                OutlinedTextField(
-                    value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
-                    label = { Text("Confirmar contraseña") },
-                    singleLine = true,
-                    visualTransformation = if (passwordVisible)
-                        VisualTransformation.None
-                    else
-                        PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                if (newPassword.isNotEmpty() && confirmPassword.isNotEmpty() && newPassword != confirmPassword) {
-                    Text(
-                        text = "Las contraseñas no coinciden",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
             }
         },
         confirmButton = {
