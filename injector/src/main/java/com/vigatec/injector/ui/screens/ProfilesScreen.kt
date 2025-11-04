@@ -405,7 +405,7 @@ private fun StatisticsHeader(profiles: List<ProfileEntity>) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             StatisticItem(
@@ -443,12 +443,12 @@ private fun StatisticItem(
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(24.dp))
+                .size(40.dp)
+                .clip(RoundedCornerShape(20.dp))
                 .background(color.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
         ) {
@@ -456,13 +456,13 @@ private fun StatisticItem(
                 imageVector = icon,
                 contentDescription = null,
                 tint = color,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
 
         Text(
             text = value,
-            style = MaterialTheme.typography.headlineSmall.copy(
+            style = MaterialTheme.typography.labelLarge.copy(
                 fontWeight = FontWeight.Bold
             ),
             color = MaterialTheme.colorScheme.onSurface
@@ -470,7 +470,7 @@ private fun StatisticItem(
 
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
     }
@@ -513,8 +513,8 @@ fun ProfileCard(
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
 
             // ====== CABECERA ======
@@ -525,7 +525,7 @@ fun ProfileCard(
                 // Avatar con gradiente + estado
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(appTypeConfig.gradient),
                     contentAlignment = Alignment.Center
@@ -534,7 +534,7 @@ fun ProfileCard(
                         imageVector = appTypeConfig.icon,
                         contentDescription = "Tipo de app ${profile.applicationType}",
                         tint = Color.White,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                     // Punto de estado
                     Box(
@@ -573,7 +573,7 @@ fun ProfileCard(
                     // Fila de metadatos compactos
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         // Badge tipo de aplicación
                         Surface(
@@ -664,21 +664,22 @@ fun ProfileCard(
 
             // ====== PROGRESO (si aplica) ======
             if (hasAny) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     LinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(6.dp)
+                            .height(5.dp)
                             .clip(RoundedCornerShape(999.dp)),
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (isReady) "Todo listo para inyectar" else "Configuración pendiente",
-                            style = MaterialTheme.typography.labelMedium,
+                            text = if (isReady) "Listo" else "Pendiente",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
@@ -692,7 +693,7 @@ fun ProfileCard(
 
             // ====== LLAVES / CHIPS ======
             if (totalKeys > 0) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(
                         items = profile.keyConfigurations.take(10),
                         key = { it.id }
@@ -744,7 +745,7 @@ fun ProfileCard(
             }
 
             // ====== ACCIONES ======
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // Acción principal destacada
                 Button(
                     onClick = { 
