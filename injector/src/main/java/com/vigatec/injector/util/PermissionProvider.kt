@@ -27,7 +27,6 @@ class PermissionProvider @Inject constructor(
         const val MANAGE_PROFILES = "manage_profiles"
         const val VIEW_LOGS = "view_logs"
         const val MANAGE_USERS = "manage_users"
-        const val TMS_CONFIG = "tms_config"
         const val RAW_DATA_LISTENER = "raw_data_listener"
         const val EXPORT_IMPORT_KEYS = "export_import_keys"
     }
@@ -66,7 +65,6 @@ class PermissionProvider @Inject constructor(
                     MANAGE_PROFILES,
                     VIEW_LOGS,
                     MANAGE_USERS,
-                    TMS_CONFIG,
                     RAW_DATA_LISTENER,
                     EXPORT_IMPORT_KEYS
                 )

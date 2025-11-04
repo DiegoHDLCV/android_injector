@@ -25,7 +25,6 @@ fun ConfigScreen(
     permissionProvider: PermissionProvider,
     onNavigateToLogs: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
-    onNavigateToTmsConfig: () -> Unit = {},
     onBack: () -> Unit,
     onLogout: () -> Unit = {}
 ) {
