@@ -23,6 +23,18 @@ lifecycleViewmodelCompose = "2.7.0"
 kotlinxCoroutinesAndroid = "1.7.3"
 datastorePreferences = "1.0.0"
 
+# Code Quality & Testing
+sonarqubePlugin = "5.0.0.4638"
+jacoco = "0.8.12"
+owaspDependencyCheck = "12.1.0"
+mockito = "5.12.0"
+mockitoKotlin = "5.4.0"
+mockk = "1.13.8"
+kotlinxCoroutinesTest = "1.9.0"
+turbine = "1.0.0"
+archCoreTesting = "2.2.0"
+truth = "1.1.5"
+
 [libraries]
 androidx-hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomRuntime" }
@@ -55,12 +67,23 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutinesAndroid" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
 
+# Testing & Code Quality Libraries
+mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
+mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version.ref = "mockitoKotlin" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "archCoreTesting" }
+truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-android-library     = { id = "com.android.library", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+sonarqube = { id = "org.sonarqube", version.ref = "sonarqubePlugin" }
+owasp-dependencycheck = { id = "org.owasp.dependencycheck", version.ref = "owaspDependencyCheck" }
 
 # El plugin de compose se aplica en los módulos que lo necesitan

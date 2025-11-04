@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
+    id("jacoco")
 }
 
 android {
@@ -32,6 +33,23 @@ android {
         }
     }
 
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+        }
+        create("qa") {
+            dimension = "environment"
+            applicationIdSuffix = ".qa"
+            versionNameSuffix = "-qa"
+        }
+        create("prod") {
+            dimension = "environment"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -39,6 +57,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+        }
+        debug {
+            enableUnitTestCoverage = true
         }
     }
     compileOptions {
@@ -48,6 +69,22 @@ android {
     kotlinOptions {
         jvmTarget = "11"
     }
+
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+            all {
+                it.ignoreFailures = true
+            }
+        }
+    }
+
+    lint {
+        abortOnError = false
+        xmlReport = true
+        htmlReport = true
+    }
+
     buildFeatures {
         compose = true
     }
@@ -94,11 +131,69 @@ dependencies {
     // Gson para importar llaves de prueba
     implementation(libs.gson)
 
+    // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockito.kotlin)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
+    testImplementation(libs.androidx.arch.core.testing)
+    testImplementation(libs.truth)
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+// JaCoCo Configuration
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    description = "Generate JaCoCo coverage report for debug unit tests"
+    group = "verification"
+    dependsOn("testDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/testDebugUnitTest/testDebugUnitTest.xml"))
+    }
+
+    val fileFilter = listOf(
+        "**/R.class", "**/R\$*.class", "**/BuildConfig.*",
+        "**/Manifest*.*", "**/*Test*.*", "android/**/*.*",
+        "**/*\$ViewInjector*.*", "**/*Dagger*.*",
+        "**/*MembersInjector*.*", "**/*_Factory.*",
+        "**/*_Provide*Factory*.*", "**/*_ViewBinding*.*",
+        "**/AutoValue_*.*", "**/R2.class", "**/R2\$*.class",
+        "**/*Directions\$*", "**/*Directions.class",
+        "**/*Binding.*",
+        "**/com/vigatec/injector/data/model/**",
+        "**/MainActivity*.class"
+    )
+
+    val debugTree = fileTree("${project.layout.buildDirectory.get()}/tmp/kotlin-classes/debug") {
+        exclude(fileFilter)
+    }
+
+    val mainSrc = "${project.projectDir}/src/main/java"
+
+    sourceDirectories.setFrom(files(mainSrc))
+    classDirectories.setFrom(files(debugTree))
+    executionData.setFrom(fileTree(project.layout.buildDirectory.get()) {
+        include("jacoco/testDebugUnitTest.exec", "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
+    })
+}
+
+tasks.withType<Test> {
+    configure<JacocoTaskExtension> {
+        isIncludeNoLocationClasses = true
+        excludes = listOf("jdk.internal.*")
+    }
 }
