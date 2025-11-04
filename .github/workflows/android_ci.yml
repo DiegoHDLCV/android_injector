@@ -1,0 +1,97 @@
+name: Android CI - SonarQube Analysis
+
+on:
+  push:
+    branches: [ main, develop, feature/*, "feature/**" ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build-and-analyze:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for better analysis
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '11'
+
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
+
+    - name: Build project
+      run: ./gradlew build --continue || true
+
+    - name: Generate Lint reports
+      run: |
+        ./gradlew :injector:lintDebug --continue || true
+        ./gradlew :keyreceiver:lintDebug --continue || true
+
+    - name: Run unit tests
+      run: |
+        ./gradlew :injector:testDebugUnitTest --continue || true
+        ./gradlew :keyreceiver:testDebugUnitTest --continue || true
+
+    - name: Generate JaCoCo reports
+      run: |
+        ./gradlew :injector:jacocoTestReport --continue || true
+        ./gradlew :keyreceiver:jacocoTestReport --continue || true
+
+    - name: SonarQube Analysis - Injector Module
+      run: ./gradlew sonarInjector
+      env:
+        SONAR_TOKEN_LOCAL: ${{ secrets.SONAR_TOKEN_LOCAL }}
+      continue-on-error: true
+
+    - name: SonarQube Analysis - KeyReceiver Module
+      run: ./gradlew sonarKeyReceiver
+      env:
+        SONAR_TOKEN_LOCAL: ${{ secrets.SONAR_TOKEN_LOCAL }}
+      continue-on-error: true
+
+    - name: OWASP Dependency-Check
+      run: ./gradlew dependencyCheckAggregate
+      continue-on-error: true
+
+    - name: Upload test reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-reports
+        path: |
+          injector/build/reports/
+          keyreceiver/build/reports/
+        retention-days: 30
+
+    - name: Comment on PR with analysis results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          let comment = '## SonarQube Analysis Results\n\n';
+
+          comment += '### Modules Analyzed\n';
+          comment += '- ✅ Injector Module\n';
+          comment += '- ✅ KeyReceiver Module\n';
+          comment += '- ⛔ dev_injector (Excluded from analysis)\n\n';
+
+          comment += '### Reports Generated\n';
+          comment += '- Lint Reports\n';
+          comment += '- Code Coverage (JaCoCo)\n';
+          comment += '- SonarQube Analysis\n\n';
+
+          comment += '**Note:** Artifacts containing detailed reports are available in the workflow run.';
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });

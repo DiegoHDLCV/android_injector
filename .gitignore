@@ -12,6 +12,7 @@
 # Local configuration (sensitive or machine-specific)
 # This file should only be in the project root.
 /local.properties
+gradle.properties.local
 
 # Android Studio captures
 /captures/
