@@ -345,6 +345,63 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
             }
         )
     }
+
+    // Diálogo de timeout expirado
+    if (state.showTimeoutDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissTimeoutDialog() },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(
+                    text = "Tiempo de Espera Agotado",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Se ha excedido el tiempo máximo de espera para custodios.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "⏰ Información",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "La ceremonia se ha cancelado automáticamente. Consulte los logs para más detalles.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.dismissTimeoutDialog() }
+                ) {
+                    Text("Aceptar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -364,11 +421,49 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    text = "de ${state.numCustodians} custodios",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(0.7f)
+                ) {
+                    Text(
+                        text = "de ${state.numCustodians} custodios",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+
+                    // Display del timeout
+                    if (state.isTimeoutActive && state.timeoutRemainingSeconds > 0) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = if (state.isTimeoutWarning)
+                                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                            else
+                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
+                            modifier = Modifier.padding(start = 4.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (state.isTimeoutWarning) "⏰" else "⏱️",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                Text(
+                                    text = formatTimeoutDisplay(state.timeoutRemainingSeconds),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (state.isTimeoutWarning)
+                                        MaterialTheme.colorScheme.error
+                                    else
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                    }
+                }
             }
             Text(
                 text = state.selectedKeyType.displayName,
@@ -582,4 +677,13 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
             }
         }
     }
-} 
+}
+
+/**
+ * Formatea el tiempo de timeout en el formato MM:SS
+ */
+private fun formatTimeoutDisplay(seconds: Int): String {
+    val minutes = seconds / 60
+    val secs = seconds % 60
+    return String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, secs)
+}

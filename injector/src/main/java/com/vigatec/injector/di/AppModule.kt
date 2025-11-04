@@ -11,6 +11,7 @@ import com.vigatec.injector.data.local.database.AppDatabase
 import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.injector.data.local.preferences.UserPreferencesManager
+import com.vigatec.injector.data.local.preferences.CustodianTimeoutPreferencesManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -140,4 +141,10 @@ object AppModule {
     fun provideSessionManager(@ApplicationContext context: Context): SessionManager {
         return SessionManager(context)
     }
-} 
+
+    @Provides
+    @Singleton
+    fun provideCustodianTimeoutPreferencesManager(@ApplicationContext context: Context): CustodianTimeoutPreferencesManager {
+        return CustodianTimeoutPreferencesManager(context)
+    }
+}

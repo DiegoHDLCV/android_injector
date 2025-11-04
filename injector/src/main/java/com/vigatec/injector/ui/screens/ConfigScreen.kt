@@ -2,6 +2,7 @@ package com.vigatec.injector.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -9,10 +10,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.injector.util.PermissionProvider
 import com.vigatec.injector.viewmodel.ConfigViewModel
+import com.vigatec.injector.data.local.preferences.CustodianTimeoutPreferencesManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,13 +67,13 @@ fun ConfigScreen(
                 )
             }
 
-            // Sección de TMS
-            if (userPermissions.contains(PermissionProvider.TMS_CONFIG)) {
-                ConfigOptionCard(
-                    title = "Terminal Management System (TMS)",
-                    description = "Configurar conexión y parámetros del sistema de gestión de terminales",
-                    icon = Icons.Default.Cloud,
-                    onClick = onNavigateToTmsConfig
+            // Sección de Configuración de Timeout de Custodios (solo para administradores)
+            if (userPermissions.contains(PermissionProvider.MANAGE_USERS)) {
+                CustodianTimeoutConfigDropdown(
+                    currentTimeoutMinutes = uiState.custodianTimeoutMinutes,
+                    onTimeoutChange = { viewModel.saveCustodianTimeout(it) },
+                    isSaving = uiState.isSavingTimeout,
+                    saveMessage = uiState.timeoutSaveMessage
                 )
             }
 
@@ -292,5 +295,175 @@ fun SystemInfoRow(label: String, value: String) {
             text = value,
             style = MaterialTheme.typography.bodyMedium
         )
+    }
+}
+
+@Composable
+fun CustodianTimeoutConfigDropdown(
+    currentTimeoutMinutes: Int,
+    onTimeoutChange: (Int) -> Unit,
+    isSaving: Boolean = false,
+    saveMessage: String? = null
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var selectedTimeout by remember { mutableStateOf(currentTimeoutMinutes) }
+
+    val timeoutOptions = listOf(5, 10, 15, 20, 30, 45, 60)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Título con icono
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Timeout de Custodios",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Tiempo máximo de espera",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Dropdown
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedButton(
+                    onClick = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isSaving
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "$selectedTimeout minutos",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Dropdown menu
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.fillMaxWidth(0.9f)
+                ) {
+                    timeoutOptions.forEach { minutes ->
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "$minutes min",
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
+                                    if (selectedTimeout == minutes) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            },
+                            onClick = {
+                                selectedTimeout = minutes
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Botón de guardar
+            Button(
+                onClick = {
+                    onTimeoutChange(selectedTimeout)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = selectedTimeout != currentTimeoutMinutes && !isSaving
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(if (isSaving) "Guardando..." else "Guardar")
+            }
+
+            // Mensaje de éxito/error
+            saveMessage?.let { message ->
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (message.startsWith("Error"))
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                    else
+                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (message.startsWith("Error")) Icons.Default.Error else Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = if (message.startsWith("Error"))
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.tertiary
+                        )
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (message.startsWith("Error"))
+                                MaterialTheme.colorScheme.error
+                            else
+                                MaterialTheme.colorScheme.tertiary,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
     }
 }

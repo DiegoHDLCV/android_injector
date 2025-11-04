@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.data.local.preferences.SessionManager
+import com.vigatec.injector.data.local.preferences.CustodianTimeoutPreferencesManager
 import com.vigatec.injector.repository.UserRepository
 import com.vigatec.injector.util.PermissionProvider
 import com.vigatec.injector.util.SystemInfoProvider
@@ -20,7 +21,10 @@ data class ConfigUiState(
     val isAdmin: Boolean = false,
     val errorMessage: String? = null,
     val applicationVersion: String = "",
-    val databaseVersion: String = ""
+    val databaseVersion: String = "",
+    val custodianTimeoutMinutes: Int = 10,  // Timeout de custodios en minutos
+    val isSavingTimeout: Boolean = false,   // Indicador de guardado
+    val timeoutSaveMessage: String? = null  // Mensaje de éxito/error al guardar timeout
 )
 
 @HiltViewModel
@@ -28,7 +32,8 @@ class ConfigViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val sessionManager: SessionManager,
     private val permissionProvider: PermissionProvider,
-    private val systemInfoProvider: SystemInfoProvider
+    private val systemInfoProvider: SystemInfoProvider,
+    private val custodianTimeoutPreferencesManager: CustodianTimeoutPreferencesManager
 ) : ViewModel() {
 
     companion object {
@@ -37,6 +42,11 @@ class ConfigViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ConfigUiState())
     val uiState: StateFlow<ConfigUiState> = _uiState.asStateFlow()
+
+    init {
+        // Cargar el timeout configurado
+        loadCustodianTimeout()
+    }
 
     fun loadCurrentUser(username: String) {
         viewModelScope.launch {
@@ -54,6 +64,75 @@ class ConfigViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    /**
+     * Carga el timeout configurado para custodios
+     */
+    private fun loadCustodianTimeout() {
+        viewModelScope.launch {
+            try {
+                custodianTimeoutPreferencesManager.getCustodianTimeoutMinutes().collect { minutes ->
+                    _uiState.value = _uiState.value.copy(
+                        custodianTimeoutMinutes = minutes
+                    )
+                    Log.d(TAG, "Timeout de custodios cargado: $minutes minutos")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al cargar timeout de custodios", e)
+            }
+        }
+    }
+
+    /**
+     * Guarda el nuevo timeout para custodios
+     */
+    fun saveCustodianTimeout(minutes: Int) {
+        viewModelScope.launch {
+            try {
+                _uiState.value = _uiState.value.copy(isSavingTimeout = true)
+
+                custodianTimeoutPreferencesManager.saveCustodianTimeoutMinutes(minutes)
+
+                Log.d(TAG, "═══════════════════════════════════════════════════════════")
+                Log.d(TAG, "Timeout de custodios guardado")
+                Log.d(TAG, "  - Nuevo valor: $minutes minutos")
+                Log.d(TAG, "  - Equivalente: ${minutes * 60} segundos")
+                Log.d(TAG, "═══════════════════════════════════════════════════════════")
+
+                _uiState.value = _uiState.value.copy(
+                    custodianTimeoutMinutes = minutes,
+                    isSavingTimeout = false,
+                    timeoutSaveMessage = "Timeout de custodios actualizado a $minutes minutos"
+                )
+
+                // Limpiar el mensaje después de 3 segundos
+                clearTimeoutSaveMessage()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al guardar timeout de custodios", e)
+                _uiState.value = _uiState.value.copy(
+                    isSavingTimeout = false,
+                    timeoutSaveMessage = "Error: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Limpia el mensaje de guardado después de un tiempo
+     */
+    private fun clearTimeoutSaveMessage() {
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(3000)
+            _uiState.value = _uiState.value.copy(timeoutSaveMessage = null)
+        }
+    }
+
+    /**
+     * Restablece el timeout al valor por defecto
+     */
+    fun resetCustodianTimeoutToDefault() {
+        saveCustodianTimeout(10) // 10 minutos es el valor por defecto
     }
 
     fun clearErrorMessage() {

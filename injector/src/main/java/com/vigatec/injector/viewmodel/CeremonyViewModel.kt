@@ -8,10 +8,13 @@ import com.vigatec.utils.security.StorageKeyManager
 import com.vigatec.utils.KcvCalculator
 import com.vigatec.utils.KeyStoreManager
 import com.vigatec.injector.data.local.preferences.SessionManager
+import com.vigatec.injector.data.local.preferences.CustodianTimeoutPreferencesManager
 import com.vigatec.injector.util.PermissionProvider
+import com.vigatec.injector.util.CustodianTimeoutManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -45,18 +48,29 @@ data class CeremonyState(
     val isAdmin: Boolean = false,             // Si el usuario actual es administrador
     val kekValidationError: String? = null,   // Error cuando no hay KEK y se intenta crear llave operacional
     val canCreateKEK: Boolean = false,        // Si el usuario tiene permiso para crear KEK
-    val canCreateOperational: Boolean = false // Si el usuario tiene permiso para crear llaves operacionales
+    val canCreateOperational: Boolean = false, // Si el usuario tiene permiso para crear llaves operacionales
+
+    // Nuevos campos para timeout de custodios
+    val timeoutRemainingSeconds: Int = 0,     // Segundos restantes del timeout
+    val timeoutTotalSeconds: Int = 0,         // Segundos totales del timeout
+    val isTimeoutActive: Boolean = false,     // Si el timeout está activo
+    val isTimeoutWarning: Boolean = false,    // Si se mostró la advertencia de tiempo agotándose
+    val showTimeoutDialog: Boolean = false    // Si se debe mostrar el diálogo de timeout expirado
 )
 
 @HiltViewModel
 class CeremonyViewModel @Inject constructor(
     private val injectedKeyRepository: InjectedKeyRepository,
     private val sessionManager: SessionManager,
-    private val permissionProvider: PermissionProvider
+    private val permissionProvider: PermissionProvider,
+    private val custodianTimeoutPreferencesManager: CustodianTimeoutPreferencesManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CeremonyState(component = "E59D620E1A6D311F19342054AB01ABF7"))
     val uiState = _uiState.asStateFlow()
+
+    // Gestor de timeout para custodios
+    private val timeoutManager = CustodianTimeoutManager()
 
     init {
         // Verificar si existe KEK Storage y cargar usuario actual
@@ -258,6 +272,133 @@ class CeremonyViewModel @Inject constructor(
             isCeremonyInProgress = true,
             isLoading = false
         )
+
+        // Iniciar el timeout de custodios
+        startCustodianTimeout()
+    }
+
+    /**
+     * Inicia el timeout para custodios
+     */
+    private fun startCustodianTimeout() {
+        viewModelScope.launch {
+            try {
+                // Obtener el tiempo de timeout configurado (en segundos)
+                custodianTimeoutPreferencesManager.getCustodianTimeoutSeconds().collect { timeoutSeconds ->
+                    android.util.Log.d("CeremonyViewModel", "Iniciando timeout de custodios: $timeoutSeconds segundos")
+
+                    timeoutManager.startTimer(
+                        timeoutSeconds = timeoutSeconds,
+                        scope = viewModelScope,
+                        onWarning = { remainingSeconds ->
+                            android.util.Log.w("CeremonyViewModel", "⚠️ Advertencia de timeout: $remainingSeconds segundos restantes")
+                            onCustodianTimeoutWarning(remainingSeconds)
+                        },
+                        onExpired = {
+                            android.util.Log.e("CeremonyViewModel", "❌ Timeout de custodio expirado")
+                            onCustodianTimeoutExpired()
+                        }
+                    )
+
+                    // Observar el estado del timeout manager en tiempo real
+                    observeTimeoutUpdates()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("CeremonyViewModel", "Error al iniciar timeout de custodios", e)
+            }
+        }
+    }
+
+    /**
+     * Observa los cambios del timeout manager y actualiza el UI
+     */
+    private fun observeTimeoutUpdates() {
+        viewModelScope.launch {
+            try {
+                timeoutManager.timeoutState.collect { timeoutState ->
+                    // Actualizar el estado con los valores actuales del timeout
+                    _uiState.value = _uiState.value.copy(
+                        timeoutRemainingSeconds = timeoutState.remainingSeconds,
+                        timeoutTotalSeconds = timeoutState.totalSeconds,
+                        isTimeoutActive = timeoutState.isActive,
+                        isTimeoutWarning = timeoutState.isWarning
+                    )
+
+                    // Log solo en puntos clave para no saturar los logs
+                    if (timeoutState.remainingSeconds % 10 == 0 && timeoutState.remainingSeconds > 0) {
+                        android.util.Log.d("CeremonyViewModel", "Timeout: ${timeoutState.remainingSeconds}s restantes")
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("CeremonyViewModel", "Error observando actualizaciones de timeout", e)
+            }
+        }
+    }
+
+    /**
+     * Callback cuando se alcanza la advertencia de timeout
+     */
+    private fun onCustodianTimeoutWarning(remainingSeconds: Int) {
+        _uiState.value = _uiState.value.copy(
+            isTimeoutWarning = true,
+            timeoutRemainingSeconds = remainingSeconds
+        )
+        addToLog("⚠️ ADVERTENCIA: El tiempo de espera para custodios se está agotando")
+        addToLog("   Tiempo restante: ${remainingSeconds / 60} minutos ${remainingSeconds % 60} segundos")
+    }
+
+    /**
+     * Callback cuando el timeout de custodios expira
+     */
+    private fun onCustodianTimeoutExpired() {
+        android.util.Log.e("CeremonyViewModel", "═══════════════════════════════════════════════════════════")
+        android.util.Log.e("CeremonyViewModel", "TIMEOUT DE CUSTODIOS EXPIRADO")
+        android.util.Log.e("CeremonyViewModel", "Registrando sesión expirada...")
+
+        addToLog("")
+        addToLog("═══════════════════════════════════════════════════════════")
+        addToLog("❌ TIMEOUT DE CUSTODIO EXPIRADO")
+        addToLog("Se ha excedido el tiempo máximo de espera")
+        addToLog("Cancelando ceremonia automáticamente...")
+        addToLog("═══════════════════════════════════════════════════════════")
+
+        // Mostrar diálogo de timeout expirado
+        _uiState.value = _uiState.value.copy(
+            showTimeoutDialog = true,
+            isTimeoutActive = false
+        )
+
+        // Nota: La redirección se realizará desde la UI cuando el usuario cierre el diálogo
+    }
+
+    /**
+     * Cierra el diálogo de timeout expirado y vuelve a la pantalla principal
+     */
+    fun dismissTimeoutDialog() {
+        android.util.Log.d("CeremonyViewModel", "Cerrando diálogo de timeout y volviendo a pantalla principal")
+
+        // Detener el timer
+        timeoutManager.stopTimer()
+
+        // Volver a la pantalla principal (paso 1)
+        _uiState.value = _uiState.value.copy(
+            showTimeoutDialog = false,
+            currentStep = 1,
+            isCeremonyInProgress = false,
+            isTimeoutActive = false,
+            isTimeoutWarning = false,
+            timeoutRemainingSeconds = 0,
+            timeoutTotalSeconds = 0,
+            currentCustodian = 1,
+            components = emptyList(),
+            component = "E59D620E1A6D311F19342054AB01ABF7"
+        )
+
+        // Registrar en log
+        addToLog("")
+        addToLog("═══════════════════════════════════════════════════════════")
+        addToLog("Volviendo a pantalla principal de ceremonia")
+        addToLog("═══════════════════════════════════════════════════════════")
     }
 
     fun addComponent() {
@@ -299,13 +440,36 @@ class CeremonyViewModel @Inject constructor(
             ""
         }
 
+        android.util.Log.d("CeremonyViewModel", "═══════════════════════════════════════════════════════════")
+        android.util.Log.d("CeremonyViewModel", "Avanzando a custodio $next de ${_uiState.value.numCustodians}")
+        android.util.Log.d("CeremonyViewModel", "Reiniciando timeout para nuevo custodio...")
+        android.util.Log.d("CeremonyViewModel", "═══════════════════════════════════════════════════════════")
+
+        // Detener el timer anterior
+        timeoutManager.stopTimer()
+
         _uiState.value = _uiState.value.copy(
             currentCustodian = next,
             components = _uiState.value.components + _uiState.value.component,
             component = nextComponent,
             partialKCV = "",
-            showComponent = false
+            showComponent = false,
+            // Resetear el estado de timeout para el nuevo custodio
+            isTimeoutWarning = false,
+            timeoutRemainingSeconds = 0,
+            timeoutTotalSeconds = 0,
+            isTimeoutActive = false
         )
+
+        // Registrar en log
+        addToLog("")
+        addToLog("═══════════════════════════════════════════════════════════")
+        addToLog("Custodio $next de ${_uiState.value.numCustodians}")
+        addToLog("Componente anterior guardado. Timeout reiniciado.")
+        addToLog("═══════════════════════════════════════════════════════════")
+
+        // Reiniciar el timeout para el nuevo custodio
+        startCustodianTimeout()
     }
 
     fun finalizeCeremony() {
@@ -519,11 +683,16 @@ class CeremonyViewModel @Inject constructor(
                 // Si se acaba de crear una KEK Storage, actualizar el estado para reflejar que ahora existe
                 val shouldUpdateKEKStorageFlag = _uiState.value.selectedKEKType == KEKType.KEK_STORAGE
 
+                // Detener el timeout al finalizar la ceremonia
+                timeoutManager.stopTimer()
+                android.util.Log.d("CeremonyViewModel", "Timer de timeout detenido al finalizar ceremonia")
+
                 _uiState.value = _uiState.value.copy(
                     currentStep = 3,
                     finalKCV = finalKcv,
                     isCeremonyFinished = true,
                     isLoading = false,
+                    isTimeoutActive = false,
                     hasKEKStorage = shouldUpdateKEKStorageFlag || _uiState.value.hasKEKStorage // Actualizar si se creó una KEK Storage
                 )
 
@@ -565,6 +734,17 @@ class CeremonyViewModel @Inject constructor(
 
     fun cancelCeremony() {
         android.util.Log.d("CeremonyViewModel", "Cancelando ceremonia - reinicializando estado")
+
+        // Detener el timer de timeout
+        timeoutManager.stopTimer()
+        android.util.Log.d("CeremonyViewModel", "Timer de timeout detenido")
+
+        // Registrar cancelación en el log
+        addToLog("")
+        addToLog("═══════════════════════════════════════════════════════════")
+        addToLog("Ceremonia cancelada por el usuario")
+        addToLog("═══════════════════════════════════════════════════════════")
+
         // Resetea al estado inicial pero preservando los datos de KEK Storage e isAdmin
         _uiState.value = CeremonyState(
             component = "E59D620E1A6D311F19342054AB01ABF7",
