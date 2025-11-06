@@ -30,7 +30,7 @@ fun MainNavGraph(
             )
         }
         composable(MainScreen.Ceremony.route) {
-            CeremonyScreen()
+            CeremonyScreen(navController = navController)
         }
         composable(MainScreen.Profiles.route) {
             ProfilesScreen(username = username)

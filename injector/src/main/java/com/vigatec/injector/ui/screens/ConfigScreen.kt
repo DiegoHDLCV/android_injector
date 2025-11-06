@@ -307,7 +307,7 @@ fun CustodianTimeoutConfigDropdown(
     var expanded by remember { mutableStateOf(false) }
     var selectedTimeout by remember { mutableStateOf(currentTimeoutMinutes) }
 
-    val timeoutOptions = listOf(5, 10, 15, 20, 30, 45, 60)
+    val timeoutOptions = listOf(1, 5, 10, 15, 20, 30, 45, 60)
 
     Card(
         modifier = Modifier.fillMaxWidth(),

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,15 +21,31 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
 import com.vigatec.injector.viewmodel.CeremonyViewModel
 import com.vigatec.injector.ui.components.HexadecimalTextField
 import com.vigatec.injector.viewmodel.KeyAlgorithmType
+import com.vigatec.injector.ui.navigation.MainScreen
 import com.example.persistence.entities.KEKType
 
 @Composable
-fun CeremonyScreen(viewModel: CeremonyViewModel = hiltViewModel()) {
+fun CeremonyScreen(
+    navController: NavHostController? = null,
+    viewModel: CeremonyViewModel = hiltViewModel()
+) {
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+
+    // Efecto para navegar a Dashboard cuando se cierre el diálogo de timeout
+    LaunchedEffect(state.showTimeoutDialog) {
+        if (!state.showTimeoutDialog && !state.isCeremonyInProgress && state.currentStep == 1) {
+            // El diálogo se cerró y volvimos al paso 1, navegar al Dashboard
+            navController?.navigate(MainScreen.Dashboard.route) {
+                // Limpiar la pila de navegación para evitar volver a Ceremony
+                popUpTo(MainScreen.Ceremony.route) { inclusive = true }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
