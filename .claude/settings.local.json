@@ -45,7 +45,9 @@
       "Bash(keyreceiver/src/main/AndroidManifest.xml )",
       "Bash(keyreceiver/src/main/java/com/vigatec/keyreceiver/receiver/ )",
       "Bash(keyreceiver/src/main/res/xml/device_filter.xml)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "WebFetch(domain:100.65.127.12)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

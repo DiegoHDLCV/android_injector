@@ -5,6 +5,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,7 +45,7 @@ fun ConfigScreen(
                 title = { Text("Configuración") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "Volver")
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, "Volver")
                     }
                 }
             )
@@ -116,7 +118,7 @@ fun ConfigScreen(
                 )
             ) {
                 Icon(
-                    Icons.Default.Logout,
+                    Icons.AutoMirrored.Default.Logout,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp)
                 )
@@ -174,7 +176,7 @@ fun UserInfoCard(
                 }
             }
 
-            Divider()
+            HorizontalDivider()
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -272,7 +274,7 @@ fun SystemInfoCard(
                 text = "Información del Sistema",
                 style = MaterialTheme.typography.titleMedium
             )
-            Divider()
+            HorizontalDivider()
             SystemInfoRow(label = "Versión", value = applicationVersion.ifEmpty { "Cargando..." })
             SystemInfoRow(label = "Base de datos", value = databaseVersion.ifEmpty { "Cargando..." })
         }

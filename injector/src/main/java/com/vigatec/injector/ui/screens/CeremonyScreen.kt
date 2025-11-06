@@ -343,7 +343,7 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
             text = {
                 Column {
                     Text(
-                        text = state.kekValidationError!!,
+                        text = state.kekValidationError ?: "",
                         style = MaterialTheme.typography.bodyMedium
                     )
 

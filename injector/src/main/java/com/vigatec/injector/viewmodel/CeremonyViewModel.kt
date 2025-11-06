@@ -14,7 +14,6 @@ import com.vigatec.injector.util.CustodianTimeoutManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -55,7 +54,10 @@ data class CeremonyState(
     val timeoutTotalSeconds: Int = 0,         // Segundos totales del timeout
     val isTimeoutActive: Boolean = false,     // Si el timeout está activo
     val isTimeoutWarning: Boolean = false,    // Si se mostró la advertencia de tiempo agotándose
-    val showTimeoutDialog: Boolean = false    // Si se debe mostrar el diálogo de timeout expirado
+    val showTimeoutDialog: Boolean = false,   // Si se debe mostrar el diálogo de timeout expirado
+
+    // Campo para almacenar logs de la ceremonia
+    val ceremonyLogs: List<String> = emptyList() // Historial de logs de la ceremonia
 )
 
 @HiltViewModel
@@ -154,6 +156,12 @@ class CeremonyViewModel @Inject constructor(
 
     fun addToLog(message: String) {
         val timestamp = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        val logEntry = "[$timestamp] $message"
+        _uiState.value = _uiState.value.copy(
+            ceremonyLogs = _uiState.value.ceremonyLogs + logEntry
+        )
+        // También registrar en logcat para debuggear
+        android.util.Log.d("CeremonyViewModel", logEntry)
     }
 
     fun onNumCustodiansChange(num: Int) {
