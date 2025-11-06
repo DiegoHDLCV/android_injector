@@ -498,38 +498,21 @@ class CeremonyViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             try {
-                val finalComponents = _uiState.value.components + _uiState.value.component
+                // La llave final ya fue calculada en advanceToFinalizationStep()
+                // Usarla directamente del estado
+                val finalKeyHex = _uiState.value.component  // Guardada en advanceToFinalizationStep
+                val finalKcv = _uiState.value.finalKCV      // Calculado en advanceToFinalizationStep
 
-                if (finalComponents.size != _uiState.value.numCustodians) {
-                    throw IllegalStateException("Número incorrecto de componentes: ${finalComponents.size} vs ${_uiState.value.numCustodians}")
-                }
+                android.util.Log.d("CeremonyViewModel", "finalizeCeremony() - Usando llave del estado: KCV=$finalKcv")
 
-
-                
-                val finalKeyBytes = finalComponents
-                    .map { component ->
-                        val bytes = KcvCalculator.hexStringToByteArray(component)
-                        bytes
-                    }
-                    .reduce { acc, bytes -> 
-                        val result = KcvCalculator.xorByteArrays(acc, bytes)
-                        result
-                    }
-
-                val finalKeyHex = finalKeyBytes.joinToString("") { "%02X".format(it) }
-
-
-
-                
-                val finalKcv = KcvCalculator.calculateKcv(finalKeyHex)
-
-
+                // Convertir llave hex a bytes si es necesario
+                val finalKeyBytes = KcvCalculator.hexStringToByteArray(finalKeyHex)
 
                 try {
                     KeyStoreManager.storeMasterKey("master_transport_key", finalKeyBytes)
 
                 } catch (e: Exception) {
-
+                    android.util.Log.e("CeremonyViewModel", "Error almacenando master key", e)
                 }
 
                 // Todas las llaves se crean como operacionales
@@ -737,7 +720,7 @@ class CeremonyViewModel @Inject constructor(
     /**
      * Verifica el KCV y procede:
      * - Si no es el último custodio: avanza automáticamente al siguiente
-     * - Si es el último custodio: finaliza la ceremonia automáticamente
+     * - Si es el último custodio: avanza a FinalizationStep (pero NO guarda la llave aún)
      */
     fun confirmKcvAndProceed() {
         val isLastCustodian = _uiState.value.currentCustodian == _uiState.value.numCustodians
@@ -746,11 +729,59 @@ class CeremonyViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(showKcvModal = false)
 
         if (isLastCustodian) {
-            // Es el último custodio, finalizar la ceremonia
-            finalizeCeremony()
+            // Es el último custodio, avanzar a FinalizationStep para que el usuario confirme el guardado
+            advanceToFinalizationStep()
         } else {
             // No es el último, pasar al siguiente custodio
             nextCustodian()
+        }
+    }
+
+    /**
+     * Avanza a la pantalla de finalización SIN GUARDAR la llave.
+     * La llave solo se guardará cuando el usuario presione "Guardar" y confirme el modal.
+     *
+     * Este método calcula el KCV final pero NO guarda en la BD.
+     */
+    private fun advanceToFinalizationStep() {
+        viewModelScope.launch {
+            try {
+                val finalComponents = _uiState.value.components + _uiState.value.component
+
+                if (finalComponents.size != _uiState.value.numCustodians) {
+                    throw IllegalStateException("Número incorrecto de componentes: ${finalComponents.size} vs ${_uiState.value.numCustodians}")
+                }
+
+                // Calcular la llave final (XOR de todos los componentes)
+                val finalKeyBytes = finalComponents
+                    .map { component ->
+                        val bytes = KcvCalculator.hexStringToByteArray(component)
+                        bytes
+                    }
+                    .reduce { acc, bytes ->
+                        val result = KcvCalculator.xorByteArrays(acc, bytes)
+                        result
+                    }
+
+                val finalKeyHex = finalKeyBytes.joinToString("") { "%02X".format(it) }
+
+                // Calcular KCV final
+                val finalKcv = KcvCalculator.calculateKcv(finalKeyHex)
+
+                // Actualizar estado con la llave y KCV final (pero SIN GUARDAR aún)
+                _uiState.value = _uiState.value.copy(
+                    currentStep = 3,  // FinalizationStep
+                    finalKCV = finalKcv,
+                    component = finalKeyHex,  // Guardar la llave en estado para usarla después en finalizeCeremony
+                    isTimeoutActive = false
+                )
+
+                android.util.Log.d("CeremonyViewModel", "Avanzando a FinalizationStep - KCV: $finalKcv (sin guardar aún)")
+
+            } catch (e: Exception) {
+                addToLog("Error al procesar custodios: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 
