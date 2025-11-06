@@ -711,16 +711,9 @@ private fun TimeoutExpiredDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    // Solo navegamos sin actualizar estado
-                    // Esto evita que CeremonyScreen se recomponga antes de desmontarse
-                    if (navController != null) {
-                        android.util.Log.d("CeremonyScreen", "🔴 User clicked Accept - Navigating DIRECTLY to Dashboard")
-                        navController.navigate(MainScreen.Dashboard.route) {
-                            popUpTo(MainScreen.Ceremony.route) { inclusive = true }
-                        }
-                    } else {
-                        android.util.Log.e("CeremonyScreen", "❌ navController is NULL in TimeoutExpiredDialog!")
-                    }
+                    // Cerrar diálogo y volver a la pantalla principal de ceremonia (paso 1)
+                    android.util.Log.d("CeremonyScreen", "🔴 User clicked Accept - Closing timeout dialog and returning to ceremony main screen")
+                    viewModel.dismissTimeoutDialog()
                 }
             ) {
                 Text("Aceptar")
