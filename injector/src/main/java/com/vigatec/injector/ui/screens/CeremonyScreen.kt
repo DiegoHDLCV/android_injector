@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -36,10 +38,16 @@ fun CeremonyScreen(
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
 
+    // Variable para rastrear si el diálogo de timeout fue mostrado
+    val wasTimeoutDialogShown = remember { mutableStateOf(false) }
+
     // Efecto para navegar a Dashboard cuando se cierre el diálogo de timeout
     LaunchedEffect(state.showTimeoutDialog) {
-        if (!state.showTimeoutDialog && !state.isCeremonyInProgress && state.currentStep == 1) {
-            // El diálogo se cerró y volvimos al paso 1, navegar al Dashboard
+        if (state.showTimeoutDialog) {
+            // El diálogo se mostró, marcar como mostrado
+            wasTimeoutDialogShown.value = true
+        } else if (wasTimeoutDialogShown.value) {
+            // El diálogo se cerró después de haber sido mostrado, navegar al Dashboard
             navController?.navigate(MainScreen.Dashboard.route) {
                 // Limpiar la pila de navegación para evitar volver a Ceremony
                 popUpTo(MainScreen.Ceremony.route) { inclusive = true }
