@@ -39,12 +39,13 @@ fun CeremonyScreen(
     val scrollState = rememberScrollState()
     val localNavController = navController // Capturar navController en una variable local
 
-    // Efecto para asegurar navegación en caso de que se cierre el diálogo de otras formas
-    LaunchedEffect(state.showTimeoutDialog) {
-        if (!state.showTimeoutDialog && state.currentStep == 1 && !state.isCeremonyInProgress) {
-            // Si llegamos aquí, significa que el timeout fue manejado pero no estamos en ceremonia
-            // Esto es un fallback en caso de que el usuario cierre el diálogo de otra forma
-            android.util.Log.d("CeremonyScreen", "LaunchedEffect: Timeout handled, estado reiniciado")
+    // Efecto para limpiar el estado de timeout cuando la pantalla se carga
+    // Esto asegura que si volvemos a la ceremonia después de un timeout,
+    // el estado esté limpio
+    LaunchedEffect(Unit) {
+        if (state.showTimeoutDialog) {
+            android.util.Log.d("CeremonyScreen", "Limpiando estado de timeout al cargar CeremonyScreen")
+            viewModel.dismissTimeoutDialog()
         }
     }
 
@@ -710,12 +711,10 @@ private fun TimeoutExpiredDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    // Primero: Actualizar estado para cerrar el diálogo y que CeremonyScreen se recomponga sin él
-                    viewModel.dismissTimeoutDialog()
-
-                    // Luego: Navegar a Dashboard
+                    // Solo navegamos sin actualizar estado
+                    // Esto evita que CeremonyScreen se recomponga antes de desmontarse
                     if (navController != null) {
-                        android.util.Log.d("CeremonyScreen", "🔴 User clicked Accept - Navigating to Dashboard")
+                        android.util.Log.d("CeremonyScreen", "🔴 User clicked Accept - Navigating DIRECTLY to Dashboard")
                         navController.navigate(MainScreen.Dashboard.route) {
                             popUpTo(MainScreen.Ceremony.route) { inclusive = true }
                         }
