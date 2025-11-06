@@ -692,14 +692,28 @@ class CeremonyViewModel @Inject constructor(
                 timeoutManager.stopTimer()
                 android.util.Log.d("CeremonyViewModel", "Timer de timeout detenido al finalizar ceremonia")
 
-                _uiState.value = _uiState.value.copy(
-                    currentStep = 3,
-                    finalKCV = finalKcv,
-                    isCeremonyFinished = true,
-                    isLoading = false,
-                    isTimeoutActive = false,
-                    hasKEKStorage = shouldUpdateKEKStorageFlag || _uiState.value.hasKEKStorage // Actualizar si se creó una KEK Storage
+                // Registrar éxito en el log
+                addToLog("")
+                addToLog("═══════════════════════════════════════════════════════════")
+                addToLog("✅ CEREMONIA COMPLETADA EXITOSAMENTE")
+                addToLog("Llave guardada en el almacén")
+                addToLog("═══════════════════════════════════════════════════════════")
+                addToLog("")
+
+                // Actualizar estado de KEK Storage si se creó una nueva KEK Storage
+                val updatedHasKEKStorage = shouldUpdateKEKStorageFlag || _uiState.value.hasKEKStorage
+
+                // Resetear al estado inicial pero preservando datos de KEK Storage e isAdmin
+                // Esto devuelve al usuario a ConfigurationStep (paso 1)
+                _uiState.value = CeremonyState(
+                    component = "E59D620E1A6D311F19342054AB01ABF7",
+                    hasKEKStorage = updatedHasKEKStorage,  // Actualizar si se creó una KEK Storage
+                    isAdmin = _uiState.value.isAdmin,
+                    canCreateKEK = _uiState.value.canCreateKEK,
+                    canCreateOperational = _uiState.value.canCreateOperational
                 )
+
+                android.util.Log.d("CeremonyViewModel", "Estado resetado a ConfigurationStep después de guardar exitosamente")
 
 
             } catch (e: Exception) {
