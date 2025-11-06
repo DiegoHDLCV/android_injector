@@ -532,19 +532,49 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
 private fun FinalizationStep(viewModel: CeremonyViewModel) {
     val state by viewModel.uiState.collectAsState()
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Título
-        Text(
-            "Ceremonia Completada",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            "La llave ha sido generada exitosamente.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-        )
+        // Título con timeout display
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Ceremonia Completada",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "La llave ha sido generada exitosamente.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+
+            // Display del timeout (visible si está activo)
+            if (state.isTimeoutActive && state.timeoutRemainingSeconds > 0) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (state.isTimeoutWarning)
+                        MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
+                    else
+                        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text(
+                        text = formatTimeoutDisplay(state.timeoutRemainingSeconds),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = if (state.isTimeoutWarning)
+                            MaterialTheme.colorScheme.onErrorContainer
+                        else
+                            MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -598,20 +628,30 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Campo de nombre personalizado
+                // Campo de nombre personalizado (obligatorio)
                 OutlinedTextField(
                     value = state.customName,
                     onValueChange = { viewModel.onCustomNameChange(it) },
-                    label = { Text("Nombre (opcional)") },
+                    label = { Text("Nombre de la Llave *") },
                     placeholder = { Text("Ej: PIN Key Principal") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    singleLine = true,
+                    isError = state.customName.isBlank(),
+                    supportingText = {
+                        if (state.customName.isBlank()) {
+                            Text(
+                                text = "El nombre de la llave es requerido",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "El nombre te ayudará a identificar la llave más fácilmente.",
+                    text = "El nombre es requerido para identificar la llave.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -638,8 +678,9 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
                 Text("Nueva")
             }
             Button(
-                onClick = { viewModel.cancelCeremony() },
-                modifier = Modifier.weight(1f)
+                onClick = { viewModel.finalizeCeremony() },
+                modifier = Modifier.weight(1f),
+                enabled = state.customName.isNotBlank()
             ) {
                 Icon(imageVector = Icons.Default.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(4.dp))

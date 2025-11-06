@@ -36,6 +36,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vigatec.injector.ui.navigation.MainScreen
 import com.vigatec.injector.ui.navigation.MainNavGraph
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.collectAsState
+import com.vigatec.injector.viewmodel.CeremonyViewModel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -61,9 +64,13 @@ fun MainScaffold(
     onNavigateToExportImport: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+    val ceremonyViewModel: CeremonyViewModel = hiltViewModel()
+    val ceremonyState by ceremonyViewModel.uiState.collectAsState()
+    val isCeremonyInProgress = ceremonyState.isCeremonyInProgress
+
     Scaffold(
-        topBar = { MainTopAppBar(onNavigateToConfig = onNavigateToConfig) },
-        bottomBar = { AppBottomBar(navController = navController) }
+        topBar = { MainTopAppBar(onNavigateToConfig = onNavigateToConfig, isCeremonyInProgress = isCeremonyInProgress) },
+        bottomBar = { AppBottomBar(navController = navController, isCeremonyInProgress = isCeremonyInProgress) }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             MainNavGraph(
@@ -77,22 +84,28 @@ fun MainScaffold(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainTopAppBar(onNavigateToConfig: () -> Unit = {}) {
+fun MainTopAppBar(onNavigateToConfig: () -> Unit = {}, isCeremonyInProgress: Boolean = false) {
     var showMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     TopAppBar(
         title = { Text("Injector") },
         actions = {
-            // Botón de configuración
-            IconButton(onClick = onNavigateToConfig) {
+            // Botón de configuración (deshabilitado durante ceremonia)
+            IconButton(
+                onClick = onNavigateToConfig,
+                enabled = !isCeremonyInProgress
+            ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = "Configuración"
                 )
             }
 
-            IconButton(onClick = { showMenu = !showMenu }) {
+            IconButton(
+                onClick = { showMenu = !showMenu },
+                enabled = !isCeremonyInProgress
+            ) {
                 Icon(
                     imageVector = Icons.Default.MoreVert,
                     contentDescription = "More"
@@ -140,7 +153,7 @@ private fun exportLogs(context: Context) {
 
 
 @Composable
-fun AppBottomBar(navController: NavHostController) {
+fun AppBottomBar(navController: NavHostController, isCeremonyInProgress: Boolean = false) {
     NavigationBar {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
@@ -149,7 +162,8 @@ fun AppBottomBar(navController: NavHostController) {
             AddItem(
                 screen = screen,
                 currentDestination = currentDestination,
-                navController = navController
+                navController = navController,
+                enabled = !isCeremonyInProgress
             )
         }
     }
@@ -159,11 +173,13 @@ fun AppBottomBar(navController: NavHostController) {
 fun RowScope.AddItem(
     screen: BottomBarDestination,
     currentDestination: NavDestination?,
-    navController: NavHostController
+    navController: NavHostController,
+    enabled: Boolean = true
 ) {
     NavigationBarItem(
         icon = { Icon(imageVector = screen.icon, contentDescription = "Navigation Icon") },
         selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+        enabled = enabled,
         onClick = {
             navController.navigate(screen.route) {
                 popUpTo(navController.graph.findStartDestination().id)
