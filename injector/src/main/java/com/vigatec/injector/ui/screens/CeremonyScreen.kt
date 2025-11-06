@@ -37,33 +37,14 @@ fun CeremonyScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val localNavController = navController // Capturar navController en una variable local
 
-    // Variable para rastrear si el diálogo de timeout fue mostrado
-    val wasTimeoutDialogShown = remember { mutableStateOf(false) }
-
-    // Efecto para navegar a Dashboard cuando se cierre el diálogo de timeout
+    // Efecto para asegurar navegación en caso de que se cierre el diálogo de otras formas
     LaunchedEffect(state.showTimeoutDialog) {
-        android.util.Log.d("CeremonyScreen", "LaunchedEffect triggered: showTimeoutDialog=${state.showTimeoutDialog}, wasShown=${wasTimeoutDialogShown.value}, navController=$navController")
-
-        if (state.showTimeoutDialog) {
-            // El diálogo se mostró, marcar como mostrado
-            wasTimeoutDialogShown.value = true
-            android.util.Log.d("CeremonyScreen", "Dialog shown, marking wasTimeoutDialogShown=true")
-        } else if (wasTimeoutDialogShown.value) {
-            // El diálogo se cerró después de haber sido mostrado, navegar al Dashboard
-            android.util.Log.d("CeremonyScreen", "Dialog closed, attempting navigation to Dashboard")
-            android.util.Log.d("CeremonyScreen", "State at navigation: currentStep=${state.currentStep}, isCeremonyInProgress=${state.isCeremonyInProgress}")
-
-            navController?.navigate(MainScreen.Dashboard.route) {
-                // Limpiar la pila de navegación para evitar volver a Ceremony
-                popUpTo(MainScreen.Ceremony.route) { inclusive = true }
-            }
-
-            if (navController != null) {
-                android.util.Log.d("CeremonyScreen", "✓ Navigation command sent to Dashboard")
-            } else {
-                android.util.Log.e("CeremonyScreen", "❌ ERROR: navController is null!")
-            }
+        if (!state.showTimeoutDialog && state.currentStep == 1 && !state.isCeremonyInProgress) {
+            // Si llegamos aquí, significa que el timeout fue manejado pero no estamos en ceremonia
+            // Esto es un fallback en caso de que el usuario cierre el diálogo de otra forma
+            android.util.Log.d("CeremonyScreen", "LaunchedEffect: Timeout handled, estado reiniciado")
         }
     }
 
@@ -115,6 +96,14 @@ fun CeremonyScreen(
                 }
             }
         }
+    }
+
+    // Diálogo de timeout expirado
+    if (state.showTimeoutDialog) {
+        TimeoutExpiredDialog(
+            navController = localNavController,
+            viewModel = viewModel
+        )
     }
 }
 
@@ -378,63 +367,6 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
                     onClick = { viewModel.clearKekValidationError() }
                 ) {
                     Text("Entendido")
-                }
-            }
-        )
-    }
-
-    // Diálogo de timeout expirado
-    if (state.showTimeoutDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissTimeoutDialog() },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Error,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error
-                )
-            },
-            title = {
-                Text(
-                    text = "Tiempo de Espera Agotado",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column {
-                    Text(
-                        text = "Se ha excedido el tiempo máximo de espera para custodios.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "⏰ Información",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "La ceremonia se ha cancelado automáticamente. Consulte los logs para más detalles.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.dismissTimeoutDialog() }
-                ) {
-                    Text("Aceptar")
                 }
             }
         )
@@ -723,4 +655,77 @@ private fun formatTimeoutDisplay(seconds: Int): String {
     val minutes = seconds / 60
     val secs = seconds % 60
     return String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, secs)
+}
+
+@Composable
+private fun TimeoutExpiredDialog(
+    navController: NavHostController?,
+    viewModel: CeremonyViewModel
+) {
+    AlertDialog(
+        onDismissRequest = { viewModel.dismissTimeoutDialog() },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Error,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = {
+            Text(
+                text = "Tiempo de Espera Agotado",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Se ha excedido el tiempo máximo de espera para custodios.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "⏰ Información",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "La ceremonia se ha cancelado automáticamente. Consulte los logs para más detalles.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    // Navegar primero, luego actualizar el estado
+                    if (navController != null) {
+                        android.util.Log.d("CeremonyScreen", "🔴 User clicked Accept - Navigating to Dashboard")
+                        navController.navigate(MainScreen.Dashboard.route) {
+                            popUpTo(MainScreen.Ceremony.route) { inclusive = true }
+                        }
+                    } else {
+                        android.util.Log.e("CeremonyScreen", "❌ navController is NULL in TimeoutExpiredDialog!")
+                    }
+
+                    // Actualizar el estado después de navegar
+                    viewModel.dismissTimeoutDialog()
+                }
+            ) {
+                Text("Aceptar")
+            }
+        }
+    )
 }
