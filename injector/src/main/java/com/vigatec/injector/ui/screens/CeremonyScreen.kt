@@ -33,11 +33,18 @@ import com.example.persistence.entities.KEKType
 @Composable
 fun CeremonyScreen(
     navController: NavHostController? = null,
-    viewModel: CeremonyViewModel = hiltViewModel()
+    viewModel: CeremonyViewModel = hiltViewModel(),
+    onCeremonyStateChanged: (Boolean) -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     val localNavController = navController // Capturar navController en una variable local
+
+    // Efecto para notificar cambios de estado de ceremonia
+    LaunchedEffect(state.isCeremonyInProgress) {
+        android.util.Log.d("CeremonyScreen", "Estado de ceremonia cambió: ${state.isCeremonyInProgress}")
+        onCeremonyStateChanged(state.isCeremonyInProgress)
+    }
 
     // Efecto para limpiar el estado de timeout cuando la pantalla se carga
     // Esto asegura que si volvemos a la ceremonia después de un timeout,

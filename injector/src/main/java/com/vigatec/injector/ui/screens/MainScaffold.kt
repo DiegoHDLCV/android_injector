@@ -36,9 +36,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vigatec.injector.ui.navigation.MainScreen
 import com.vigatec.injector.ui.navigation.MainNavGraph
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.runtime.collectAsState
-import com.vigatec.injector.viewmodel.CeremonyViewModel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -64,9 +61,7 @@ fun MainScaffold(
     onNavigateToExportImport: () -> Unit = {}
 ) {
     val navController = rememberNavController()
-    val ceremonyViewModel: CeremonyViewModel = hiltViewModel()
-    val ceremonyState by ceremonyViewModel.uiState.collectAsState()
-    val isCeremonyInProgress = ceremonyState.isCeremonyInProgress
+    var isCeremonyInProgress by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = { MainTopAppBar(onNavigateToConfig = onNavigateToConfig, isCeremonyInProgress = isCeremonyInProgress) },
@@ -76,7 +71,10 @@ fun MainScaffold(
             MainNavGraph(
                 navController = navController,
                 username = username,
-                onNavigateToExportImport = onNavigateToExportImport
+                onNavigateToExportImport = onNavigateToExportImport,
+                onCeremonyStateChanged = { inProgress ->
+                    isCeremonyInProgress = inProgress
+                }
             )
         }
     }
