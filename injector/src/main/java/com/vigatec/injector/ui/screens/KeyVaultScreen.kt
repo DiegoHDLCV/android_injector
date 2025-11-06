@@ -307,11 +307,14 @@ fun KeyCard(
                 Text("Algoritmo: ${key.keyAlgorithm}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 // Para llaves de ceremonia, mostrar información relevante
-                Text("Origen: Ceremonia", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Solo mostrar "Origen" para llaves operacionales (no para KEK Storage)
+                if (!isKEKStorage) {
+                    Text("Origen: Ceremonia", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Text("Longitud: ${key.keyData.length / 2} bytes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                // Mostrar estado si es KEK Storage o KTK
-                if (isKEKStorage || isKTK) {
+                // Mostrar estado SOLO si es KTK (no para KEK Storage)
+                if (isKTK) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Estado: ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Surface(
@@ -334,18 +337,20 @@ fun KeyCard(
                 }
             }
 
-            // Mostrar los perfiles asignados para todas las llaves
-            Text(
-                text = if (assignedProfiles.isNotEmpty())
-                    "Perfil${if (assignedProfiles.size > 1) "es" else ""}: ${assignedProfiles.joinToString(", ")}"
-                else
-                    "Sin asignar",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (assignedProfiles.isNotEmpty())
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            // Mostrar los perfiles asignados (solo para llaves operacionales, no para KEK Storage)
+            if (!isKEKStorage) {
+                Text(
+                    text = if (assignedProfiles.isNotEmpty())
+                        "Perfil${if (assignedProfiles.size > 1) "es" else ""}: ${assignedProfiles.joinToString(", ")}"
+                    else
+                        "Sin asignar",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (assignedProfiles.isNotEmpty())
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Text("Fecha: ${formatDate(key.injectionTimestamp)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
