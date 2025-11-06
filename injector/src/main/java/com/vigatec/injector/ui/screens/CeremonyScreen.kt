@@ -43,14 +43,26 @@ fun CeremonyScreen(
 
     // Efecto para navegar a Dashboard cuando se cierre el diálogo de timeout
     LaunchedEffect(state.showTimeoutDialog) {
+        android.util.Log.d("CeremonyScreen", "LaunchedEffect triggered: showTimeoutDialog=${state.showTimeoutDialog}, wasShown=${wasTimeoutDialogShown.value}, navController=$navController")
+
         if (state.showTimeoutDialog) {
             // El diálogo se mostró, marcar como mostrado
             wasTimeoutDialogShown.value = true
+            android.util.Log.d("CeremonyScreen", "Dialog shown, marking wasTimeoutDialogShown=true")
         } else if (wasTimeoutDialogShown.value) {
             // El diálogo se cerró después de haber sido mostrado, navegar al Dashboard
+            android.util.Log.d("CeremonyScreen", "Dialog closed, attempting navigation to Dashboard")
+            android.util.Log.d("CeremonyScreen", "State at navigation: currentStep=${state.currentStep}, isCeremonyInProgress=${state.isCeremonyInProgress}")
+
             navController?.navigate(MainScreen.Dashboard.route) {
                 // Limpiar la pila de navegación para evitar volver a Ceremony
                 popUpTo(MainScreen.Ceremony.route) { inclusive = true }
+            }
+
+            if (navController != null) {
+                android.util.Log.d("CeremonyScreen", "✓ Navigation command sent to Dashboard")
+            } else {
+                android.util.Log.e("CeremonyScreen", "❌ ERROR: navController is null!")
             }
         }
     }

@@ -27,7 +27,10 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.vigatec.injector.R
 import com.vigatec.injector.viewmodel.LoginViewModel
 
 @Composable
@@ -43,6 +46,8 @@ fun LoginScreen(
     }
 
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    val isDevFlavor = remember { context.resources.getBoolean(R.bool.is_dev_flavor) }
 
     Box(
         modifier = Modifier
@@ -210,6 +215,36 @@ fun LoginScreen(
                                     Text("Ingresar", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                 }
                             }
+                        }
+                    }
+
+                    // Auto-login button for DEV flavor only
+                    if (isDevFlavor) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                // Auto-fill admin credentials and login
+                                loginViewModel.onUsernameChange("admin")
+                                loginViewModel.onPasswordChange("admin")
+                                // Small delay to ensure state updates before login
+                                focusManager.clearFocus()
+                                loginViewModel.login()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            enabled = !loginViewModel.isLoading,
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.7f),
+                                disabledContainerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Text(
+                                "🔓 Auto-login Admin (DEV)",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
                         }
                     }
                 }
