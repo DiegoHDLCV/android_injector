@@ -8,6 +8,7 @@ import com.example.persistence.repository.InjectedKeyRepository
 import com.example.persistence.repository.ProfileRepository
 import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.data.local.preferences.SessionManager
+import com.vigatec.utils.security.StorageKeyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -126,10 +127,25 @@ class KeyVaultViewModel @Inject constructor(
             Log.w(TAG, "Usuario no autorizado intentó eliminar una llave")
             return
         }
-        
+
         viewModelScope.launch {
-            injectedKeyRepository.deleteKey(key)
-            loadKeys() // Recargar
+            try {
+                // Si es KEK Storage, también eliminar del Android Keystore
+                if (key.isKEKStorage()) {
+                    Log.w(TAG, "Eliminando KEK Storage del Android Keystore...")
+                    StorageKeyManager.deleteStorageKEK()
+                    Log.d(TAG, "✓ KEK Storage eliminada del Keystore")
+                }
+
+                // Eliminar de la base de datos
+                injectedKeyRepository.deleteKey(key)
+                Log.d(TAG, "✓ Llave eliminada de la base de datos")
+
+                loadKeys() // Recargar
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al eliminar llave", e)
+                e.printStackTrace()
+            }
         }
     }
 
@@ -148,11 +164,27 @@ class KeyVaultViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
             return
         }
-        
+
         viewModelScope.launch {
-            injectedKeyRepository.deleteAllKeys()
-            _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
-            loadKeys() // Recargar
+            try {
+                // Verificar si existe KEK Storage antes de eliminar
+                if (StorageKeyManager.hasStorageKEK()) {
+                    Log.w(TAG, "Eliminando KEK Storage del Android Keystore (Clear All)...")
+                    StorageKeyManager.deleteStorageKEK()
+                    Log.d(TAG, "✓ KEK Storage eliminada del Keystore")
+                }
+
+                // Eliminar todas las llaves de la base de datos
+                injectedKeyRepository.deleteAllKeys()
+                Log.d(TAG, "✓ Todas las llaves eliminadas de la base de datos")
+
+                _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
+                loadKeys() // Recargar
+            } catch (e: Exception) {
+                Log.e(TAG, "Error al eliminar todas las llaves", e)
+                e.printStackTrace()
+                _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
+            }
         }
     }
 

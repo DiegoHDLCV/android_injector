@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -54,6 +55,13 @@ fun CeremonyScreen(
             android.util.Log.d("CeremonyScreen", "Limpiando estado de timeout al cargar CeremonyScreen")
             viewModel.dismissTimeoutDialog()
         }
+    }
+
+    // Efecto para actualizar el estado del KEK Storage cuando volvemos a esta pantalla
+    // Esto es necesario en caso de que se haya eliminado el KEK Storage desde el Almacén de Llaves
+    LaunchedEffect(Unit) {
+        android.util.Log.d("CeremonyScreen", "Actualizando estado del KEK Storage al cargar")
+        viewModel.refreshKEKStorageStatus()
     }
 
     Column(
@@ -177,39 +185,88 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
         Spacer(modifier = Modifier.height(8.dp))
         
         Column(Modifier.selectableGroup()) {
-            // Opción: Llave Operacional (siempre visible)
+            // Opción: Llave Operacional (deshabilitada si no existe KEK Storage)
             Card(
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (state.selectedKEKType == KEKType.NONE)
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    containerColor = when {
+                        state.selectedKEKType == KEKType.NONE && state.hasKEKStorage ->
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        !state.hasKEKStorage ->
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                        else ->
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                    }
                 ),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(if (!state.hasKEKStorage) 0.6f else 1f)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp)
                 ) {
-                    RadioButton(
-                        selected = state.selectedKEKType == KEKType.NONE,
-                        onClick = { viewModel.onKEKTypeChange(KEKType.NONE) }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = "Llave Operacional",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        RadioButton(
+                            selected = state.selectedKEKType == KEKType.NONE,
+                            onClick = {
+                                if (state.hasKEKStorage) {
+                                    viewModel.onKEKTypeChange(KEKType.NONE)
+                                }
+                            },
+                            enabled = state.hasKEKStorage
                         )
-                        Text(
-                            text = "Para operaciones normales (PIN, MAC, etc.)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Llave Operacional",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (state.hasKEKStorage)
+                                    MaterialTheme.colorScheme.onSurface
+                                else
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                            Text(
+                                text = "Para operaciones normales (PIN, MAC, etc.)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                    alpha = if (state.hasKEKStorage) 0.6f else 0.4f
+                                )
+                            )
+                        }
+                    }
+
+                    // Mensaje de aviso cuando no hay KEK Storage
+                    if (!state.hasKEKStorage) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "🔒",
+                                    style = MaterialTheme.typography.titleSmall
+                                )
+                                Text(
+                                    text = "Requiere una KEK Storage existente para cifrar las llaves",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
                     }
                 }
             }

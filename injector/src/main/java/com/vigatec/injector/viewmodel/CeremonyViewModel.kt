@@ -91,11 +91,22 @@ class CeremonyViewModel @Inject constructor(
         loadCurrentUser()
     }
 
+    /**
+     * Verifica si existe KEK Storage y actualiza el estado
+     * Este método es público para permitir que otros componentes (ej. KeyVaultViewModel)
+     * notifiquen cuando el KEK Storage ha sido eliminado
+     */
+    fun refreshKEKStorageStatus() {
+        checkKEKStorageExists()
+        android.util.Log.d("CeremonyViewModel", "KEK Storage status actualizado: ${_uiState.value.hasKEKStorage}")
+    }
+
     private fun checkKEKStorageExists() {
         val hasKEK = StorageKeyManager.hasStorageKEK()
         _uiState.value = _uiState.value.copy(
             hasKEKStorage = hasKEK
         )
+        android.util.Log.d("CeremonyViewModel", "checkKEKStorageExists() - hasKEK: $hasKEK")
     }
 
     private fun loadCurrentUser() {
