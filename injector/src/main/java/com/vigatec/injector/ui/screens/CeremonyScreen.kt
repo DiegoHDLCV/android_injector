@@ -678,7 +678,7 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
                 Text("Nueva")
             }
             Button(
-                onClick = { viewModel.finalizeCeremony() },
+                onClick = { viewModel.showConfirmSaveModal() },
                 modifier = Modifier.weight(1f),
                 enabled = state.customName.isNotBlank()
             ) {
@@ -687,6 +687,141 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
                 Text("Guardar")
             }
         }
+    }
+
+    // Modal de confirmación para guardar la llave
+    if (state.showConfirmSaveModal) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissConfirmSaveModal() },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = "Confirmar Guardado de Llave",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Por favor revisa los datos de la llave antes de guardar:",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Resumen de la llave
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Nombre
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Nombre:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = state.customName,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            // Algoritmo
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Algoritmo:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = state.selectedKeyType.displayName,
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+
+                            // KCV
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "KCV Final:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = state.finalKCV,
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            // Tipo de llave
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Tipo:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = when (state.selectedKEKType) {
+                                        com.example.persistence.entities.KEKType.NONE -> "Operacional"
+                                        com.example.persistence.entities.KEKType.KEK_STORAGE -> "KEK Storage"
+                                        com.example.persistence.entities.KEKType.KEK_TRANSPORT -> "KEK Transporte"
+                                        else -> "Operacional"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "¿Deseas guardar esta llave?",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.confirmAndSave() }
+                ) {
+                    Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissConfirmSaveModal() }
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 

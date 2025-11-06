@@ -57,7 +57,10 @@ data class CeremonyState(
     val showTimeoutDialog: Boolean = false,   // Si se debe mostrar el diálogo de timeout expirado
 
     // Campo para almacenar logs de la ceremonia
-    val ceremonyLogs: List<String> = emptyList() // Historial de logs de la ceremonia
+    val ceremonyLogs: List<String> = emptyList(), // Historial de logs de la ceremonia
+
+    // Modal de confirmación de guardado
+    val showConfirmSaveModal: Boolean = false  // Mostrar modal de confirmación antes de guardar llave
 )
 
 @HiltViewModel
@@ -767,6 +770,28 @@ class CeremonyViewModel @Inject constructor(
 
     fun clearKekValidationError() {
         _uiState.value = _uiState.value.copy(kekValidationError = null)
+    }
+
+    /**
+     * Abre el modal de confirmación de guardado
+     */
+    fun showConfirmSaveModal() {
+        _uiState.value = _uiState.value.copy(showConfirmSaveModal = true)
+    }
+
+    /**
+     * Cierra el modal de confirmación sin guardar
+     */
+    fun dismissConfirmSaveModal() {
+        _uiState.value = _uiState.value.copy(showConfirmSaveModal = false)
+    }
+
+    /**
+     * Guarda la llave y cierra el modal (se llama desde el modal de confirmación)
+     */
+    fun confirmAndSave() {
+        dismissConfirmSaveModal()
+        finalizeCeremony()
     }
 
 }
