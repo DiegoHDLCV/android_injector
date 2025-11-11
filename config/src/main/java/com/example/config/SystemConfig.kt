@@ -37,8 +37,8 @@ object SystemConfig {
     // - Otros dispositivos Aisino: Puertos 0, 1 o 6, 7, 8 según el modelo
     // El puerto 0 es el más universal y es el que funciona en A90 Pro
     var aisinoCandidatePorts: List<Int> = listOf(0, 1, 7, 8, 6)  // Puerto 0 primero (A90 Pro), luego alternativas
-    // Orden: intenta 9600 primero (velocidad más común en A90 Pro), luego 115200
-    var aisinoCandidateBauds: List<Int> = listOf(9600, 115200)
+    // Orden: intenta 115200 primero (requerido por CH340), luego 9600 como fallback legacy
+    var aisinoCandidateBauds: List<Int> = listOf(115200, 9600)
 
     // Helpers
     fun isMaster(): Boolean = deviceRole == DeviceRole.MASTER

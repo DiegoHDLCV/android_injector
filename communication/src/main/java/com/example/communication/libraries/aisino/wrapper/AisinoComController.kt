@@ -484,7 +484,14 @@ class AisinoComController(
 
                 if (detected) {
                     Log.i(TAG, "║ [CH340] ✅ Cable CH340 detectado y listo")
-                    // Configurar UART según parámetros almacenados
+                    // Forzar parámetros compatibles con CH340 (115200 8N1) para mantener sincronía con NewPOS
+                    if (storedBaudRate != 115200) {
+                        Log.i(TAG, "║ [CH340] Ajustando baud rate de ${storedBaudRate} a 115200 para compatibilidad")
+                    }
+                    storedBaudRate = 115200
+                    storedDataBits = 8
+                    storedParity = 0
+                    storedStopBits = 1
                     detector.configure(storedBaudRate, storedDataBits, storedStopBits, storedParity, 0)
 
                     ch340Detector = detector

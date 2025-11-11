@@ -53,6 +53,13 @@ object UsbModeManager {
         Log.i(TAG, "║   • Puerto USB normal → USB PERIPHERAL (es detectado)")
         Log.i(TAG, "║")
 
+        val usbStateBefore = readUsbState()
+        if (usbStateBefore != null) {
+            Log.i(TAG, "║ Estado USB actual: '$usbStateBefore'")
+        } else {
+            Log.w(TAG, "║ Estado USB actual no disponible")
+        }
+
         when (role) {
             DeviceRole.MASTER -> {
                 Log.i(TAG, "║ MASTER (injector):")
@@ -92,17 +99,31 @@ object UsbModeManager {
                     }
                 }
                 DeviceRole.SUBPOS -> {
-                    // Intenta configurar como PERIPHERAL (en caso que no sea automático)
-                    try {
-                        Runtime.getRuntime().exec("setprop sys.usb.config adb,accessory").waitFor()
-                        Log.d(TAG, "  Fallback PERIPHERAL: configurado via setprop")
-                    } catch (e: Exception) {
-                        Log.d(TAG, "  Fallback PERIPHERAL: no disponible - usando configuración automática")
-                    }
+                    Log.d(TAG, "  Fallback PERIPHERAL deshabilitado para evitar forzar modo accessory")
+                    return
                 }
+            }
+
+            val usbStateAfter = readUsbState()
+            if (usbStateAfter != null) {
+                Log.d(TAG, "  Estado USB tras fallback: '$usbStateAfter'")
             }
         } catch (e: Exception) {
             Log.d(TAG, "  Fallback deshabilitado: ${e.message}")
+        }
+    }
+
+    private fun readUsbState(): String? {
+        return try {
+            val process = Runtime.getRuntime().exec(arrayOf("getprop", "sys.usb.state"))
+            process.inputStream.bufferedReader().use { reader ->
+                val state = reader.readLine()?.trim()
+                process.waitFor()
+                if (state.isNullOrEmpty()) null else state
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo leer sys.usb.state: ${e.message}")
+            null
         }
     }
 }

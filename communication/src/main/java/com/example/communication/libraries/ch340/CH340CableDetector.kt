@@ -1,6 +1,10 @@
 package com.example.communication.libraries.ch340
 
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.util.Log
@@ -8,8 +12,18 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.GlobalScope
 import java.io.IOException
+import android.hardware.usb.UsbDeviceConnection
+import android.os.Build
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlin.coroutines.resume
 
 /**
  * CH340 USB Cable Detection Wrapper - Modern Implementation
@@ -65,6 +79,7 @@ class CH340CableDetector(private val context: Context) {
     private var usbSerialDriver: UsbSerialDriver? = null
     private var usbSerialPort: UsbSerialPort? = null
     private var isConnected = false
+    private val usbPermissionAction: String = "${context.packageName}.USB_PERMISSION"
 
     /**
      * Detect CH340 cable
@@ -88,11 +103,39 @@ class CH340CableDetector(private val context: Context) {
                 Log.i(TAG, "║ ℹ️ Continuing with CH340 detection anyway...")
             }
 
+            // Step 1.5: Verificar si hay dispositivos USB conectados antes de intentar detectarlos
+            val deviceList = usbManager.deviceList
+            Log.d(TAG, "║ Dispositivos USB detectados por UsbManager: ${deviceList.size}")
+            if (deviceList.isEmpty()) {
+                Log.w(TAG, "║ ⚠️ No hay dispositivos USB detectados por UsbManager")
+                Log.w(TAG, "║    Posibles causas:")
+                Log.w(TAG, "║    1. El dispositivo está en modo ADB (conectado a PC)")
+                Log.w(TAG, "║    2. No se está usando un cable OTG en el dispositivo HOST")
+                Log.w(TAG, "║    3. El cable CH340 no está conectado")
+                Log.w(TAG, "║    SOLUCIÓN: Desconecta el cable USB de la PC y usa un cable OTG")
+            } else {
+                deviceList.values.forEach { device ->
+                    Log.d(TAG, "║    - ${device.deviceName} (VID: 0x${device.vendorId.toString(16)}, PID: 0x${device.productId.toString(16)})")
+                }
+            }
+
             // Step 2: Enumerate available USB devices using usb-serial-for-android
             val availableDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
 
             if (availableDrivers.isEmpty()) {
                 Log.e(TAG, "║ ❌ No USB serial devices found")
+                if (deviceList.isEmpty()) {
+                    Log.e(TAG, "║ ⚠️ IMPORTANTE: No hay dispositivos USB detectados")
+                    Log.e(TAG, "║    El dispositivo puede estar en modo ADB (conectado a PC)")
+                    Log.e(TAG, "║    Para usar CH340, el dispositivo debe estar en modo HOST")
+                    Log.e(TAG, "║    SOLUCIÓN:")
+                    Log.e(TAG, "║    1. Desconecta el cable USB de la PC")
+                    Log.e(TAG, "║    2. Conecta un cable OTG al dispositivo")
+                    Log.e(TAG, "║    3. Conecta el cable CH340 al adaptador OTG")
+                } else {
+                    Log.e(TAG, "║ ⚠️ Hay dispositivos USB pero no son seriales compatibles")
+                    Log.e(TAG, "║    Verifica que el cable CH340 esté correctamente conectado")
+                }
                 Log.d(TAG, "╚═══════════════════════════════════════════════════════════════")
                 return@withContext false
             }
@@ -111,18 +154,31 @@ class CH340CableDetector(private val context: Context) {
                 Log.i(TAG, "║ ✓ CH340 device detected")
                 usbSerialDriver = driver
 
-                // Step 4: Open connection to the device
-                val connection = try {
-                    usbManager.openDevice(device)
-                } catch (e: SecurityException) {
-                    Log.e(TAG, "║ ⚠️ SecurityException: USB permission denied")
-                    Log.e(TAG, "║    Error: ${e.message}")
-                    Log.e(TAG, "║    Solution: Device filter added to manifest, please allow USB permission when prompted")
+                // Step 4: Request USB permission and verify it's granted
+                Log.i(TAG, "║ 🔐 Verificando/solicitando permiso USB para ${device.deviceName}...")
+                if (!ensureUsbPermission(device)) {
+                    Log.w(TAG, "║ ⚠️ USB permission was not granted for ${device.deviceName}")
                     continue
                 }
 
+                // Double-check permission before opening device
+                if (!usbManager.hasPermission(device)) {
+                    Log.e(TAG, "║ ❌ ERROR: ensureUsbPermission retornó true pero hasPermission es false!")
+                    Log.e(TAG, "║    Esto no debería pasar. Reintentando solicitud de permiso...")
+                    if (!ensureUsbPermission(device)) {
+                        Log.e(TAG, "║ ❌ Segundo intento de permiso también falló")
+                        continue
+                    }
+                }
+
+                Log.i(TAG, "║ ✅ Permiso USB confirmado, abriendo dispositivo...")
+                val connection = openDeviceWithRetry(device)
                 if (connection == null) {
-                    Log.e(TAG, "║ ⚠️ Permission may be needed for device access (connection was null)")
+                    Log.e(TAG, "║ ❌ Unable to open USB connection (permission granted but connection null)")
+                    Log.e(TAG, "║    Verificando permiso nuevamente...")
+                    if (!usbManager.hasPermission(device)) {
+                        Log.e(TAG, "║ ❌ El permiso se perdió después de ensureUsbPermission!")
+                    }
                     continue
                 }
 
@@ -171,6 +227,224 @@ class CH340CableDetector(private val context: Context) {
             isConnected = false
             false
         }
+    }
+
+    private suspend fun ensureUsbPermission(device: UsbDevice): Boolean {
+        if (usbManager.hasPermission(device)) {
+            Log.d(TAG, "║ ✓ USB permission already granted for ${device.deviceName}")
+            return true
+        }
+
+        Log.i(TAG, "║ ⚠️ USB permission not granted for ${device.deviceName}, requesting...")
+        Log.i(TAG, "║    Action: $usbPermissionAction")
+        Log.i(TAG, "║    Device ID: ${device.deviceId}")
+
+        return try {
+            withTimeout(20000) { // 20 segundos para dar tiempo al usuario de responder
+                suspendCancellableCoroutine { continuation ->
+                    val filter = IntentFilter(usbPermissionAction)
+                    var receiverRegistered = false
+                    var permissionResolved = false
+                    val lock = Any()
+                    
+                    val receiver = object : BroadcastReceiver() {
+                        override fun onReceive(context: Context, intent: Intent) {
+                            Log.i(TAG, "║ 📨 Broadcast recibido: action=${intent.action}")
+                            Log.d(TAG, "║    Esperado: $usbPermissionAction")
+                            
+                            if (intent.action != usbPermissionAction) {
+                                Log.d(TAG, "║ ⚠️ Acción no coincide (${intent.action} != $usbPermissionAction), ignorando")
+                                return
+                            }
+
+                            val intentDevice = intent.getParcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
+                            Log.d(TAG, "║ 📨 Device ID recibido: ${intentDevice?.deviceId}, esperado: ${device.deviceId}")
+                            
+                            if (intentDevice?.deviceId != device.deviceId) {
+                                Log.d(TAG, "║ ⚠️ Device ID no coincide (${intentDevice?.deviceId} != ${device.deviceId}), ignorando")
+                                return
+                            }
+
+                            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                            Log.i(TAG, "║ 📨 Permiso USB ${if (granted) "✅ OTORGADO" else "❌ DENEGADO"} para ${device.deviceName}")
+
+                            synchronized(lock) {
+                                if (!permissionResolved && !continuation.isCompleted) {
+                                    permissionResolved = true
+                                    if (receiverRegistered) {
+                                        try {
+                                            context.unregisterReceiver(this)
+                                            receiverRegistered = false
+                                            Log.d(TAG, "║ ✓ BroadcastReceiver desregistrado")
+                                        } catch (_: IllegalArgumentException) {
+                                        }
+                                    }
+                                    continuation.resume(granted)
+                                }
+                            }
+                        }
+                    }
+
+                    // Usar RECEIVER_EXPORTED para permitir ejecución en background (requerido para Android 13+)
+                    val registerFlags =
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            Context.RECEIVER_EXPORTED // Cambiado a EXPORTED para permitir ejecución en background
+                        } else {
+                            0
+                        }
+
+                    try {
+                        context.registerReceiver(receiver, filter, registerFlags)
+                        receiverRegistered = true
+                        Log.d(TAG, "║ ✓ BroadcastReceiver registrado para acción: $usbPermissionAction")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "║ ❌ Error registrando receiver: ${e.message}")
+                        continuation.resume(false)
+                        return@suspendCancellableCoroutine
+                    }
+
+                    continuation.invokeOnCancellation {
+                        if (receiverRegistered) {
+                            try {
+                                context.unregisterReceiver(receiver)
+                                receiverRegistered = false
+                            } catch (_: IllegalArgumentException) {
+                            }
+                        }
+                    }
+
+                    val permissionIntent = try {
+                        PendingIntent.getBroadcast(
+                            context,
+                            device.deviceId,
+                            Intent(usbPermissionAction).apply {
+                                putExtra(UsbManager.EXTRA_DEVICE, device)
+                            },
+                            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                        )
+                    } catch (e: Exception) {
+                        Log.e(TAG, "║ ❌ Error creando PendingIntent: ${e.message}")
+                        if (receiverRegistered) {
+                            try {
+                                context.unregisterReceiver(receiver)
+                            } catch (_: IllegalArgumentException) {
+                            }
+                        }
+                        continuation.resume(false)
+                        return@suspendCancellableCoroutine
+                    }
+
+                    Log.i(TAG, "║ 📤 Solicitando permiso USB...")
+                    Log.i(TAG, "║    ⚠️ IMPORTANTE: El diálogo de permiso debería aparecer ahora")
+                    Log.i(TAG, "║    Si no aparece, ve a Configuración > Apps > ${context.packageName} > Permisos USB")
+                    
+                    try {
+                        usbManager.requestPermission(device, permissionIntent)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "║ ❌ Error en requestPermission: ${e.message}", e)
+                        if (receiverRegistered) {
+                            try {
+                                context.unregisterReceiver(receiver)
+                            } catch (_: IllegalArgumentException) {
+                            }
+                        }
+                        continuation.resume(false)
+                        return@suspendCancellableCoroutine
+                    }
+
+                    // Verificar periódicamente si el permiso se otorgó (incluso si no recibimos el broadcast)
+                    // Esto maneja el caso donde el UsbPermissionReceiver del manifest otorga el permiso
+                    GlobalScope.launch(Dispatchers.IO) {
+                        var checkCount = 0
+                        val maxChecks = 100 // 20 segundos / 200ms = 100 checks
+                        
+                        while (!permissionResolved && checkCount < maxChecks && !continuation.isCompleted) {
+                            delay(200)
+                            checkCount++
+                            
+                            if (usbManager.hasPermission(device)) {
+                                synchronized(lock) {
+                                    if (!permissionResolved && !continuation.isCompleted) {
+                                        permissionResolved = true
+                                        Log.i(TAG, "║ ✓ Permiso otorgado (verificado después de ${checkCount * 200}ms)")
+                                        if (receiverRegistered) {
+                                            try {
+                                                context.unregisterReceiver(receiver)
+                                                receiverRegistered = false
+                                                Log.d(TAG, "║ ✓ BroadcastReceiver desregistrado")
+                                            } catch (_: IllegalArgumentException) {
+                                            }
+                                        }
+                                        continuation.resume(true)
+                                    }
+                                }
+                                return@launch
+                            }
+                            
+                            // Log cada 5 segundos para no saturar
+                            if (checkCount % 25 == 0) {
+                                Log.d(TAG, "║ ⏳ Esperando permiso... (${checkCount * 200}ms transcurridos)")
+                            }
+                        }
+                        
+                        if (!permissionResolved && !continuation.isCompleted) {
+                            Log.d(TAG, "║ ⏳ Esperando respuesta del usuario (máximo 20 segundos)...")
+                            Log.d(TAG, "║    El diálogo de permiso debería estar visible en la pantalla")
+                        }
+                    }
+                }
+            }.also { granted ->
+                if (granted) {
+                    Log.i(TAG, "║ ✅ USB permission granted for ${device.deviceName}")
+                } else {
+                    Log.w(TAG, "║ ❌ USB permission denied or timeout for ${device.deviceName}")
+                    Log.w(TAG, "║    SOLUCIÓN: Ve a Configuración > Apps > ${context.packageName} > Permisos USB")
+                    Log.w(TAG, "║    y otorga el permiso manualmente, luego vuelve a intentar")
+                }
+            }
+        } catch (timeout: TimeoutCancellationException) {
+            Log.w(TAG, "║ ❌ USB permission request timed out (20s) for ${device.deviceName}")
+            Log.w(TAG, "║    SOLUCIÓN: Ve a Configuración > Apps > ${context.packageName} > Permisos USB")
+            Log.w(TAG, "║    y otorga el permiso manualmente, luego vuelve a intentar")
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "║ ❌ Error solicitando permiso USB: ${e.message}", e)
+            false
+        }
+    }
+
+    private suspend fun openDeviceWithRetry(device: UsbDevice): UsbDeviceConnection? {
+        Log.d(TAG, "║ 🔓 Intentando abrir dispositivo USB (máximo 3 intentos)...")
+        Log.d(TAG, "║    Verificando permiso antes de abrir: ${usbManager.hasPermission(device)}")
+        
+        repeat(3) { attempt ->
+            try {
+                Log.d(TAG, "║    Intento ${attempt + 1}/3: abriendo dispositivo...")
+                val connection = usbManager.openDevice(device)
+                if (connection != null) {
+                    Log.i(TAG, "║ ✅ Dispositivo abierto exitosamente en intento ${attempt + 1}")
+                    return connection
+                }
+                Log.w(TAG, "║ ⚠️ openDevice retornó null en intento ${attempt + 1}, esperando 200ms...")
+                delay(200)
+            } catch (e: SecurityException) {
+                Log.e(TAG, "║ ❌ SecurityException en intento ${attempt + 1}: ${e.message}")
+                Log.e(TAG, "║    Verificando permiso después del error: ${usbManager.hasPermission(device)}")
+                Log.e(TAG, "║    Device ID: ${device.deviceId}, Device Name: ${device.deviceName}")
+                if (attempt < 2) {
+                    Log.w(TAG, "║    Reintentando después de 500ms...")
+                    delay(500)
+                } else {
+                    Log.e(TAG, "║    Todos los intentos fallaron con SecurityException")
+                    return null
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "║ ❌ Error inesperado abriendo dispositivo: ${e.javaClass.simpleName}: ${e.message}")
+                return null
+            }
+        }
+        Log.e(TAG, "║ ❌ No se pudo abrir el dispositivo después de 3 intentos")
+        return null
     }
 
     /**

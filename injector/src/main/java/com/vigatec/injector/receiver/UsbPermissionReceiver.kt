@@ -70,7 +70,7 @@ class UsbPermissionReceiver : BroadcastReceiver() {
         val permissionIntent = android.app.PendingIntent.getBroadcast(
             context, 0,
             Intent(ACTION_USB_PERMISSION),
-            android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+            android.app.PendingIntent.FLAG_MUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
         )
         usbManager.requestPermission(device, permissionIntent)
     }

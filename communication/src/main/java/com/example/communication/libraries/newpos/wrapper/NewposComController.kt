@@ -22,13 +22,14 @@ class NewposComController(private val context: Context? = null) : IComController
         parity: EnumCommConfParity,
         dataBits: EnumCommConfDataBits
     ): Int {
-        Log.d(TAG, "╔══════════════════════════════════════════════════════════════")
-        Log.d(TAG, "║ NEWPOS COM INIT - Detección Dual Cable (USB OTG + CH340)")
-        Log.d(TAG, "╠══════════════════════════════════════════════════════════════")
+        Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
+        Log.i(TAG, "║ NEWPOS COM INIT - Detección Dual Cable (USB OTG + CH340)")
+        Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
         Log.i(TAG, "║ Parámetros solicitados:")
         Log.i(TAG, "║   • Baud Rate: ${baudRate.name}")
         Log.i(TAG, "║   • Parity: ${parity.name}")
         Log.i(TAG, "║   • Data Bits: ${dataBits.name}")
+        Log.i(TAG, "║   • Context disponible: ${if (context != null) "SÍ" else "NO"}")
 
         try {
             // PASO 1: Intentar cable CH340 si contexto disponible
@@ -36,12 +37,13 @@ class NewposComController(private val context: Context? = null) : IComController
                 Log.i(TAG, "║ 🔍 PASO 1/2: Intentando cable especial CH340...")
                 if (tryCH340()) {
                     Log.i(TAG, "║ ✅ Cable CH340 detectado y configurado")
-                    Log.d(TAG, "╚══════════════════════════════════════════════════════════════")
+                    Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
                     return 0
                 }
-                Log.d(TAG, "║ Cable CH340 no disponible, continuando...")
+                Log.i(TAG, "║ ⚠️ Cable CH340 no disponible, continuando con USB OTG...")
             } else {
-                Log.d(TAG, "║ [PASO 1/2] Omitiendo CH340 (sin contexto)")
+                Log.w(TAG, "║ ⚠️ [PASO 1/2] Omitiendo CH340 (sin contexto)")
+                Log.w(TAG, "║    El contexto es necesario para detectar cable CH340")
             }
 
             // PASO 2: Intentar puertos virtuales USB (fallback)
@@ -89,8 +91,16 @@ class NewposComController(private val context: Context? = null) : IComController
      */
     private fun tryCH340(): Boolean {
         return try {
-            Log.d(TAG, "║ [CH340] Detectando...")
+            Log.i(TAG, "║ [CH340] Iniciando detección de cable CH340...")
+            Log.i(TAG, "║ [CH340] Contexto disponible: ${if (context != null) "SÍ" else "NO"}")
+            
+            if (context == null) {
+                Log.e(TAG, "║ [CH340] ❌ Contexto es null, no se puede detectar CH340")
+                return false
+            }
+            
             val detector = com.example.communication.libraries.ch340.CH340CableDetector(context!!)
+            Log.i(TAG, "║ [CH340] CH340CableDetector creado, iniciando detección...")
 
             // Detectar cable de forma síncrona
             val detected = runBlocking {
@@ -98,19 +108,25 @@ class NewposComController(private val context: Context? = null) : IComController
             }
 
             if (detected) {
-                Log.i(TAG, "║ [CH340] ✅ Cable detectado")
+                Log.i(TAG, "║ [CH340] ✅ Cable CH340 detectado exitosamente")
                 // Configurar UART: 115200 baud, 8 data bits, 1 stop bit, no parity
-                detector.configure(115200, 8, 1, 0, 0)
-                ch340Detector = detector
-                usingCH340Cable = true
-                Log.i(TAG, "║ [CH340] ✓ Configurado: 115200bps 8N1")
-                true
+                val configSuccess = detector.configure(115200, 8, 1, 0, 0)
+                if (configSuccess) {
+                    ch340Detector = detector
+                    usingCH340Cable = true
+                    Log.i(TAG, "║ [CH340] ✓ Configurado: 115200bps 8N1")
+                    true
+                } else {
+                    Log.e(TAG, "║ [CH340] ❌ Error al configurar UART después de detección")
+                    detector.close()
+                    false
+                }
             } else {
-                Log.d(TAG, "║ [CH340] ✗ No detectado")
+                Log.w(TAG, "║ [CH340] ✗ Cable CH340 no detectado")
                 false
             }
         } catch (e: Exception) {
-            Log.e(TAG, "║ [CH340] ❌ Error durante detección/configuración", e)
+            Log.e(TAG, "║ [CH340] ❌ EXCEPCIÓN durante detección/configuración", e)
             Log.e(TAG, "║    Tipo: ${e.javaClass.simpleName}")
             Log.e(TAG, "║    Mensaje: ${e.message}")
             Log.e(TAG, "║    Stack: ${e.stackTraceToString().take(400)}")
