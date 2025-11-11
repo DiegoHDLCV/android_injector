@@ -1,9 +1,9 @@
 // Archivo: com/example/persistence/repository/InjectionLogRepository.kt
 
-package com.example.persistence.repository
+package com.vigatec.persistence.repository
 
-import com.example.persistence.dao.InjectionLogDao
-import com.example.persistence.entities.InjectionLogEntity
+import com.vigatec.persistence.dao.InjectionLogDao
+import com.vigatec.persistence.entities.InjectionLogEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton

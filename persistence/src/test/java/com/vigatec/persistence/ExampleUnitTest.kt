@@ -1,4 +1,4 @@
-package com.example.persistence
+package com.vigatec.persistence
 
 import org.junit.Test
 

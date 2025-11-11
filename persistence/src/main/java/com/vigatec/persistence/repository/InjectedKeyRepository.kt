@@ -1,10 +1,10 @@
 // Archivo: com/example/persistence/repository/InjectedKeyRepository.kt (Modificado)
 
-package com.example.persistence.repository
+package com.vigatec.persistence.repository
 
 import android.util.Log
-import com.example.persistence.dao.InjectedKeyDao
-import com.example.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.dao.InjectedKeyDao
+import com.vigatec.persistence.entities.InjectedKeyEntity
 import com.vigatec.utils.security.StorageKeyManager
 import com.vigatec.utils.security.EncryptedKeyData
 import javax.inject.Inject

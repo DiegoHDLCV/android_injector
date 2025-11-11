@@ -1,7 +1,7 @@
-package com.example.persistence.dao
+package com.vigatec.persistence.dao
 
 import androidx.room.*
-import com.example.persistence.entities.ProfileEntity
+import com.vigatec.persistence.entities.ProfileEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

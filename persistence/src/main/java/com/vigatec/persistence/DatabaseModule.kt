@@ -1,15 +1,15 @@
 // file: com/example/persistence/DatabaseModule.kt
 
-package com.example.persistence
+package com.vigatec.persistence
 
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.example.persistence.dao.InjectedKeyDao // Importa el nuevo DAO
-import com.example.persistence.dao.KeyDao
-import com.example.persistence.dao.ProfileDao
+import com.vigatec.persistence.dao.InjectedKeyDao // Importa el nuevo DAO
+import com.vigatec.persistence.dao.KeyDao
+import com.vigatec.persistence.dao.ProfileDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

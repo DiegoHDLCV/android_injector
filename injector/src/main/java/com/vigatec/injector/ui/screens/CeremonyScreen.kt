@@ -29,7 +29,7 @@ import com.vigatec.injector.viewmodel.CeremonyViewModel
 import com.vigatec.injector.ui.components.HexadecimalTextField
 import com.vigatec.injector.viewmodel.KeyAlgorithmType
 import com.vigatec.injector.ui.navigation.MainScreen
-import com.example.persistence.entities.KEKType
+import com.vigatec.persistence.entities.KEKType
 
 @Composable
 fun CeremonyScreen(
@@ -849,9 +849,9 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
                                 )
                                 Text(
                                     text = when (state.selectedKEKType) {
-                                        com.example.persistence.entities.KEKType.NONE -> "Operacional"
-                                        com.example.persistence.entities.KEKType.KEK_STORAGE -> "KEK Storage"
-                                        com.example.persistence.entities.KEKType.KEK_TRANSPORT -> "KEK Transporte"
+                                        com.vigatec.persistence.entities.KEKType.NONE -> "Operacional"
+                                        com.vigatec.persistence.entities.KEKType.KEK_STORAGE -> "KEK Storage"
+                                        com.vigatec.persistence.entities.KEKType.KEK_TRANSPORT -> "KEK Transporte"
                                         else -> "Operacional"
                                     },
                                     style = MaterialTheme.typography.labelMedium

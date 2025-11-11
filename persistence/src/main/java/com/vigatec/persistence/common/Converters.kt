@@ -1,7 +1,7 @@
-package com.example.persistence.common
+package com.vigatec.persistence.common
 
 import androidx.room.TypeConverter
-import com.example.persistence.entities.KeyConfiguration
+import com.vigatec.persistence.entities.KeyConfiguration
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 

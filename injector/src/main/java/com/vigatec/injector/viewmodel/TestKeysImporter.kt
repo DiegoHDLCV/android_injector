@@ -3,7 +3,7 @@ package com.vigatec.injector.viewmodel
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
-import com.example.persistence.repository.InjectedKeyRepository
+import com.vigatec.persistence.repository.InjectedKeyRepository
 import com.vigatec.utils.security.StorageKeyManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

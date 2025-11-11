@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.persistence.entities.InjectionLogEntity
+import com.vigatec.persistence.entities.InjectionLogEntity
 import com.vigatec.injector.viewmodel.LogsViewModel
 import java.text.SimpleDateFormat
 import java.util.*

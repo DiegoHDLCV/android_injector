@@ -2,8 +2,8 @@ package com.vigatec.injector.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.persistence.entities.InjectionLogEntity
-import com.example.persistence.repository.InjectionLogRepository
+import com.vigatec.persistence.entities.InjectionLogEntity
+import com.vigatec.persistence.repository.InjectionLogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

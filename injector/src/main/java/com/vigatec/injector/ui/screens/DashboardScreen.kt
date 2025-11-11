@@ -33,7 +33,7 @@ import com.vigatec.injector.ui.components.StatCardSkeleton
 import com.vigatec.injector.viewmodel.DashboardState
 import com.vigatec.injector.viewmodel.DashboardViewModel
 import com.vigatec.injector.viewmodel.SystemStats
-import com.example.communication.polling.CommLogEntry
+import com.vigatec.communication.polling.CommLogEntry
 
 private data class QuickActionMeta(
     val title: String,

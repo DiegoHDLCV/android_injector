@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.persistence.entities.ProfileEntity
+import com.vigatec.persistence.entities.ProfileEntity
 import com.vigatec.injector.viewmodel.InjectionStatus
 import com.vigatec.injector.viewmodel.KeyInjectionState
 import com.vigatec.injector.viewmodel.KeyInjectionViewModel

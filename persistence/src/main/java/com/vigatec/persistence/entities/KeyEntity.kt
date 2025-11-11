@@ -1,8 +1,8 @@
-package com.example.persistence.entities
+package com.vigatec.persistence.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.example.persistence.common.Identifiable
+import com.vigatec.persistence.common.Identifiable
 
 @Entity(tableName = "key")
 data class KeyEntity(

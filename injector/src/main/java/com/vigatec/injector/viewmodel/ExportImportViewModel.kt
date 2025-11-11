@@ -4,8 +4,8 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.persistence.entities.InjectedKeyEntity
-import com.example.persistence.repository.InjectedKeyRepository
+import com.vigatec.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.repository.InjectedKeyRepository
 import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.utils.security.ExportKeyData
 import com.vigatec.utils.security.KeyExportManager

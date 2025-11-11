@@ -1,9 +1,9 @@
 // Archivo: com/example/persistence/dao/InjectedKeyDao.kt
 
-package com.example.persistence.dao
+package com.vigatec.persistence.dao
 
 import androidx.room.*
-import com.example.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.entities.InjectedKeyEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

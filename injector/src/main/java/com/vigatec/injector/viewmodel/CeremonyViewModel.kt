@@ -2,8 +2,8 @@ package com.vigatec.injector.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.persistence.repository.InjectedKeyRepository
-import com.example.persistence.entities.KEKType
+import com.vigatec.persistence.repository.InjectedKeyRepository
+import com.vigatec.persistence.entities.KEKType
 import com.vigatec.utils.security.StorageKeyManager
 import com.vigatec.utils.KcvCalculator
 import com.vigatec.utils.KeyStoreManager

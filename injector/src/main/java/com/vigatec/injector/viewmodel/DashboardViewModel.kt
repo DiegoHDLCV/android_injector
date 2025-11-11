@@ -4,11 +4,11 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.communication.libraries.CommunicationSDKManager
-import com.example.communication.polling.PollingService
-import com.example.communication.polling.CommLog
-import com.example.persistence.repository.InjectedKeyRepository
-import com.example.persistence.repository.ProfileRepository
+import com.vigatec.communication.libraries.CommunicationSDKManager
+import com.vigatec.communication.polling.PollingService
+import com.vigatec.communication.polling.CommLog
+import com.vigatec.persistence.repository.InjectedKeyRepository
+import com.vigatec.persistence.repository.ProfileRepository
 import com.vigatec.injector.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +30,7 @@ data class DashboardState(
     val isLoading: Boolean = true,
     val isSubPosConnected: Boolean = false,
     val isPollingActive: Boolean = false,
-    val commLogs: List<com.example.communication.polling.CommLogEntry> = emptyList()
+    val commLogs: List<com.vigatec.communication.polling.CommLogEntry> = emptyList()
 )
 
 @HiltViewModel

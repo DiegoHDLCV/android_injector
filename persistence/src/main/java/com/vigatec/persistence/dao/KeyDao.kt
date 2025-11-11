@@ -1,11 +1,11 @@
-package com.example.persistence.dao
+package com.vigatec.persistence.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
-import com.example.persistence.entities.KeyEntity
+import com.vigatec.persistence.entities.KeyEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao

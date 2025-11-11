@@ -2,11 +2,11 @@ package com.vigatec.injector.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.persistence.entities.InjectedKeyEntity
-import com.example.persistence.entities.KeyConfiguration
-import com.example.persistence.entities.ProfileEntity
-import com.example.persistence.repository.InjectedKeyRepository
-import com.example.persistence.repository.ProfileRepository
+import com.vigatec.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.entities.KeyConfiguration
+import com.vigatec.persistence.entities.ProfileEntity
+import com.vigatec.persistence.repository.InjectedKeyRepository
+import com.vigatec.persistence.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow

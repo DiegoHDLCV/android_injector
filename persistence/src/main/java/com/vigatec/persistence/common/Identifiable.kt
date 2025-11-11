@@ -1,4 +1,4 @@
-package com.example.persistence.common
+package com.vigatec.persistence.common
 
 interface Identifiable {
     // Cambiado de Any? a Long para mayor especificidad

@@ -1,7 +1,7 @@
-package com.example.persistence.repository
+package com.vigatec.persistence.repository
 
-import com.example.persistence.dao.KeyDao
-import com.example.persistence.entities.KeyEntity
+import com.vigatec.persistence.dao.KeyDao
+import com.vigatec.persistence.entities.KeyEntity
 import com.vigatec.utils.enums.Role
 import javax.inject.Inject
 import javax.inject.Singleton

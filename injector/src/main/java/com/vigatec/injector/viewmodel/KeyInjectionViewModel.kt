@@ -3,21 +3,21 @@ package com.vigatec.injector.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.communication.base.EnumCommConfBaudRate
-import com.example.communication.base.EnumCommConfDataBits
-import com.example.communication.base.EnumCommConfParity
-import com.example.communication.base.IComController
-import com.example.communication.libraries.CommunicationSDKManager
-import com.example.config.CommProtocol
-import com.example.config.SystemConfig
-import com.example.format.*
-import com.example.format.base.IMessageFormatter
-import com.example.format.base.IMessageParser
-import com.example.persistence.entities.InjectedKeyEntity
-import com.example.persistence.entities.KeyConfiguration
-import com.example.persistence.entities.ProfileEntity
-import com.example.persistence.repository.InjectedKeyRepository
-import com.example.persistence.repository.ProfileRepository
+import com.vigatec.communication.base.EnumCommConfBaudRate
+import com.vigatec.communication.base.EnumCommConfDataBits
+import com.vigatec.communication.base.EnumCommConfParity
+import com.vigatec.communication.base.IComController
+import com.vigatec.communication.libraries.CommunicationSDKManager
+import com.vigatec.config.CommProtocol
+import com.vigatec.config.SystemConfig
+import com.vigatec.format.*
+import com.vigatec.format.base.IMessageFormatter
+import com.vigatec.format.base.IMessageParser
+import com.vigatec.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.entities.KeyConfiguration
+import com.vigatec.persistence.entities.ProfileEntity
+import com.vigatec.persistence.repository.InjectedKeyRepository
+import com.vigatec.persistence.repository.ProfileRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -75,7 +75,7 @@ class KeyInjectionViewModel @Inject constructor(
     private val connectionMutex = Mutex()
     
     // Instancia del servicio de polling
-    private val pollingService = com.example.communication.polling.PollingService()
+    private val pollingService = com.vigatec.communication.polling.PollingService()
     
     // Username del usuario actual para los logs
     private var currentUsername: String = "system"

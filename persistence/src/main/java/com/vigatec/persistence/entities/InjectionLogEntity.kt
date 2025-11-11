@@ -1,6 +1,6 @@
 // file: com/example/persistence/entities/InjectionLogEntity.kt
 
-package com.example.persistence.entities
+package com.vigatec.persistence.entities
 
 import androidx.room.Entity
 import androidx.room.Index

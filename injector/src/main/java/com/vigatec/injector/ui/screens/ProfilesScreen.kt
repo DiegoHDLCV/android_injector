@@ -35,16 +35,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.persistence.entities.InjectedKeyEntity
-import com.example.persistence.entities.KeyConfiguration
-import com.example.persistence.entities.ProfileEntity
+import com.vigatec.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.entities.KeyConfiguration
+import com.vigatec.persistence.entities.ProfileEntity
 import com.vigatec.injector.ui.components.ProfileCardSkeleton
 import com.vigatec.injector.viewmodel.ProfileFormData
 import com.vigatec.injector.viewmodel.ProfileViewModel
 import com.vigatec.injector.viewmodel.KeyInjectionViewModel
 import com.vigatec.injector.viewmodel.InjectionStatus
-import com.example.config.SystemConfig
-import com.example.config.EnumManufacturer
+import com.vigatec.config.SystemConfig
+import com.vigatec.config.EnumManufacturer
 import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)

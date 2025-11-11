@@ -1,9 +1,9 @@
 package com.vigatec.injector
 
 import android.app.Application
-import com.example.config.SystemConfig
-import com.example.config.DeviceRole
-import com.example.communication.usb.UsbModeManager
+import com.vigatec.config.SystemConfig
+import com.vigatec.config.DeviceRole
+import com.vigatec.communication.usb.UsbModeManager
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp

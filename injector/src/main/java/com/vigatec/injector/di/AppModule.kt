@@ -5,7 +5,7 @@ import android.util.Log
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.example.persistence.dao.InjectionLogDao
+import com.vigatec.persistence.dao.InjectionLogDao
 import com.vigatec.injector.data.local.dao.PermissionDao
 import com.vigatec.injector.data.local.database.AppDatabase
 import com.vigatec.injector.data.local.entity.User

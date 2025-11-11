@@ -3,8 +3,8 @@ package com.vigatec.injector.data.local.database
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.example.persistence.dao.InjectionLogDao
-import com.example.persistence.entities.InjectionLogEntity
+import com.vigatec.persistence.dao.InjectionLogDao
+import com.vigatec.persistence.entities.InjectionLogEntity
 import com.vigatec.injector.data.local.dao.PermissionDao
 import com.vigatec.injector.data.local.dao.UserDao
 import com.vigatec.injector.data.local.entity.Permission

@@ -1,7 +1,7 @@
 package com.vigatec.injector.manager
 
 import android.util.Log
-import com.example.persistence.repository.InjectedKeyRepository
+import com.vigatec.persistence.repository.InjectedKeyRepository
 import com.vigatec.utils.KeyStoreManager
 import com.vigatec.utils.KcvCalculator
 import kotlinx.coroutines.Dispatchers

@@ -1,7 +1,7 @@
-package com.example.persistence.repository
+package com.vigatec.persistence.repository
 
-import com.example.persistence.dao.ProfileDao
-import com.example.persistence.entities.ProfileEntity
+import com.vigatec.persistence.dao.ProfileDao
+import com.vigatec.persistence.entities.ProfileEntity
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton

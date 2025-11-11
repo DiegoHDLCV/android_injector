@@ -1,17 +1,17 @@
 // file: com/example/persistence/AppDatabase.kt
 
-package com.example.persistence
+package com.vigatec.persistence
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
-import com.example.persistence.common.Converters
-import com.example.persistence.dao.InjectedKeyDao
-import com.example.persistence.dao.KeyDao
-import com.example.persistence.dao.ProfileDao
-import com.example.persistence.entities.InjectedKeyEntity
-import com.example.persistence.entities.KeyEntity
-import com.example.persistence.entities.ProfileEntity
+import com.vigatec.persistence.common.Converters
+import com.vigatec.persistence.dao.InjectedKeyDao
+import com.vigatec.persistence.dao.KeyDao
+import com.vigatec.persistence.dao.ProfileDao
+import com.vigatec.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.entities.KeyEntity
+import com.vigatec.persistence.entities.ProfileEntity
 
 /**
  * La clase principal de la base de datos para la app.

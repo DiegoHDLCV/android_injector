@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.entities.InjectedKeyEntity
 import com.vigatec.injector.viewmodel.KeyVaultViewModel
 import com.vigatec.injector.viewmodel.KeyWithProfiles
 import java.text.SimpleDateFormat

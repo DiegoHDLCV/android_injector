@@ -1,4 +1,4 @@
-package com.example.persistence.entities
+package com.vigatec.persistence.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

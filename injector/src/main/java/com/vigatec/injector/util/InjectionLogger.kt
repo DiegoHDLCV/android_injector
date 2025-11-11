@@ -1,7 +1,7 @@
 package com.vigatec.injector.util
 
-import com.example.persistence.entities.InjectionLogEntity
-import com.example.persistence.repository.InjectionLogRepository
+import com.vigatec.persistence.entities.InjectionLogEntity
+import com.vigatec.persistence.repository.InjectionLogRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

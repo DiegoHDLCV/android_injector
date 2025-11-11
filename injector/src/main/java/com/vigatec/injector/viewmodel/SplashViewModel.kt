@@ -6,7 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vigatec.injector.ui.navigation.Screen
 import com.vigatec.injector.ui.events.UiEvent
-import com.example.manufacturer.di.SDKInitManager
+import com.vigatec.manufacturer.di.SDKInitManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
