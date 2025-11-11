@@ -7,8 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.vigatec.keyreceiver.ui.events.UiEvent
 import com.vigatec.keyreceiver.ui.navigation.Routes
 // SOLO necesitas importar SDKInitManager (y PedException para el catch)
-import com.example.manufacturer.base.controllers.ped.PedException // Ajusta la ruta
-import com.example.manufacturer.di.SDKInitManager
+import com.vigatec.manufacturer.base.controllers.ped.PedException // Ajusta la ruta
+import com.vigatec.manufacturer.di.SDKInitManager
 
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers

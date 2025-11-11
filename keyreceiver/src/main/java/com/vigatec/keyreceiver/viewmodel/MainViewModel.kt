@@ -4,26 +4,26 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.communication.base.EnumCommConfBaudRate
-import com.example.communication.base.EnumCommConfDataBits
-import com.example.communication.base.EnumCommConfParity
-import com.example.communication.base.IComController
-import com.example.communication.libraries.CommunicationSDKManager
-import com.example.communication.libraries.aisino.AisinoCommunicationManager
-import com.example.config.CommProtocol
-import com.example.config.SystemConfig
-import com.example.format.*
-import com.example.format.base.IMessageFormatter
-import com.example.format.base.IMessageParser
-import com.example.manufacturer.KeySDKManager
-import com.example.manufacturer.base.controllers.ped.IPedController
-import com.example.manufacturer.base.controllers.ped.PedKeyException
-import com.example.manufacturer.base.models.KeyAlgorithm
-import com.example.manufacturer.base.models.KeyAlgorithm as GenericKeyAlgorithm
-import com.example.manufacturer.base.models.PedKeyData
-import com.example.persistence.repository.InjectedKeyRepository
+import com.vigatec.communication.base.EnumCommConfBaudRate
+import com.vigatec.communication.base.EnumCommConfDataBits
+import com.vigatec.communication.base.EnumCommConfParity
+import com.vigatec.communication.base.IComController
+import com.vigatec.communication.libraries.CommunicationSDKManager
+import com.vigatec.communication.libraries.aisino.AisinoCommunicationManager
+import com.vigatec.config.CommProtocol
+import com.vigatec.config.SystemConfig
+import com.vigatec.format.*
+import com.vigatec.format.base.IMessageFormatter
+import com.vigatec.format.base.IMessageParser
+import com.vigatec.manufacturer.KeySDKManager
+import com.vigatec.manufacturer.base.controllers.ped.IPedController
+import com.vigatec.manufacturer.base.controllers.ped.PedKeyException
+import com.vigatec.manufacturer.base.models.KeyAlgorithm
+import com.vigatec.manufacturer.base.models.KeyAlgorithm as GenericKeyAlgorithm
+import com.vigatec.manufacturer.base.models.PedKeyData
+import com.vigatec.persistence.repository.InjectedKeyRepository
 import com.vigatec.keyreceiver.ui.events.UiEvent
-import com.example.communication.polling.CommLog
+import com.vigatec.communication.polling.CommLog
 import com.vigatec.utils.FormatUtils
 import com.vigatec.keyreceiver.util.UsbCableDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -40,7 +40,7 @@ import kotlinx.coroutines.sync.withLock
 import java.nio.charset.Charset
 import javax.inject.Inject
 
-import com.example.manufacturer.base.models.KeyType as GenericKeyType
+import com.vigatec.manufacturer.base.models.KeyType as GenericKeyType
 import java.util.UUID
 
 enum class ConnectionStatus {
@@ -674,7 +674,7 @@ class MainViewModel @Inject constructor(
 
                     // Llamar al método específico de DUKPT TR-31
                     val currentPedController = pedController
-                    if (currentPedController is com.example.manufacturer.libraries.newpos.wrapper.NewposPedController) {
+                    if (currentPedController is com.vigatec.manufacturer.libraries.newpos.wrapper.NewposPedController) {
                         currentPedController.writeDukptIPEK(
                             kbpkIndex = kbpkSlot,
                             ipekIndex = command.keySlot,
@@ -1247,11 +1247,24 @@ class MainViewModel @Inject constructor(
                                 _snackbarEvent.emit("Cable USB detectado. Pulse 'Iniciar Escucha' para comenzar.")
                             } else {
                                 Log.w(TAG, "⚠️ CABLE USB DESCONECTADO (confirmado $HYSTERESIS_THRESHOLD veces)")
-                                CommLog.w(TAG, "⚠️ CABLE USB DESCONECTADO - Pero listening continúa activo")
-                                // 🔴 CRÍTICO: NO cancelar el listening automáticamente
-                                // La detección de cable USB Aisino puede ser inconsistente/falsos positivos
-                                // Permitir que el listening continúe esperando datos
-                                // El usuario puede detener manualmente si es necesario
+                                CommLog.w(TAG, "⚠️ CABLE USB DESCONECTADO")
+                                
+                                // Si está escuchando o en cualquier estado activo, detener automáticamente
+                                val currentStatus = _connectionStatus.value
+                                if (currentStatus == ConnectionStatus.LISTENING ||
+                                    currentStatus == ConnectionStatus.INITIALIZING ||
+                                    currentStatus == ConnectionStatus.OPENING) {
+                                    Log.i(TAG, "║ 🔴 Deteniendo escucha automáticamente por desconexión del cable")
+                                    CommLog.i(TAG, "🔴 Deteniendo escucha automáticamente por desconexión del cable")
+                                    viewModelScope.launch {
+                                        connectionMutex.withLock {
+                                            stopListeningInternal()
+                                        }
+                                    }
+                                    _snackbarEvent.emit("Cable desconectado. Escucha detenida automáticamente.")
+                                } else {
+                                    CommLog.d(TAG, "Cable desconectado pero no hay escucha activa")
+                                }
                             }
                         } else {
                             // Registro de transición pendiente (no se hizo el cambio aún)

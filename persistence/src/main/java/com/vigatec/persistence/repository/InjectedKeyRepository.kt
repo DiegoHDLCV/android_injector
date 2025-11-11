@@ -5,6 +5,8 @@ package com.vigatec.persistence.repository
 import android.util.Log
 import com.vigatec.persistence.dao.InjectedKeyDao
 import com.vigatec.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.model.DeletionReason
+import com.vigatec.persistence.model.KeyDeletionValidation
 import com.vigatec.utils.security.StorageKeyManager
 import com.vigatec.utils.security.EncryptedKeyData
 import javax.inject.Inject
@@ -14,7 +16,8 @@ import kotlinx.coroutines.flow.map
 
 @Singleton
 class InjectedKeyRepository @Inject constructor(
-    private val injectedKeyDao: InjectedKeyDao
+    private val injectedKeyDao: InjectedKeyDao,
+    private val profileRepository: ProfileRepository
 ) {
     private val TAG = "InjectedKeyRepository"
 
@@ -292,6 +295,76 @@ class InjectedKeyRepository @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "Error deleting key by entity", e)
             throw e
+        }
+    }
+
+    /**
+     * Valida si una llave puede ser eliminada de forma segura.
+     *
+     * Verifica:
+     * 1. Si la llave está siendo usada en algún perfil
+     * 2. Si la llave es la KEK Storage activa
+     * 3. Si la llave es la KTK activa
+     *
+     * @param key La llave a validar para eliminación
+     * @return Validación con resultado y razón si no se puede eliminar
+     */
+    suspend fun validateKeyDeletion(key: InjectedKeyEntity): KeyDeletionValidation {
+        return try {
+            Log.d(TAG, "=== VALIDANDO ELIMINACIÓN DE LLAVE ===")
+            Log.d(TAG, "KCV: ${key.kcv}, ID: ${key.id}, Tipo: ${key.keyType}")
+
+            // 1. Verificar si está en perfiles
+            val assignedProfiles = profileRepository.getProfileNamesByKeyKcv(key.kcv)
+            Log.d(TAG, "Perfiles asignados: ${assignedProfiles.size}")
+            assignedProfiles.forEach { Log.d(TAG, "  - Perfil: $it") }
+
+            // 2. Verificar si es KEK Storage activa
+            val isActiveKEKStorage = key.isKEKStorage() && key.status == "ACTIVE"
+            Log.d(TAG, "¿Es KEK Storage activa?: $isActiveKEKStorage")
+
+            // 3. Verificar si es KTK activa
+            val currentKTK = getCurrentKTK()
+            val isActiveKTK = currentKTK?.kcv == key.kcv && currentKTK.status == "ACTIVE"
+            Log.d(TAG, "¿Es KTK activa?: $isActiveKTK")
+
+            // Determinar si se puede eliminar
+            val (canDelete, reason) = when {
+                assignedProfiles.isNotEmpty() && (isActiveKEKStorage || isActiveKTK) -> {
+                    Pair(false, DeletionReason.MULTIPLE_USES)
+                }
+                assignedProfiles.isNotEmpty() -> {
+                    Pair(false, DeletionReason.IN_USE_BY_PROFILES)
+                }
+                isActiveKEKStorage -> {
+                    Pair(false, DeletionReason.IS_ACTIVE_KEK_STORAGE)
+                }
+                isActiveKTK -> {
+                    Pair(false, DeletionReason.IS_ACTIVE_KTK)
+                }
+                else -> {
+                    Pair(true, DeletionReason.OK)
+                }
+            }
+
+            Log.d(TAG, "Resultado: canDelete=$canDelete, reason=$reason")
+            Log.d(TAG, "=== FIN VALIDACIÓN ===")
+
+            KeyDeletionValidation(
+                canDelete = canDelete,
+                reason = reason,
+                assignedProfiles = assignedProfiles,
+                isActiveKEKStorage = isActiveKEKStorage,
+                isActiveKTK = isActiveKTK
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error validando eliminación de llave KCV=${key.kcv}", e)
+            // En caso de error, no permitir eliminación por seguridad
+            KeyDeletionValidation(
+                canDelete = false,
+                reason = DeletionReason.OK,
+                assignedProfiles = emptyList()
+            )
         }
     }
 

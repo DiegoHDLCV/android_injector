@@ -47,7 +47,10 @@
       "Bash(keyreceiver/src/main/res/xml/device_filter.xml)",
       "Bash(git push:*)",
       "WebFetch(domain:100.65.127.12)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []

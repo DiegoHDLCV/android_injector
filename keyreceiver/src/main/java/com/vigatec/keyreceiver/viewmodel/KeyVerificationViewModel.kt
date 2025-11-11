@@ -4,11 +4,11 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.manufacturer.KeySDKManager
-import com.example.manufacturer.base.controllers.ped.IPedController
-import com.example.manufacturer.base.controllers.ped.PedKeyException
-import com.example.manufacturer.base.models.KeyAlgorithm
-import com.example.manufacturer.base.models.KeyType
+import com.vigatec.manufacturer.KeySDKManager
+import com.vigatec.manufacturer.base.controllers.ped.IPedController
+import com.vigatec.manufacturer.base.controllers.ped.PedKeyException
+import com.vigatec.manufacturer.base.models.KeyAlgorithm
+import com.vigatec.manufacturer.base.models.KeyType
 import com.vigatec.keyreceiver.data.InstalledKey
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers

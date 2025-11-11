@@ -3,8 +3,8 @@ package com.vigatec.keyreceiver.util
 import android.content.Context
 import android.hardware.usb.UsbManager
 import android.util.Log
-import com.example.communication.polling.CommLog
-import com.example.communication.libraries.ch340.CH340CableDetector
+import com.vigatec.communication.polling.CommLog
+import com.vigatec.communication.libraries.ch340.CH340CableDetector
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File

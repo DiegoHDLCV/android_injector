@@ -28,6 +28,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.components.ActivityComponent
+import com.vigatec.injector.data.local.preferences.SessionManager
 
 @EntryPoint
 @InstallIn(ActivityComponent::class)
@@ -35,9 +36,22 @@ interface PermissionProviderEntryPoint {
     fun permissionProvider(): PermissionProvider
 }
 
+@EntryPoint
+@InstallIn(ActivityComponent::class)
+interface SessionManagerEntryPoint {
+    fun sessionManager(): SessionManager
+}
+
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val sessionManager = remember {
+        EntryPointAccessors.fromActivity(
+            context as android.app.Activity,
+            SessionManagerEntryPoint::class.java
+        ).sessionManager()
+    }
     var currentUsername by remember { mutableStateOf("") }
 
     NavHost(
@@ -98,9 +112,22 @@ fun AppNavigation() {
                     PermissionProviderEntryPoint::class.java
                 ).permissionProvider()
             }
-            
+
+            var usernameForConfig by remember { mutableStateOf(currentUsername) }
+
+            // Obtener el username de SessionManager si currentUsername está vacío
+            LaunchedEffect(currentUsername) {
+                if (currentUsername.isEmpty()) {
+                    sessionManager.getLoggedUsername().collect { username ->
+                        usernameForConfig = username ?: ""
+                    }
+                } else {
+                    usernameForConfig = currentUsername
+                }
+            }
+
             ConfigScreen(
-                currentUsername = currentUsername,
+                currentUsername = usernameForConfig,
                 permissionProvider = permissionProvider,
                 onNavigateToLogs = {
                     navController.navigate(Screen.Logs.route)

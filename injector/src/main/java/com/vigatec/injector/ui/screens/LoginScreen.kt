@@ -225,7 +225,7 @@ fun LoginScreen(
                             onClick = {
                                 // Auto-fill admin credentials and login
                                 loginViewModel.onUsernameChange("admin")
-                                loginViewModel.onPasswordChange("admin")
+                                loginViewModel.onPasswordChange("Vigatec2025@@@@@@")
                                 // Small delay to ensure state updates before login
                                 focusManager.clearFocus()
                                 loginViewModel.login()

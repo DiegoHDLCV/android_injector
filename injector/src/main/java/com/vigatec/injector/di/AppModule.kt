@@ -58,7 +58,7 @@ object AppModule {
                         // Usuario admin predeterminado
                         val adminUser = User(
                             username = "admin",
-                            pass = "admin",
+                            pass = "Vigatec2025@@@@@@",
                             role = "ADMIN",
                             fullName = "Administrador",
                             isActive = true  // IMPORTANTE: Usuario activo por defecto
@@ -75,7 +75,7 @@ object AppModule {
                         // Usuario dev para desarrollo y pruebas
                         val devUser = User(
                             username = "dev",
-                            pass = "dev",
+                            pass = "Vigatec2025@@@@@@",
                             role = "ADMIN",
                             fullName = "Desarrollador",
                             isActive = true  // IMPORTANTE: Usuario activo por defecto
@@ -108,6 +108,32 @@ object AppModule {
                 Log.d(TAG, "NOTA: isActive controla el acceso (habilitado/deshabilitado)")
                 Log.d(TAG, "      Los admins pueden activar/desactivar usuarios desde Gestión")
                 Log.d(TAG, "─────────────────────────────────────────────────────────────")
+
+                // Actualizar contraseñas de usuarios existentes si están desactualizado
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val userDao = userDaoProvider.get()
+                        val newPassword = "Vigatec2025@@@@@@"
+
+                        // Actualizar usuario admin si existe
+                        val adminUser = userDao.findByUsername("admin")
+                        if (adminUser != null && adminUser.pass != newPassword) {
+                            Log.i(TAG, "Actualizando contraseña del usuario ADMIN...")
+                            userDao.updateUserPassword(adminUser.id, newPassword)
+                            Log.i(TAG, "✓ Contraseña del usuario ADMIN actualizada")
+                        }
+
+                        // Actualizar usuario dev si existe
+                        val devUser = userDao.findByUsername("dev")
+                        if (devUser != null && devUser.pass != newPassword) {
+                            Log.i(TAG, "Actualizando contraseña del usuario DEV...")
+                            userDao.updateUserPassword(devUser.id, newPassword)
+                            Log.i(TAG, "✓ Contraseña del usuario DEV actualizada")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error al actualizar contraseñas de usuarios", e)
+                    }
+                }
             }
         }).build()
     }

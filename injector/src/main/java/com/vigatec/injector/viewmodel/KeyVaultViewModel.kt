@@ -33,7 +33,10 @@ data class KeyVaultState(
     val isAdmin: Boolean = false,     // Flag rápido para verificar si es admin
     val showKEKStoragePasswordDialog: Boolean = false,  // Diálogo para pedir contraseña antes de mostrar KEK Storage
     val showKEKStorage: Boolean = false,  // Flag para mostrar/ocultar KEK Storage
-    val kekStoragePasswordError: String? = null  // Error de contraseña al mostrar KEK Storage
+    val kekStoragePasswordError: String? = null,  // Error de contraseña al mostrar KEK Storage
+    val showKeyDeletionValidationDialog: Boolean = false,  // Diálogo de validación de eliminación
+    val keyDeletionValidation: com.vigatec.persistence.model.KeyDeletionValidation? = null,  // Resultado de validación
+    val deletionError: String? = null  // Mensaje de error al validar
 )
 
 @HiltViewModel
@@ -134,22 +137,54 @@ class KeyVaultViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // Si es KEK Storage, también eliminar del Android Keystore
-                if (key.isKEKStorage()) {
-                    Log.w(TAG, "Eliminando KEK Storage del Android Keystore...")
-                    StorageKeyManager.deleteStorageKEK()
-                    Log.d(TAG, "✓ KEK Storage eliminada del Keystore")
+                Log.d(TAG, "Iniciando proceso de eliminación para llave KCV=${key.kcv}")
+
+                // Validar antes de eliminar
+                val validation = injectedKeyRepository.validateKeyDeletion(key)
+
+                if (!validation.canDelete) {
+                    Log.w(TAG, "Eliminación bloqueada: ${validation.reason}")
+                    _uiState.value = _uiState.value.copy(
+                        showKeyDeletionValidationDialog = true,
+                        keyDeletionValidation = validation,
+                        selectedKey = key
+                    )
+                    return@launch
                 }
 
-                // Eliminar de la base de datos
-                injectedKeyRepository.deleteKey(key)
-                Log.d(TAG, "✓ Llave eliminada de la base de datos")
+                // Si la validación fue exitosa, proceder a eliminar
+                Log.d(TAG, "Validación exitosa, procediendo a eliminar llave")
+                performKeyDeletion(key)
 
-                loadKeys() // Recargar
             } catch (e: Exception) {
-                Log.e(TAG, "Error al eliminar llave", e)
-                e.printStackTrace()
+                Log.e(TAG, "Error al validar eliminación de llave", e)
+                _uiState.value = _uiState.value.copy(
+                    deletionError = "Error al validar: ${e.message}"
+                )
             }
+        }
+    }
+
+    /**
+     * Realiza la eliminación real de la llave después de validación exitosa
+     */
+    private suspend fun performKeyDeletion(key: InjectedKeyEntity) {
+        try {
+            // Si es KEK Storage, también eliminar del Android Keystore
+            if (key.isKEKStorage()) {
+                Log.w(TAG, "Eliminando KEK Storage del Android Keystore...")
+                StorageKeyManager.deleteStorageKEK()
+                Log.d(TAG, "✓ KEK Storage eliminada del Keystore")
+            }
+
+            // Eliminar de la base de datos
+            injectedKeyRepository.deleteKey(key)
+            Log.d(TAG, "✓ Llave eliminada de la base de datos (KCV=${key.kcv})")
+
+            loadKeys() // Recargar
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al eliminar llave", e)
+            e.printStackTrace()
         }
     }
 
@@ -198,6 +233,18 @@ class KeyVaultViewModel @Inject constructor(
 
     fun onDismissDeleteModal() {
         _uiState.value = _uiState.value.copy(showDeleteModal = false, selectedKey = null)
+    }
+
+    /**
+     * Cierra el diálogo de validación de eliminación
+     */
+    fun onDismissKeyDeletionValidationDialog() {
+        _uiState.value = _uiState.value.copy(
+            showKeyDeletionValidationDialog = false,
+            keyDeletionValidation = null,
+            deletionError = null,
+            selectedKey = null
+        )
     }
 
     /**

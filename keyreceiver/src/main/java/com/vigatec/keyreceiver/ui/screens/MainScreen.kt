@@ -22,8 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
-import com.example.config.CommProtocol
-import com.example.config.SystemConfig
+import com.vigatec.config.CommProtocol
+import com.vigatec.config.SystemConfig
 import com.vigatec.keyreceiver.ui.Navigator
 import com.vigatec.keyreceiver.ui.components.InjectionFeedCard
 import com.vigatec.keyreceiver.ui.events.UiEvent

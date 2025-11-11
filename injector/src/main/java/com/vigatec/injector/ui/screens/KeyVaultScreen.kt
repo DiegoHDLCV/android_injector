@@ -202,6 +202,14 @@ fun KeyVaultScreen(
             onDismiss = { viewModel.onDismissKEKStoragePasswordDialog() }
         )
     }
+
+    // Diálogo de validación de eliminación
+    if (state.showKeyDeletionValidationDialog && state.keyDeletionValidation != null) {
+        KeyDeletionValidationDialog(
+            validation = state.keyDeletionValidation!!,
+            onDismiss = { viewModel.onDismissKeyDeletionValidationDialog() }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -676,4 +684,160 @@ fun KEKStoragePasswordDialog(
             }
         }
     )
+}
+
+/**
+ * Diálogo que muestra la validación fallida de eliminación de una llave.
+ * Indica por qué no se puede eliminar y en qué perfiles está siendo usada.
+ */
+@Composable
+fun KeyDeletionValidationDialog(
+    validation: com.vigatec.persistence.model.KeyDeletionValidation,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "No se puede eliminar",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text("No se puede eliminar la llave")
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Título del motivo
+                Text(
+                    text = getMotivoEliminacion(validation.reason),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+
+                // Detalles específicos según la razón
+                when (validation.reason) {
+                    com.vigatec.persistence.model.DeletionReason.IN_USE_BY_PROFILES -> {
+                        Text(
+                            "Esta llave está asignada a los siguientes perfil(es):",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            validation.assignedProfiles.forEach { profileName ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text("•", fontWeight = FontWeight.Bold)
+                                    Text(
+                                        profileName,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            "Elimine esta llave de los perfiles antes de continuar.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    com.vigatec.persistence.model.DeletionReason.IS_ACTIVE_KEK_STORAGE -> {
+                        Text(
+                            "Esta llave es la KEK Storage activa.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            "Se usa para cifrar otras llaves. Primero debe establecer una nueva KEK Storage.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    com.vigatec.persistence.model.DeletionReason.IS_ACTIVE_KTK -> {
+                        Text(
+                            "Esta llave es la KTK (Key Transport Key) activa.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            "Se usa para transportar llaves. Primero debe establecer una nueva KTK.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    com.vigatec.persistence.model.DeletionReason.MULTIPLE_USES -> {
+                        Text(
+                            "Esta llave está siendo usada en múltiples contextos:",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium
+                        )
+                        if (validation.assignedProfiles.isNotEmpty()) {
+                            Text("• Asignada a ${validation.assignedProfiles.size} perfil(es)", style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (validation.isActiveKEKStorage) {
+                            Text("• Es la KEK Storage activa", style = MaterialTheme.typography.bodySmall)
+                        }
+                        if (validation.isActiveKTK) {
+                            Text("• Es la KTK activa", style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text(
+                            "Debe resolver todos estos usos antes de eliminar.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    else -> {
+                        Text(
+                            "No se puede eliminar esta llave debido a inconsistencias de datos.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Entendido")
+            }
+        }
+    )
+}
+
+/**
+ * Convierte el código de razón a un mensaje legible para el usuario
+ */
+private fun getMotivoEliminacion(reason: com.vigatec.persistence.model.DeletionReason): String {
+    return when (reason) {
+        com.vigatec.persistence.model.DeletionReason.IN_USE_BY_PROFILES ->
+            "Llave en uso en perfiles"
+        com.vigatec.persistence.model.DeletionReason.IS_ACTIVE_KEK_STORAGE ->
+            "KEK Storage activa"
+        com.vigatec.persistence.model.DeletionReason.IS_ACTIVE_KTK ->
+            "KTK activa"
+        com.vigatec.persistence.model.DeletionReason.MULTIPLE_USES ->
+            "Usos múltiples"
+        else ->
+            "Error de validación"
+    }
 } 

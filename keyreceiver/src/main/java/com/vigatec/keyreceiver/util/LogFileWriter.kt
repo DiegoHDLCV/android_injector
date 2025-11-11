@@ -2,7 +2,7 @@ package com.vigatec.keyreceiver.util
 
 import android.content.Context
 import android.os.Environment
-import com.example.communication.polling.CommLog
+import com.vigatec.communication.polling.CommLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

@@ -76,7 +76,7 @@ class DashboardViewModel @Inject constructor(
             ) { profiles, injectedKeys ->
                 // Calcular estadísticas en tiempo real
                 val profilesCount = profiles.size
-                val keysCount = injectedKeys.count { it.status == "SUCCESSFUL" }
+                val keysCount = injectedKeys.size // Contar todas las llaves almacenadas, sin filtrar por estado
                 val injectionsToday = injectedKeys.count { it.injectionTimestamp >= startOfDay }
                 val usersCount = userRepository.getUserCount()
 
