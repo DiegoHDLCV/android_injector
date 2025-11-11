@@ -548,11 +548,12 @@ fun ProfileCard(
                     )
                 }
 
-                // Título + descripción + meta
+                // Título + metadatos
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    // Nombre
                     Text(
                         text = profile.name,
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -560,76 +561,73 @@ fun ProfileCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    // Descripción (opcional)
                     if (profile.description.isNotBlank()) {
                         Text(
                             text = profile.description,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    // Fila de metadatos compactos
+                    // Fila de badges compactos
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
+                        // Badge dispositivo (fabricante) - COMPACTO
+                        val deviceEmoji = when (profile.deviceType) {
+                            "NEWPOS" -> "💻"
+                            else -> "🏭"
+                        }
+                        val deviceLabel = profile.deviceType.ifBlank { "AISINO" }
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "$deviceEmoji $deviceLabel",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+
                         // Badge tipo de aplicación
                         Surface(
                             color = appTypeConfig.color.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
                                 text = profile.applicationType,
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                 color = appTypeConfig.color,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                             )
                         }
 
                         // Contador de llaves
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Key,
                                 contentDescription = null,
-                                modifier = Modifier.size(14.dp),
+                                modifier = Modifier.size(12.dp),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
                                 text = "$readyKeys/$totalKeys",
-                                style = MaterialTheme.typography.labelSmall,
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
 
-                        // Estado (chip)
-                        Surface(
-                            color = statusColor.copy(alpha = 0.12f),
-                            shape = RoundedCornerShape(999.dp),
-                            border = BorderStroke(1.dp, statusColor.copy(alpha = 0.4f))
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(statusColor)
-                                )
-                                Text(
-                                    text = statusLabel,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
                     }
                 }
 
@@ -673,19 +671,17 @@ fun ProfileCard(
                             .clip(RoundedCornerShape(999.dp)),
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp),
+                        horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = if (isReady) "Listo" else "Pendiente",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
                             text = "${(progress * 100).toInt()}%",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
                         )
                     }
                 }
