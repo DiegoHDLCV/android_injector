@@ -32,6 +32,9 @@ data class ExportImportState(
     val exportSuccess: Boolean = false,
     val exportedFilePath: String = "",
     val exportedKeyCount: Int = 0,
+    val showAdminPasswordDialogForExport: Boolean = false,  // Diálogo para pedir contraseña de admin antes de exportar
+    val adminPasswordForExport: String = "",
+    val adminPasswordErrorForExport: String? = null,
 
     // Importación
     val importPassphrase: String = "",
@@ -41,6 +44,9 @@ data class ExportImportState(
     val importSuccess: Boolean = false,
     val importedKeyCount: Int = 0,
     val skippedDuplicates: Int = 0,
+    val showAdminPasswordDialogForImport: Boolean = false,  // Diálogo para pedir contraseña de admin antes de importar
+    val adminPasswordForImport: String = "",
+    val adminPasswordErrorForImport: String? = null,
 
     // Drag & Drop
     val isDraggingFile: Boolean = false,
@@ -58,7 +64,8 @@ data class ExportImportState(
 class ExportImportViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val injectedKeyRepository: InjectedKeyRepository,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val userRepository: com.vigatec.injector.repository.UserRepository
 ) : ViewModel() {
 
     companion object {
@@ -121,6 +128,68 @@ class ExportImportViewModel @Inject constructor(
     fun onToggleExportPassphraseVisibility() {
         _uiState.value = _uiState.value.copy(
             showExportPassphrase = !_uiState.value.showExportPassphrase
+        )
+    }
+
+    fun onRequestExport() {
+        // Primero pedir contraseña de administrador
+        _uiState.value = _uiState.value.copy(
+            showAdminPasswordDialogForExport = true,
+            adminPasswordForExport = "",
+            adminPasswordErrorForExport = null
+        )
+    }
+
+    fun onAdminPasswordEnteredForExport(password: String) {
+        viewModelScope.launch {
+            try {
+                val session = sessionManager.getCurrentSession()
+                if (session == null) {
+                    _uiState.value = _uiState.value.copy(
+                        adminPasswordErrorForExport = "No hay sesión activa"
+                    )
+                    return@launch
+                }
+
+                val (userId, _, _) = session
+                val user = userRepository.findById(userId.toInt())
+
+                if (user == null) {
+                    _uiState.value = _uiState.value.copy(
+                        adminPasswordErrorForExport = "Usuario no encontrado"
+                    )
+                    return@launch
+                }
+
+                // Verificar contraseña
+                if (user.pass != password) {
+                    _uiState.value = _uiState.value.copy(
+                        adminPasswordErrorForExport = "Contraseña incorrecta"
+                    )
+                    return@launch
+                }
+
+                // Contraseña correcta - proceder con exportación
+                _uiState.value = _uiState.value.copy(
+                    showAdminPasswordDialogForExport = false,
+                    adminPasswordForExport = password,
+                    adminPasswordErrorForExport = null
+                )
+                exportKeys()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error verificando contraseña de admin para exportar", e)
+                _uiState.value = _uiState.value.copy(
+                    adminPasswordErrorForExport = "Error al verificar contraseña: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun onDismissAdminPasswordDialogForExport() {
+        _uiState.value = _uiState.value.copy(
+            showAdminPasswordDialogForExport = false,
+            adminPasswordForExport = "",
+            adminPasswordErrorForExport = null
         )
     }
 
@@ -293,6 +362,76 @@ class ExportImportViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             selectedImportFile = filePath,
             errorMessage = null
+        )
+    }
+
+    fun onSelectFileFromBluetooth() {
+        // Abrir selector de archivos que incluye Bluetooth como opción
+        // Esto se manejará desde la UI usando un Intent
+        _uiState.value = _uiState.value.copy(
+            errorMessage = null
+        )
+    }
+
+    fun onRequestImport() {
+        // Primero pedir contraseña de administrador
+        _uiState.value = _uiState.value.copy(
+            showAdminPasswordDialogForImport = true,
+            adminPasswordForImport = "",
+            adminPasswordErrorForImport = null
+        )
+    }
+
+    fun onAdminPasswordEnteredForImport(password: String) {
+        viewModelScope.launch {
+            try {
+                val session = sessionManager.getCurrentSession()
+                if (session == null) {
+                    _uiState.value = _uiState.value.copy(
+                        adminPasswordErrorForImport = "No hay sesión activa"
+                    )
+                    return@launch
+                }
+
+                val (userId, _, _) = session
+                val user = userRepository.findById(userId.toInt())
+
+                if (user == null) {
+                    _uiState.value = _uiState.value.copy(
+                        adminPasswordErrorForImport = "Usuario no encontrado"
+                    )
+                    return@launch
+                }
+
+                // Verificar contraseña
+                if (user.pass != password) {
+                    _uiState.value = _uiState.value.copy(
+                        adminPasswordErrorForImport = "Contraseña incorrecta"
+                    )
+                    return@launch
+                }
+
+                // Contraseña correcta - proceder con importación
+                _uiState.value = _uiState.value.copy(
+                    showAdminPasswordDialogForImport = false,
+                    adminPasswordForImport = password,
+                    adminPasswordErrorForImport = null
+                )
+                importKeys()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error verificando contraseña de admin para importar", e)
+                _uiState.value = _uiState.value.copy(
+                    adminPasswordErrorForImport = "Error al verificar contraseña: ${e.message}"
+                )
+            }
+        }
+    }
+
+    fun onDismissAdminPasswordDialogForImport() {
+        _uiState.value = _uiState.value.copy(
+            showAdminPasswordDialogForImport = false,
+            adminPasswordForImport = "",
+            adminPasswordErrorForImport = null
         )
     }
 

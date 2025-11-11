@@ -3,6 +3,8 @@ package com.vigatec.injector.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -10,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -271,6 +274,9 @@ fun CreateUserDialog(
                     label = "Contraseña",
                     modifier = Modifier.fillMaxWidth()
                 )
+                
+                // Indicador de fortaleza de contraseña
+                PasswordStrengthIndicator(passphrase = password)
 
                 OutlinedTextField(
                     value = fullName,
@@ -434,7 +440,8 @@ fun ChangePasswordDialog(
         title = { Text("Cambiar Contraseña") },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
                 PasswordConfirmationFields(
                     password = newPassword,
@@ -446,6 +453,11 @@ fun ChangePasswordDialog(
                     modifier = Modifier.fillMaxWidth(),
                     showMismatchError = true
                 )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Indicador de fortaleza de contraseña
+                PasswordStrengthIndicator(passphrase = newPassword)
             }
         },
         confirmButton = {
@@ -462,4 +474,84 @@ fun ChangePasswordDialog(
             }
         }
     )
+}
+
+@Composable
+private fun PasswordStrengthIndicator(passphrase: String) {
+    val hasMinLength = passphrase.length >= 16
+    val hasUpperCase = passphrase.any { it.isUpperCase() }
+    val hasLowerCase = passphrase.any { it.isLowerCase() }
+    val hasDigit = passphrase.any { it.isDigit() }
+    val hasSpecial = passphrase.any { !it.isLetterOrDigit() }
+
+    val strength = listOf(hasMinLength, hasUpperCase, hasLowerCase, hasDigit, hasSpecial).count { it }
+    val strengthText = when {
+        strength < 3 -> "Débil"
+        strength < 4 -> "Media"
+        strength < 5 -> "Fuerte"
+        else -> "Muy fuerte"
+    }
+    val strengthColor = when {
+        strength < 3 -> MaterialTheme.colorScheme.error
+        strength < 4 -> Color(0xFFFFA726)
+        strength < 5 -> Color(0xFF66BB6A)
+        else -> Color(0xFF43A047)
+    }
+
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 8.dp)
+        ) {
+            Text(
+                text = "Fortaleza: ",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                text = strengthText,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = strengthColor
+            )
+        }
+
+        LinearProgressIndicator(
+            progress = { strength / 5f },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp),
+            color = strengthColor,
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Column(modifier = Modifier.padding(start = 8.dp)) {
+            CheckItem("Mínimo 16 caracteres", hasMinLength)
+            CheckItem("Mayúsculas", hasUpperCase)
+            CheckItem("Minúsculas", hasLowerCase)
+            CheckItem("Números", hasDigit)
+            CheckItem("Caracteres especiales", hasSpecial)
+        }
+    }
+}
+
+@Composable
+private fun CheckItem(text: String, checked: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 2.dp)
+    ) {
+        Icon(
+            imageVector = if (checked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+            contentDescription = null,
+            tint = if (checked) Color(0xFF43A047) else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (checked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }

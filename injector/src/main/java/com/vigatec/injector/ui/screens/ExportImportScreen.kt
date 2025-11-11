@@ -120,14 +120,17 @@ fun ExportImportScreen(
                     onPassphraseChange = viewModel::onExportPassphraseChange,
                     onPassphraseConfirmChange = viewModel::onExportPassphraseConfirmChange,
                     onToggleVisibility = viewModel::onToggleExportPassphraseVisibility,
-                    onExport = viewModel::exportKeys
+                    onExport = viewModel::onRequestExport,
+                    viewModel = viewModel
                 )
                 1 -> ImportTab(
                     state = state,
                     onPassphraseChange = viewModel::onImportPassphraseChange,
                     onToggleVisibility = viewModel::onToggleImportPassphraseVisibility,
                     onSelectFile = { importFileLauncher.launch(createFilePickerIntent()) },
-                    onImport = viewModel::importKeys
+                    onImport = viewModel::onRequestImport,
+                    viewModel = viewModel,
+                    context = context
                 )
             }
         }
@@ -153,6 +156,24 @@ fun ExportImportScreen(
             ErrorDialog(
                 message = errorMessage,
                 onDismiss = viewModel::clearError
+            )
+        }
+
+        // Diálogo para pedir contraseña de admin antes de exportar
+        if (state.showAdminPasswordDialogForExport) {
+            AdminPasswordDialog(
+                passwordError = state.adminPasswordErrorForExport,
+                onPasswordEntered = viewModel::onAdminPasswordEnteredForExport,
+                onDismiss = viewModel::onDismissAdminPasswordDialogForExport
+            )
+        }
+
+        // Diálogo para pedir contraseña de admin antes de importar
+        if (state.showAdminPasswordDialogForImport) {
+            AdminPasswordDialog(
+                passwordError = state.adminPasswordErrorForImport,
+                onPasswordEntered = viewModel::onAdminPasswordEnteredForImport,
+                onDismiss = viewModel::onDismissAdminPasswordDialogForImport
             )
         }
 
@@ -209,7 +230,8 @@ private fun ExportTab(
     onPassphraseChange: (String) -> Unit,
     onPassphraseConfirmChange: (String) -> Unit,
     onToggleVisibility: () -> Unit,
-    onExport: () -> Unit
+    onExport: () -> Unit,
+    viewModel: ExportImportViewModel
 ) {
     Column(
         modifier = Modifier
@@ -285,7 +307,7 @@ private fun ExportTab(
 
         // Botón exportar
         Button(
-            onClick = onExport,
+            onClick = { viewModel.onRequestExport() },
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading &&
                       state.exportPassphrase.isNotEmpty() &&
@@ -324,8 +346,28 @@ private fun ImportTab(
     onPassphraseChange: (String) -> Unit,
     onToggleVisibility: () -> Unit,
     onSelectFile: () -> Unit,
-    onImport: () -> Unit
+    onImport: () -> Unit,
+    viewModel: ExportImportViewModel,
+    context: Context
 ) {
+    // Launcher para seleccionar archivo desde Bluetooth u otras fuentes
+    val bluetoothFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data?.let { uri ->
+                // Copiar archivo a cache para lectura
+                val inputStream = context.contentResolver.openInputStream(uri)
+                val tempFile = File(context.cacheDir, "temp_bluetooth_import.json")
+                inputStream?.use { input ->
+                    tempFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                viewModel.onSelectImportFile(tempFile.absolutePath)
+            }
+        }
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -342,18 +384,39 @@ private fun ImportTab(
         )
 
         // Selector de archivo
-        OutlinedButton(
-            onClick = onSelectFile,
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(Icons.Default.Folder, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = if (state.selectedImportFile != null)
-                    "Archivo: ${File(state.selectedImportFile).name}"
-                else
-                    "Seleccionar archivo JSON"
-            )
+            OutlinedButton(
+                onClick = onSelectFile,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Folder, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (state.selectedImportFile != null)
+                        "Archivo: ${File(state.selectedImportFile).name}"
+                    else
+                        "Seleccionar archivo JSON"
+                )
+            }
+            
+            // Botón para importar desde Bluetooth
+            OutlinedButton(
+                onClick = { 
+                    val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                        type = "application/json"
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                    }
+                    val chooser = Intent.createChooser(intent, "Seleccionar archivo desde Bluetooth u otra fuente")
+                    bluetoothFileLauncher.launch(chooser)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Bluetooth, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Importar desde Bluetooth")
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -396,7 +459,7 @@ private fun ImportTab(
 
         // Botón importar
         Button(
-            onClick = onImport,
+            onClick = { viewModel.onRequestImport() },
             modifier = Modifier.fillMaxWidth(),
             enabled = !state.isLoading &&
                       state.selectedImportFile != null &&
@@ -617,14 +680,27 @@ private fun ExportSuccessDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = {
-                    shareExportFile(context, filePath)
-                }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Share, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Compartir")
+                OutlinedButton(
+                    onClick = {
+                        shareExportFileViaBluetooth(context, filePath)
+                    }
+                ) {
+                    Icon(Icons.Default.Bluetooth, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Bluetooth")
+                }
+                Button(
+                    onClick = {
+                        shareExportFile(context, filePath)
+                    }
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Compartir")
+                }
             }
         },
         dismissButton = {
@@ -650,6 +726,34 @@ private fun shareExportFile(context: Context, filePath: String) {
         }
         val chooser = Intent.createChooser(intent, "Compartir archivo de exportación")
         context.startActivity(chooser)
+    }
+}
+
+private fun shareExportFileViaBluetooth(context: Context, filePath: String) {
+    val file = File(filePath)
+    if (file.exists()) {
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.provider",
+            file
+        )
+        // Intent específico para Bluetooth
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            // Intent específico para Bluetooth
+            setPackage("com.android.bluetooth")
+        }
+        
+        // Si Bluetooth no está disponible, usar el chooser general
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback al chooser general que incluirá Bluetooth si está disponible
+            val chooser = Intent.createChooser(intent, "Compartir por Bluetooth")
+            context.startActivity(chooser)
+        }
     }
 }
 
@@ -841,4 +945,69 @@ private fun createFilePickerIntent(): Intent {
     intent.type = "application/json"
     intent.addCategory(Intent.CATEGORY_OPENABLE)
     return Intent.createChooser(intent, "Seleccionar archivo de exportación")
+}
+
+@Composable
+private fun AdminPasswordDialog(
+    passwordError: String?,
+    onPasswordEntered: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Verificar Contraseña de Administrador") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Ingrese su contraseña de administrador para continuar:",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Contraseña") },
+                    visualTransformation = if (showPassword)
+                        VisualTransformation.None
+                    else
+                        PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showPassword = !showPassword }) {
+                            Icon(
+                                if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = "Mostrar/Ocultar"
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = passwordError != null,
+                    singleLine = true
+                )
+                if (passwordError != null) {
+                    Text(
+                        text = passwordError,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onPasswordEntered(password) },
+                enabled = password.isNotEmpty()
+            ) {
+                Text("Verificar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }

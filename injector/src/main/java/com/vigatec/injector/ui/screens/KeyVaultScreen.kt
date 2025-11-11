@@ -10,9 +10,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ImportExport
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -89,20 +94,70 @@ fun KeyVaultScreen(
                     Text("No hay llaves almacenadas.", color = MaterialTheme.colorScheme.onBackground)
                 }
             } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 300.dp),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(state.keysWithProfiles) { keyWithProfiles ->
-                        KeyCard(
-                            key = keyWithProfiles.key,
-                            assignedProfiles = keyWithProfiles.assignedProfiles,
-                            onDelete = { viewModel.onShowDeleteModal(it) },
-                            onToggleKTK = { viewModel.toggleKeyAsKTK(it) },
-                            isAdmin = state.isAdmin
-                        )
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Botón para mostrar KEK Storage (si existe y está oculta)
+                    // Verificar si hay KEK Storage comparando el total de llaves con las mostradas
+                    val hasKEKStorage = remember(state.keysWithProfiles.size) {
+                        // Si no estamos mostrando KEK Storage pero el usuario es admin, probablemente hay KEK Storage oculta
+                        !state.showKEKStorage && state.isAdmin
+                    }
+                    
+                    if (hasKEKStorage) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "KEK Storage",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Oculta por seguridad",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.onShowKEKStoragePasswordDialog() }
+                                ) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = "Mostrar KEK Storage",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 300.dp),
+                        contentPadding = PaddingValues(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(state.keysWithProfiles) { keyWithProfiles ->
+                            KeyCard(
+                                key = keyWithProfiles.key,
+                                assignedProfiles = keyWithProfiles.assignedProfiles,
+                                onDelete = { viewModel.onShowDeleteModal(it) },
+                                onToggleKTK = { viewModel.toggleKeyAsKTK(it) },
+                                isAdmin = state.isAdmin
+                            )
+                        }
                     }
                 }
             }
@@ -134,6 +189,17 @@ fun KeyVaultScreen(
                 viewModel.onDismissImportJsonDialog()
             },
             onDismiss = { viewModel.onDismissImportJsonDialog() }
+        )
+    }
+
+    // Diálogo para pedir contraseña antes de mostrar KEK Storage
+    if (state.showKEKStoragePasswordDialog) {
+        KEKStoragePasswordDialog(
+            passwordError = state.kekStoragePasswordError,
+            onPasswordEntered = { password ->
+                viewModel.verifyAdminPasswordAndShowKEKStorage(password)
+            },
+            onDismiss = { viewModel.onDismissKEKStoragePasswordDialog() }
         )
     }
 }
@@ -169,12 +235,12 @@ fun KeyVaultTopBar(
                 ) {
                     Icon(Icons.Default.Upload, contentDescription = "Importar Llaves de Prueba")
                 }
-                IconButton(
-                    onClick = onGenerateTestKeys,
-                    enabled = !loading
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Generar Llaves de Prueba")
-                }
+//                IconButton(
+//                    onClick = onGenerateTestKeys,
+//                    enabled = !loading
+//                ) {
+//                    Icon(Icons.Default.Add, contentDescription = "Generar Llaves de Prueba")
+//                }
                 IconButton(onClick = onClearAll, enabled = !loading) {
                     Icon(Icons.Default.Delete, contentDescription = "Limpiar Almacén")
                 }
@@ -545,4 +611,69 @@ fun detectKeyAlgorithm(key: InjectedKeyEntity): String {
         32 -> "AES-256"
         else -> "Desconocido (${keyLengthBytes}B)"
     }
+}
+
+@Composable
+fun KEKStoragePasswordDialog(
+    passwordError: String?,
+    onPasswordEntered: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Verificar Contraseña") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Ingrese su contraseña de administrador para ver KEK Storage:",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Contraseña") },
+                    visualTransformation = if (showPassword)
+                        VisualTransformation.None
+                    else
+                        PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { showPassword = !showPassword }) {
+                            Icon(
+                                if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                contentDescription = "Mostrar/Ocultar"
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = passwordError != null,
+                    singleLine = true
+                )
+                if (passwordError != null) {
+                    Text(
+                        text = passwordError,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onPasswordEntered(password) },
+                enabled = password.isNotEmpty()
+            ) {
+                Text("Verificar")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 } 

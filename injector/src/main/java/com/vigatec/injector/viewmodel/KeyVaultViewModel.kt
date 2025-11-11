@@ -30,14 +30,18 @@ data class KeyVaultState(
     val showClearAllConfirmation: Boolean = false,  // Diálogo de confirmación para eliminar todas
     val showImportJsonDialog: Boolean = false,  // Diálogo para importar desde JSON
     val currentUser: User? = null,  // Usuario actual para permisos
-    val isAdmin: Boolean = false     // Flag rápido para verificar si es admin
+    val isAdmin: Boolean = false,     // Flag rápido para verificar si es admin
+    val showKEKStoragePasswordDialog: Boolean = false,  // Diálogo para pedir contraseña antes de mostrar KEK Storage
+    val showKEKStorage: Boolean = false,  // Flag para mostrar/ocultar KEK Storage
+    val kekStoragePasswordError: String? = null  // Error de contraseña al mostrar KEK Storage
 )
 
 @HiltViewModel
 class KeyVaultViewModel @Inject constructor(
     private val injectedKeyRepository: InjectedKeyRepository,
     private val profileRepository: ProfileRepository,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val userRepository: com.vigatec.injector.repository.UserRepository
 ) : ViewModel() {
     
     companion object {
@@ -100,14 +104,14 @@ class KeyVaultViewModel @Inject constructor(
             injectedKeyRepository.getAllInjectedKeys().collect { keys ->
                 Log.d(TAG, "KeyVault - loadKeys() - Total llaves recibidas: ${keys.size}")
                 
-                // Filtrar KEK Storage si el usuario NO es admin
-                val filteredKeys = if (_uiState.value.isAdmin) {
-                    Log.d(TAG, "KeyVault - Usuario es ADMIN, mostrando todas las llaves")
-                    keys // Admin ve todas las llaves
+                // Filtrar KEK Storage - siempre oculto a menos que se haya autenticado con contraseña
+                val filteredKeys = if (_uiState.value.showKEKStorage) {
+                    Log.d(TAG, "KeyVault - KEK Storage visible (autenticado con contraseña)")
+                    keys // Mostrar todas las llaves incluyendo KEK Storage
                 } else {
                     val kekStorageCount = keys.count { it.isKEKStorage() }
-                    Log.d(TAG, "KeyVault - Usuario NO es admin, filtrando $kekStorageCount KEK Storage")
-                    keys.filter { !it.isKEKStorage() } // Usuario normal NO ve KEK Storage
+                    Log.d(TAG, "KeyVault - Ocultando $kekStorageCount KEK Storage (requiere autenticación)")
+                    keys.filter { !it.isKEKStorage() } // Ocultar KEK Storage hasta autenticación
                 }
                 
                 Log.d(TAG, "KeyVault - loadKeys() - Llaves después del filtro: ${filteredKeys.size}")
@@ -424,5 +428,87 @@ class KeyVaultViewModel @Inject constructor(
         // Por ahora generar un KCV simulado basado en la llave
         val hash = keyHex.hashCode().toString(16).uppercase()
         return hash.take(6).padEnd(6, '0')
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // GESTIÓN DE KEK STORAGE OCULTA
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Muestra el diálogo para pedir contraseña antes de mostrar KEK Storage
+     */
+    fun onShowKEKStoragePasswordDialog() {
+        _uiState.value = _uiState.value.copy(
+            showKEKStoragePasswordDialog = true,
+            kekStoragePasswordError = null
+        )
+    }
+
+    /**
+     * Cierra el diálogo de contraseña de KEK Storage
+     */
+    fun onDismissKEKStoragePasswordDialog() {
+        _uiState.value = _uiState.value.copy(
+            showKEKStoragePasswordDialog = false,
+            kekStoragePasswordError = null
+        )
+    }
+
+    /**
+     * Verifica la contraseña del administrador y muestra KEK Storage si es correcta
+     */
+    fun verifyAdminPasswordAndShowKEKStorage(password: String) {
+        viewModelScope.launch {
+            try {
+                val session = sessionManager.getCurrentSession()
+                if (session == null) {
+                    _uiState.value = _uiState.value.copy(
+                        kekStoragePasswordError = "No hay sesión activa"
+                    )
+                    return@launch
+                }
+
+                val (userId, username, _) = session
+                val user = userRepository.findById(userId.toInt())
+
+                if (user == null) {
+                    _uiState.value = _uiState.value.copy(
+                        kekStoragePasswordError = "Usuario no encontrado"
+                    )
+                    return@launch
+                }
+
+                // Verificar contraseña
+                if (user.pass != password) {
+                    _uiState.value = _uiState.value.copy(
+                        kekStoragePasswordError = "Contraseña incorrecta"
+                    )
+                    return@launch
+                }
+
+                // Contraseña correcta - mostrar KEK Storage
+                _uiState.value = _uiState.value.copy(
+                    showKEKStoragePasswordDialog = false,
+                    showKEKStorage = true,
+                    kekStoragePasswordError = null
+                )
+                loadKeys() // Recargar para mostrar KEK Storage
+            } catch (e: Exception) {
+                Log.e(TAG, "Error verificando contraseña de admin", e)
+                _uiState.value = _uiState.value.copy(
+                    kekStoragePasswordError = "Error al verificar contraseña: ${e.message}"
+                )
+            }
+        }
+    }
+
+    /**
+     * Oculta KEK Storage nuevamente
+     */
+    fun hideKEKStorage() {
+        _uiState.value = _uiState.value.copy(
+            showKEKStorage = false
+        )
+        loadKeys() // Recargar para ocultar KEK Storage
     }
 } 
