@@ -25,7 +25,7 @@ import com.vigatec.persistence.entities.ProfileEntity
         InjectedKeyEntity::class,
         ProfileEntity::class
     ],
-    version = 14, //
+    version = 15, //
     exportSchema = true
 )
 @TypeConverters(Converters::class)

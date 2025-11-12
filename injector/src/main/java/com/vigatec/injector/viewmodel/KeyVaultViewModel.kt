@@ -10,9 +10,9 @@ import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.utils.security.StorageKeyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.vigatec.injector.util.PermissionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -31,6 +31,7 @@ data class KeyVaultState(
     val showImportJsonDialog: Boolean = false,  // Diálogo para importar desde JSON
     val currentUser: User? = null,  // Usuario actual para permisos
     val isAdmin: Boolean = false,     // Flag rápido para verificar si es admin
+    val userRole: String = PermissionManager.ROLE_USER,
     val showKEKStoragePasswordDialog: Boolean = false,  // Diálogo para pedir contraseña antes de mostrar KEK Storage
     val showKEKStorage: Boolean = false,  // Flag para mostrar/ocultar KEK Storage
     val kekStoragePasswordError: String? = null,  // Error de contraseña al mostrar KEK Storage
@@ -73,7 +74,7 @@ class KeyVaultViewModel @Inject constructor(
             val session = sessionManager.getCurrentSession()
 
             if (session != null) {
-                val (userId, username, role) = session
+                val (_, username, role) = session
                 val isAdmin = role == "ADMIN"
 
                 Log.d(TAG, "KeyVault - Usuario de sesión: username=$username, role=$role")
@@ -81,7 +82,8 @@ class KeyVaultViewModel @Inject constructor(
 
                 _uiState.value = _uiState.value.copy(
                     currentUser = null, // Ya no necesitamos el objeto User completo aquí
-                    isAdmin = isAdmin
+                    isAdmin = isAdmin,
+                    userRole = role
                 )
 
                 Log.d(TAG, "KeyVault - Estado actualizado: isAdmin=${_uiState.value.isAdmin}")
@@ -89,7 +91,8 @@ class KeyVaultViewModel @Inject constructor(
                 Log.w(TAG, "KeyVault - ⚠️ No hay sesión activa")
                 _uiState.value = _uiState.value.copy(
                     currentUser = null,
-                    isAdmin = false
+                    isAdmin = false,
+                    userRole = PermissionManager.ROLE_USER
                 )
             }
         } catch (e: Exception) {
@@ -273,10 +276,11 @@ class KeyVaultViewModel @Inject constructor(
      * Genera 5 llaves de prueba automáticamente para desarrollo.
      * Solo disponible para usuarios administradores.
      */
+    @Suppress("DEPRECATION")
     fun generateTestKeys() {
         viewModelScope.launch {
             try {
-                android.util.Log.i("KeyVaultViewModel", "=== GENERANDO LLAVES DE PRUEBA ===")
+                Log.i("KeyVaultViewModel", "=== GENERANDO LLAVES DE PRUEBA ===")
 
                 // Llave 1: AES-256 para KEK
                 injectedKeyRepository.recordKeyInjectionWithData(
@@ -289,7 +293,7 @@ class KeyVaultViewModel @Inject constructor(
                     isKEK = false,
                     customName = "KEK Test AES-256"
                 )
-                android.util.Log.d("KeyVaultViewModel", "✓ Llave 1 generada: AES-256 KEK")
+                Log.d("KeyVaultViewModel", "✓ Llave 1 generada: AES-256 KEK")
 
                 // Llave 2: 3DES PIN Encryption
                 injectedKeyRepository.recordKeyInjectionWithData(
@@ -302,7 +306,7 @@ class KeyVaultViewModel @Inject constructor(
                     isKEK = false,
                     customName = "PIN Key 3DES"
                 )
-                android.util.Log.d("KeyVaultViewModel", "✓ Llave 2 generada: 3DES PIN")
+                Log.d("KeyVaultViewModel", "✓ Llave 2 generada: 3DES PIN")
 
                 // Llave 3: AES-128 MAC
                 injectedKeyRepository.recordKeyInjectionWithData(
@@ -315,7 +319,7 @@ class KeyVaultViewModel @Inject constructor(
                     isKEK = false,
                     customName = "MAC Key AES-128"
                 )
-                android.util.Log.d("KeyVaultViewModel", "✓ Llave 3 generada: AES-128 MAC")
+                Log.d("KeyVaultViewModel", "✓ Llave 3 generada: AES-128 MAC")
 
                 // Llave 4: AES-192 Data Encryption
                 injectedKeyRepository.recordKeyInjectionWithData(
@@ -328,7 +332,7 @@ class KeyVaultViewModel @Inject constructor(
                     isKEK = false,
                     customName = "Data Encryption AES-192"
                 )
-                android.util.Log.d("KeyVaultViewModel", "✓ Llave 4 generada: AES-192 Data")
+                Log.d("KeyVaultViewModel", "✓ Llave 4 generada: AES-192 Data")
 
                 // Llave 5: 3DES DUKPT BDK
                 injectedKeyRepository.recordKeyInjectionWithData(
@@ -341,16 +345,16 @@ class KeyVaultViewModel @Inject constructor(
                     isKEK = false,
                     customName = "DUKPT BDK 3DES"
                 )
-                android.util.Log.d("KeyVaultViewModel", "✓ Llave 5 generada: 3DES DUKPT BDK")
+                Log.d("KeyVaultViewModel", "✓ Llave 5 generada: 3DES DUKPT BDK")
 
-                android.util.Log.i("KeyVaultViewModel", "✅ 5 llaves de prueba generadas exitosamente")
-                android.util.Log.i("KeyVaultViewModel", "================================================")
+                Log.i("KeyVaultViewModel", "✅ 5 llaves de prueba generadas exitosamente")
+                Log.i("KeyVaultViewModel", "================================================")
 
                 // Recargar las llaves para mostrar las nuevas
                 loadKeys()
 
             } catch (e: Exception) {
-                android.util.Log.e("KeyVaultViewModel", "❌ Error al generar llaves de prueba", e)
+                Log.e("KeyVaultViewModel", "❌ Error al generar llaves de prueba", e)
                 e.printStackTrace()
             }
         }
@@ -397,86 +401,6 @@ class KeyVaultViewModel @Inject constructor(
         }
     }
     
-    /**
-     * Genera llaves de prueba directamente (simulando importación del script)
-     */
-    private suspend fun generateTestKeysFromScript() {
-        try {
-            Log.i(TAG, "Generando llaves de prueba con KCVs correctos...")
-            
-            // Generar llaves para diferentes algoritmos
-            val algorithms = listOf(
-                "3DES-16" to "DES_DOUBLE",
-                "3DES-24" to "DES_TRIPLE", 
-                "AES-128" to "AES_128",
-                "AES-192" to "AES_192",
-                "AES-256" to "AES_256"
-            )
-            
-            var imported = 0
-            
-            algorithms.forEach { (scriptAlgo, dbAlgo) ->
-                // Generar llave aleatoria
-                val keyBytes = when (scriptAlgo) {
-                    "3DES-16" -> 16
-                    "3DES-24" -> 24
-                    "AES-128" -> 16
-                    "AES-192" -> 24
-                    "AES-256" -> 32
-                    else -> 16
-                }
-                
-                val keyHex = generateRandomKeyHex(keyBytes)
-                val kcv = calculateKCV(keyHex, scriptAlgo)
-                
-                Log.d(TAG, "Generando llave: $scriptAlgo - KCV: $kcv")
-                
-                // Guardar en BD
-                injectedKeyRepository.recordKeyInjectionWithData(
-                    keySlot = -1,
-                    keyType = "CEREMONY_KEY",
-                    keyAlgorithm = dbAlgo,
-                    kcv = kcv,
-                    keyData = keyHex,
-                    status = "GENERATED",
-                    isKEK = false,
-                    kekType = "",
-                    customName = "Test Key $scriptAlgo"
-                )
-                
-                imported++
-            }
-            
-            Log.i(TAG, "✅ Importadas $imported llaves de prueba con KCVs correctos")
-            
-            // Recargar lista de llaves
-            loadKeys()
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ Error generando llaves de prueba", e)
-            e.printStackTrace()
-        }
-    }
-    
-    /**
-     * Genera una llave aleatoria en formato hexadecimal
-     */
-    private fun generateRandomKeyHex(bytes: Int): String {
-        val chars = "0123456789ABCDEF"
-        return (1..bytes * 2).map { chars.random() }.joinToString("")
-    }
-    
-    /**
-     * Calcula KCV usando el mismo algoritmo que KcvCalculator.kt
-     * (simulación básica - en producción usar KcvCalculator)
-     */
-    private fun calculateKCV(keyHex: String, algorithm: String): String {
-        // Simulación de KCV - en producción usar KcvCalculator.calculateKcv()
-        // Por ahora generar un KCV simulado basado en la llave
-        val hash = keyHex.hashCode().toString(16).uppercase()
-        return hash.take(6).padEnd(6, '0')
-    }
-
     // ═══════════════════════════════════════════════════════════════════════
     // GESTIÓN DE KEK STORAGE OCULTA
     // ═══════════════════════════════════════════════════════════════════════
@@ -515,8 +439,8 @@ class KeyVaultViewModel @Inject constructor(
                     return@launch
                 }
 
-                val (userId, username, _) = session
-                val user = userRepository.findById(userId.toInt())
+                val (userId, _, _) = session
+                val user = userRepository.findById(userId)
 
                 if (user == null) {
                     _uiState.value = _uiState.value.copy(

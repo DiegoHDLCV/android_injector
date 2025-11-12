@@ -10,7 +10,6 @@ import com.vigatec.injector.ui.screens.DashboardScreen
 import com.vigatec.injector.ui.screens.KeyVaultScreen
 import com.vigatec.injector.ui.screens.CeremonyScreen
 import com.vigatec.injector.ui.screens.ProfilesScreen
-import com.vigatec.injector.ui.screens.RawDataListenerScreen
 
 @Composable
 fun MainNavGraph(
@@ -51,11 +50,6 @@ fun MainNavGraph(
             // Resetear estado de ceremonia al salir
             onCeremonyStateChanged(false)
             ProfilesScreen(username = username)
-        }
-        composable(MainScreen.RawDataListener.route) {
-            // Resetear estado de ceremonia al salir
-            onCeremonyStateChanged(false)
-            RawDataListenerScreen()
         }
     }
 }

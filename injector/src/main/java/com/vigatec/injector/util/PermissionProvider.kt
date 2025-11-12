@@ -19,16 +19,11 @@ class PermissionProvider @Inject constructor(
     companion object {
         private const val TAG = "PermissionProvider"
         
-        // IDs de permisos del sistema
-        const val KEY_VAULT = "key_vault"
-        const val CEREMONY_KEK = "ceremony_kek"
-        const val CEREMONY_OPERATIONAL = "ceremony_operational"
-        const val SELECT_KTK = "select_ktk"
-        const val MANAGE_PROFILES = "manage_profiles"
-        const val VIEW_LOGS = "view_logs"
-        const val MANAGE_USERS = "manage_users"
-        const val RAW_DATA_LISTENER = "raw_data_listener"
-        const val EXPORT_IMPORT_KEYS = "export_import_keys"
+        // IDs de permisos del sistema (reexportados para compatibilidad)
+        const val CEREMONY_KEK = PermissionsCatalog.CEREMONY_KEK
+        const val CEREMONY_OPERATIONAL = PermissionsCatalog.CEREMONY_OPERATIONAL
+        const val VIEW_LOGS = PermissionsCatalog.VIEW_LOGS
+        const val MANAGE_USERS = PermissionsCatalog.MANAGE_USERS
     }
     
     private val _userPermissions = MutableStateFlow<Set<String>>(emptySet())
@@ -57,17 +52,7 @@ class PermissionProvider @Inject constructor(
             if (user.role == "ADMIN") {
                 // Admin tiene TODOS los permisos
                 Log.d(TAG, "Usuario es ADMIN → asignando TODOS los permisos")
-                _userPermissions.value = setOf(
-                    KEY_VAULT,
-                    CEREMONY_KEK,
-                    CEREMONY_OPERATIONAL,
-                    SELECT_KTK,
-                    MANAGE_PROFILES,
-                    VIEW_LOGS,
-                    MANAGE_USERS,
-                    RAW_DATA_LISTENER,
-                    EXPORT_IMPORT_KEYS
-                )
+                _userPermissions.value = PermissionsCatalog.SYSTEM_PERMISSION_IDS
                 Log.d(TAG, "Permisos asignados a ADMIN: ${_userPermissions.value.joinToString(", ")}")
             } else {
                 // Obtener permisos desde la BD

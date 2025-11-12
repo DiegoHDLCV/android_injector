@@ -22,7 +22,7 @@ import com.vigatec.injector.ui.components.PasswordTextField
 import com.vigatec.injector.ui.components.PasswordConfirmationFields
 import com.vigatec.injector.ui.components.RoleSelector
 import com.vigatec.injector.ui.components.PermissionsSelector
-import com.vigatec.injector.ui.components.AdminInfoCard
+import com.vigatec.injector.util.PermissionsCatalog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -187,15 +187,30 @@ fun UserListItem(
                     )
                 }
 
-                Surface(
-                    color = if (user.role == "ADMIN")
-                        MaterialTheme.colorScheme.primaryContainer
-                    else
+                val (roleLabel, roleColor, roleContentColor) = when (user.role) {
+                    "ADMIN" -> Triple(
+                        "Admin",
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    "OPERATOR" -> Triple(
+                        "Operador",
+                        MaterialTheme.colorScheme.tertiaryContainer,
+                        MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    else -> Triple(
+                        "Usuario",
                         MaterialTheme.colorScheme.secondaryContainer,
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+                Surface(
+                    color = roleColor,
+                    contentColor = roleContentColor,
                     shape = MaterialTheme.shapes.small
                 ) {
                     Text(
-                        text = if (user.role == "ADMIN") "Admin" else "Usuario",
+                        text = roleLabel,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         style = MaterialTheme.typography.labelSmall
                     )
@@ -250,8 +265,15 @@ fun CreateUserDialog(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var fullName by remember { mutableStateOf("") }
-    var role by remember { mutableStateOf("USER") }
-    var selectedPermissions by remember { mutableStateOf(setOf<String>()) }
+    var role by remember { mutableStateOf("OPERATOR") }
+    var selectedPermissions by remember { mutableStateOf(PermissionsCatalog.OPERATOR_DEFAULT_PERMISSION_IDS) }
+
+    LaunchedEffect(role) {
+        when (role) {
+            "OPERATOR" -> selectedPermissions = PermissionsCatalog.OPERATOR_DEFAULT_PERMISSION_IDS
+            "ADMIN" -> selectedPermissions = PermissionsCatalog.SYSTEM_PERMISSION_IDS
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -343,6 +365,13 @@ fun EditUserDialog(
         val userPerms = viewModel.getUserPermissions(user.id)
         selectedPermissions = userPerms.map { it.id }.toSet()
         permissionsLoaded = true
+    }
+
+    LaunchedEffect(role) {
+        when (role) {
+            "OPERATOR" -> selectedPermissions = PermissionsCatalog.OPERATOR_DEFAULT_PERMISSION_IDS
+            "ADMIN" -> selectedPermissions = PermissionsCatalog.SYSTEM_PERMISSION_IDS
+        }
     }
 
     AlertDialog(

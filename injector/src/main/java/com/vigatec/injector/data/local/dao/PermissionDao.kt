@@ -28,6 +28,12 @@ interface PermissionDao {
     
     @Query("DELETE FROM user_permissions WHERE userId = :userId")
     suspend fun deleteUserPermissions(userId: Int)
+
+    @Query("DELETE FROM user_permissions WHERE permissionId = :permissionId")
+    suspend fun deleteUserPermissionsByPermissionId(permissionId: String)
+
+    @Query("DELETE FROM permissions WHERE id = :permissionId")
+    suspend fun deletePermissionById(permissionId: String)
     
     @Transaction
     suspend fun updateUserPermissions(userId: Int, permissionIds: List<String>) {

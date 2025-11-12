@@ -7,26 +7,17 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBox
-import androidx.compose.material.icons.filled.Cable
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.core.content.FileProvider
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -36,6 +27,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vigatec.injector.ui.navigation.MainScreen
 import com.vigatec.injector.ui.navigation.MainNavGraph
+import com.vigatec.injector.util.PermissionManager
+import com.vigatec.injector.util.PermissionProvider
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -57,15 +50,49 @@ val bottomBarDestinations = listOf(
 @Composable
 fun MainScaffold(
     username: String,
+    userRole: String?,
+    permissionProvider: PermissionProvider,
     onNavigateToConfig: () -> Unit = {},
     onNavigateToExportImport: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     var isCeremonyInProgress by remember { mutableStateOf(false) }
+    val userPermissions by permissionProvider.userPermissions.collectAsState()
+
+    LaunchedEffect(username) {
+        if (username.isNotBlank()) {
+            try {
+                permissionProvider.loadPermissions(username)
+            } catch (e: Exception) {
+                android.util.Log.e("MainScaffold", "Error al cargar permisos para $username", e)
+            }
+        }
+    }
+
+    val hasCeremonyPermission = remember(userPermissions) {
+        userPermissions.contains(PermissionProvider.CEREMONY_KEK) ||
+            userPermissions.contains(PermissionProvider.CEREMONY_OPERATIONAL)
+    }
+    val canShowCeremony = remember(userRole, hasCeremonyPermission) {
+        userRole != PermissionManager.ROLE_OPERATOR && hasCeremonyPermission
+    }
+    val currentDestinations = remember(canShowCeremony) {
+        if (canShowCeremony) {
+            bottomBarDestinations
+        } else {
+            bottomBarDestinations.filterNot { it.route == MainScreen.Ceremony.route }
+        }
+    }
 
     Scaffold(
         topBar = { MainTopAppBar(onNavigateToConfig = onNavigateToConfig, isCeremonyInProgress = isCeremonyInProgress) },
-        bottomBar = { AppBottomBar(navController = navController, isCeremonyInProgress = isCeremonyInProgress) }
+        bottomBar = {
+            AppBottomBar(
+                navController = navController,
+                destinations = currentDestinations,
+                isCeremonyInProgress = isCeremonyInProgress
+            )
+        }
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             MainNavGraph(
@@ -131,8 +158,7 @@ fun MainTopAppBar(onNavigateToConfig: () -> Unit = {}, isCeremonyInProgress: Boo
 }
 
 private fun exportLogs(context: Context) {
-    val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-    val fileName = "comm-logs-${'$'}{dateFormat.format(Date())}.txt"
+    val fileName = "comm-logs-${SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())}.txt"
     val logFile = File(context.getExternalFilesDir("Download"), fileName)
 
     if (logFile.exists()) {
@@ -151,12 +177,16 @@ private fun exportLogs(context: Context) {
 
 
 @Composable
-fun AppBottomBar(navController: NavHostController, isCeremonyInProgress: Boolean = false) {
+fun AppBottomBar(
+    navController: NavHostController,
+    destinations: List<BottomBarDestination>,
+    isCeremonyInProgress: Boolean = false
+) {
     NavigationBar {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
 
-        bottomBarDestinations.forEach { screen ->
+        destinations.forEach { screen ->
             AddItem(
                 screen = screen,
                 currentDestination = currentDestination,

@@ -10,7 +10,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ImportExport
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.VpnKey
@@ -29,12 +28,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.persistence.entities.InjectedKeyEntity
 import com.vigatec.injector.viewmodel.KeyVaultViewModel
-import com.vigatec.injector.viewmodel.KeyWithProfiles
+import com.vigatec.injector.util.PermissionManager
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -66,12 +64,27 @@ fun KeyVaultScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             // Indicador de rol del usuario
+            val (roleBackground, roleTextColor, roleLabel) = when (state.userRole) {
+                PermissionManager.ROLE_ADMIN -> Triple(
+                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f),
+                    MaterialTheme.colorScheme.tertiary,
+                    "👤 ADMINISTRADOR"
+                )
+                PermissionManager.ROLE_OPERATOR -> Triple(
+                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f),
+                    MaterialTheme.colorScheme.tertiary,
+                    "👤 OPERADOR"
+                )
+                else -> Triple(
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                    "👤 USUARIO"
+                )
+            }
+
             Surface(
                 shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp),
-                color = if (state.isAdmin) 
-                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-                else 
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                color = roleBackground,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -79,13 +92,10 @@ fun KeyVaultScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (state.isAdmin) "👤 ADMINISTRADOR" else "👤 USUARIO",
+                        text = roleLabel,
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.Bold,
-                        color = if (state.isAdmin) 
-                            MaterialTheme.colorScheme.tertiary
-                        else 
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                        color = roleTextColor
                     )
                 }
             }
@@ -216,12 +226,12 @@ fun KeyVaultTopBar(
                 ) {
                     Icon(Icons.Default.Upload, contentDescription = "Importar Llaves de Prueba")
                 }
-//                IconButton(
-//                    onClick = onGenerateTestKeys,
-//                    enabled = !loading
-//                ) {
-//                    Icon(Icons.Default.Add, contentDescription = "Generar Llaves de Prueba")
-//                }
+                IconButton(
+                    onClick = onGenerateTestKeys,
+                    enabled = !loading
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Generar Llaves de Prueba")
+                }
                 IconButton(onClick = onClearAll, enabled = !loading) {
                     Icon(Icons.Default.Delete, contentDescription = "Limpiar Almacén")
                 }
@@ -359,7 +369,15 @@ fun KeyCard(
                 if (!isKEKStorage) {
                     Text("Origen: Ceremonia", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("Longitud: ${key.keyData.length / 2} bytes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val keyLengthBytes = when {
+                    key.encryptedKeyData.isNotEmpty() -> key.encryptedKeyData.length / 2
+                    key.isLegacy() -> {
+                        @Suppress("DEPRECATION")
+                        key.keyData.length / 2
+                    }
+                    else -> 0
+                }
+                Text("Longitud: ${keyLengthBytes} bytes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 // Mostrar estado SOLO si es KTK (no para KEK Storage)
                 if (isKTK) {
@@ -599,7 +617,14 @@ fun detectKeyAlgorithm(key: InjectedKeyEntity): String {
     }
 
     // Si no, detectar por longitud de datos
-    val keyLengthBytes = key.keyData.length / 2 // Convertir hex a bytes
+    val keyLengthBytes = when {
+        key.encryptedKeyData.isNotEmpty() -> key.encryptedKeyData.length / 2
+        key.isLegacy() -> {
+            @Suppress("DEPRECATION")
+            key.keyData.length / 2
+        }
+        else -> 0
+    }
     return when (keyLengthBytes) {
         8 -> "DES"
         16 -> "3DES/AES-128" // Ambigüedad - pueden ser 3DES o AES-128

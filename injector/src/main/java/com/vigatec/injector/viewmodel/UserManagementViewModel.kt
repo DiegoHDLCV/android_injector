@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.vigatec.injector.data.local.entity.Permission
 import com.vigatec.injector.data.local.entity.User
 import com.vigatec.injector.repository.UserRepository
+import com.vigatec.injector.util.PermissionsCatalog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -145,15 +146,21 @@ class UserManagementViewModel @Inject constructor(
                 val userId = userRepository.insertUser(newUser)
                 if (userId > 0) {
                     // Asignar permisos
-                    if (role == "ADMIN") {
-                        // ADMIN obtiene TODOS los permisos automáticamente
-                        val allPermissionIds = _uiState.value.allPermissions.map { it.id }
-                        userRepository.updateUserPermissions(userId.toInt(), allPermissionIds)
-                        Log.d(TAG, "✓ Usuario ADMIN creado con TODOS los permisos")
-                    } else {
-                        // USER obtiene solo los permisos seleccionados
-                        userRepository.updateUserPermissions(userId.toInt(), selectedPermissions)
-                        Log.d(TAG, "✓ Usuario USER creado con ${selectedPermissions.size} permisos")
+                    when (role) {
+                        "ADMIN" -> {
+                            val allPermissionIds = _uiState.value.allPermissions.map { it.id }
+                            userRepository.updateUserPermissions(userId.toInt(), allPermissionIds)
+                            Log.d(TAG, "✓ Usuario ADMIN creado con TODOS los permisos")
+                        }
+                        "OPERATOR" -> {
+                            val operatorPermissions = PermissionsCatalog.OPERATOR_DEFAULT_PERMISSION_IDS.toList()
+                            userRepository.updateUserPermissions(userId.toInt(), operatorPermissions)
+                            Log.d(TAG, "✓ Usuario OPERADOR creado con permisos predeterminados")
+                        }
+                        else -> {
+                            userRepository.updateUserPermissions(userId.toInt(), selectedPermissions)
+                            Log.d(TAG, "✓ Usuario USER creado con ${selectedPermissions.size} permisos")
+                        }
                     }
                     
                     _uiState.value = _uiState.value.copy(
@@ -173,21 +180,6 @@ class UserManagementViewModel @Inject constructor(
         }
     }
 
-    fun updateUser(user: User) {
-        viewModelScope.launch {
-            try {
-                userRepository.updateUser(user)
-                _uiState.value = _uiState.value.copy(
-                    successMessage = "Usuario actualizado exitosamente"
-                )
-            } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    errorMessage = "Error al actualizar usuario: ${e.message}"
-                )
-            }
-        }
-    }
-    
     fun updateUserWithPermissions(user: User, selectedPermissions: List<String>) {
         viewModelScope.launch {
             try {
@@ -195,15 +187,21 @@ class UserManagementViewModel @Inject constructor(
                 userRepository.updateUser(user)
                 
                 // Actualizar permisos
-                if (user.role == "ADMIN") {
-                    // ADMIN siempre tiene todos los permisos (no editables)
-                    val allPermissionIds = _uiState.value.allPermissions.map { it.id }
-                    userRepository.updateUserPermissions(user.id, allPermissionIds)
-                    Log.d(TAG, "✓ Usuario ADMIN actualizado con TODOS los permisos")
-                } else {
-                    // USER obtiene los permisos seleccionados
-                    userRepository.updateUserPermissions(user.id, selectedPermissions)
-                    Log.d(TAG, "✓ Usuario USER actualizado con ${selectedPermissions.size} permisos")
+                when (user.role) {
+                    "ADMIN" -> {
+                        val allPermissionIds = _uiState.value.allPermissions.map { it.id }
+                        userRepository.updateUserPermissions(user.id, allPermissionIds)
+                        Log.d(TAG, "✓ Usuario ADMIN actualizado con TODOS los permisos")
+                    }
+                    "OPERATOR" -> {
+                        val operatorPermissions = PermissionsCatalog.OPERATOR_DEFAULT_PERMISSION_IDS.toList()
+                        userRepository.updateUserPermissions(user.id, operatorPermissions)
+                        Log.d(TAG, "✓ Usuario OPERADOR actualizado con permisos predeterminados")
+                    }
+                    else -> {
+                        userRepository.updateUserPermissions(user.id, selectedPermissions)
+                        Log.d(TAG, "✓ Usuario USER actualizado con ${selectedPermissions.size} permisos")
+                    }
                 }
                 
                 _uiState.value = _uiState.value.copy(

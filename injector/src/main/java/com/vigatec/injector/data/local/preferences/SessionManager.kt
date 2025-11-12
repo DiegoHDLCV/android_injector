@@ -75,7 +75,7 @@ class SessionManager(private val context: Context) {
 
     /**
      * Obtiene el rol del usuario actualmente logueado.
-     * @return Rol (ADMIN o USER) o null si no hay sesión activa
+     * @return Rol (ADMIN, USER u OPERATOR) o null si no hay sesión activa
      */
     fun getLoggedUserRole(): Flow<String?> {
         return context.sessionDataStore.data.map { preferences ->
@@ -86,6 +86,7 @@ class SessionManager(private val context: Context) {
     /**
      * Verifica si el usuario actual es administrador.
      */
+    @Suppress("unused")
     suspend fun isCurrentUserAdmin(): Boolean {
         val role = getLoggedUserRole().first()
         val isAdmin = role == "ADMIN"
@@ -96,6 +97,7 @@ class SessionManager(private val context: Context) {
     /**
      * Verifica si hay una sesión activa.
      */
+    @Suppress("unused")
     suspend fun hasActiveSession(): Boolean {
         val userId = getLoggedUserId().first()
         val hasSession = userId != null

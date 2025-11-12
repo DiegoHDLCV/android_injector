@@ -6,6 +6,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -22,7 +23,6 @@ import com.vigatec.injector.ui.screens.LogDetailScreen
 import com.vigatec.injector.ui.screens.UserManagementScreen
 import com.vigatec.injector.ui.screens.ExportImportScreen
 import com.vigatec.injector.viewmodel.LoginViewModel
-import javax.inject.Inject
 import androidx.compose.ui.platform.LocalContext
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -52,7 +52,15 @@ fun AppNavigation() {
             SessionManagerEntryPoint::class.java
         ).sessionManager()
     }
+    val permissionProvider = remember {
+        EntryPointAccessors.fromActivity(
+            context as android.app.Activity,
+            PermissionProviderEntryPoint::class.java
+        ).permissionProvider()
+    }
     var currentUsername by remember { mutableStateOf("") }
+    val roleFlow = remember { sessionManager.getLoggedUserRole() }
+    val currentRole by roleFlow.collectAsState(initial = null)
 
     NavHost(
         navController = navController,
@@ -95,6 +103,8 @@ fun AppNavigation() {
         composable(Screen.Main.route) {
             MainScaffold(
                 username = currentUsername,
+                userRole = currentRole,
+                permissionProvider = permissionProvider,
                 onNavigateToConfig = {
                     navController.navigate(Screen.Config.route)
                 },

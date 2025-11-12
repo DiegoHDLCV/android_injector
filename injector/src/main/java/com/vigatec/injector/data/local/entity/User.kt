@@ -13,7 +13,7 @@ data class User(
     val id: Int = 0,
     val username: String,
     val pass: String,
-    val role: String = "USER",  // "ADMIN" o "USER"
+    val role: String = "USER",  // "ADMIN", "USER" u "OPERATOR"
     val fullName: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val isActive: Boolean = true

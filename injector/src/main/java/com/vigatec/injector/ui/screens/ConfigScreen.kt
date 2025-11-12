@@ -17,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.injector.util.PermissionProvider
 import com.vigatec.injector.viewmodel.ConfigViewModel
-import com.vigatec.injector.data.local.preferences.CustodianTimeoutPreferencesManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -186,21 +185,32 @@ fun UserInfoCard(
                     text = "Rol:",
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Surface(
-                    color = if (role == "ADMIN")
-                        MaterialTheme.colorScheme.primaryContainer
-                    else
+                val (roleLabel, roleColor, contentColor) = when (role) {
+                    "ADMIN" -> Triple(
+                        "Administrador",
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    "OPERATOR" -> Triple(
+                        "Operador",
+                        MaterialTheme.colorScheme.tertiaryContainer,
+                        MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    else -> Triple(
+                        "Usuario",
                         MaterialTheme.colorScheme.secondaryContainer,
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+                Surface(
+                    color = roleColor,
+                    contentColor = contentColor,
                     shape = MaterialTheme.shapes.small
                 ) {
                     Text(
-                        text = if (role == "ADMIN") "Administrador" else "Usuario",
+                        text = roleLabel,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (role == "ADMIN")
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        else
-                            MaterialTheme.colorScheme.onSecondaryContainer
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
             }
