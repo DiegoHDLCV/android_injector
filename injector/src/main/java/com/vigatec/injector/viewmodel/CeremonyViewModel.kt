@@ -60,7 +60,11 @@ data class CeremonyState(
     val ceremonyLogs: List<String> = emptyList(), // Historial de logs de la ceremonia
 
     // Modal de confirmación de guardado
-    val showConfirmSaveModal: Boolean = false  // Mostrar modal de confirmación antes de guardar llave
+    val showConfirmSaveModal: Boolean = false, // Mostrar modal de confirmación antes de guardar llave
+
+    // Error de llave duplicada
+    val showDuplicateKeyError: Boolean = false, // Mostrar modal de error de llave duplicada
+    val duplicateKeyMessage: String? = null    // Mensaje del error de llave duplicada
 )
 
 @HiltViewModel
@@ -673,6 +677,24 @@ class CeremonyViewModel @Inject constructor(
                     -1 // Operacionales sin slot asignado aún
                 }
 
+                // === VERIFICAR DUPLICADOS ANTES DE GUARDAR ===
+                val keyExists = injectedKeyRepository.existsKeyWithKcv(finalKcv)
+
+                if (keyExists) {
+                    // Llave duplicada detectada
+                    val errorMessage = "Ya existe una llave con KCV: $finalKcv. No se puede guardar la misma llave dos veces."
+                    android.util.Log.w("CeremonyViewModel", "Llave duplicada detectada: KCV=$finalKcv")
+                    addToLog("⚠️ Error: Llave duplicada con KCV $finalKcv")
+
+                    // Mostrar modal de error
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        showDuplicateKeyError = true,
+                        duplicateKeyMessage = errorMessage
+                    )
+                    return@launch
+                }
+
                 injectedKeyRepository.recordKeyInjectionWithData(
                     keySlot = keySlotToSave,
                     keyType = keyType, // Siempre CEREMONY_KEY (operacional)
@@ -848,6 +870,24 @@ class CeremonyViewModel @Inject constructor(
     fun confirmAndSave() {
         dismissConfirmSaveModal()
         finalizeCeremony()
+    }
+
+    /**
+     * Cierra el modal de error de llave duplicada
+     */
+    fun dismissDuplicateKeyError() {
+        _uiState.value = _uiState.value.copy(
+            showDuplicateKeyError = false,
+            duplicateKeyMessage = null
+        )
+    }
+
+    /**
+     * Cierra el modal de error de llave duplicada y sale a la pantalla principal
+     */
+    fun dismissDuplicateKeyErrorAndExit() {
+        dismissDuplicateKeyError()
+        cancelCeremony()
     }
 
 }

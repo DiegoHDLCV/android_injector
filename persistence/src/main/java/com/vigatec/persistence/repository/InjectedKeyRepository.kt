@@ -653,4 +653,20 @@ class InjectedKeyRepository @Inject constructor(
         }
     }
 
+    /**
+     * Verifica si ya existe una llave con el KCV especificado.
+     * Útil para detectar duplicados antes de intentar guardar en ceremonia.
+     * @return true si existe una llave con ese KCV, false en caso contrario
+     */
+    suspend fun existsKeyWithKcv(kcv: String): Boolean {
+        return try {
+            val count = injectedKeyDao.existsKeyWithKcv(kcv)
+            Log.d(TAG, "Verificando llave con KCV $kcv: existe=${ count > 0}")
+            count > 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Error verificando llave con KCV $kcv", e)
+            false
+        }
+    }
+
 }

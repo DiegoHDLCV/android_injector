@@ -888,6 +888,84 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
             }
         )
     }
+
+    // === MODAL DE ERROR DE LLAVE DUPLICADA ===
+    if (state.showDuplicateKeyError) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissDuplicateKeyError() },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Error,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(
+                    text = "Llave Duplicada",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = state.duplicateKeyMessage ?: "No se puede guardar una llave que ya existe.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Verifica que estés usando una llave diferente.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.dismissDuplicateKeyErrorAndExit() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Salir")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissDuplicateKeyError() }
+                ) {
+                    Text("Volver")
+                }
+            }
+        )
+    }
 }
 
 /**

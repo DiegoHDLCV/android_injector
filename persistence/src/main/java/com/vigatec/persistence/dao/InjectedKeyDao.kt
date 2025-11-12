@@ -92,6 +92,13 @@ interface InjectedKeyDao {
     suspend fun getKeyByKcv(kcv: String): InjectedKeyEntity?
 
     /**
+     * Verifica si ya existe una llave con el KCV especificado.
+     * Útil para detectar duplicados antes de intentar guardar en ceremonia.
+     */
+    @Query("SELECT COUNT(*) FROM injected_keys WHERE kcv = :kcv")
+    suspend fun existsKeyWithKcv(kcv: String): Int
+
+    /**
      * NUEVA FUNCIÓN: Actualiza el campo 'status' para todos los registros en la tabla.
      * Útil para marcar todas las llaves como "DELETING" al iniciar un borrado masivo.
      * @param newStatus El nuevo estado que tendrán todas las llaves.
