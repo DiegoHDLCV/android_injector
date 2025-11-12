@@ -733,13 +733,14 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
             Button(
                 onClick = { viewModel.cancelCeremony() },
                 modifier = Modifier.weight(1f),
+                enabled = state.customName.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.tertiary
                 )
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = null)
+                Icon(imageVector = Icons.Default.Close, contentDescription = null)
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Nueva")
+                Text("Salir")
             }
             Button(
                 onClick = { viewModel.showConfirmSaveModal() },
