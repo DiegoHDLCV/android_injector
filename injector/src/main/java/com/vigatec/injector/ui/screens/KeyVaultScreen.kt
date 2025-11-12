@@ -7,7 +7,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Refresh
@@ -33,6 +32,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.persistence.entities.InjectedKeyEntity
 import com.vigatec.injector.viewmodel.KeyVaultViewModel
 import com.vigatec.injector.util.PermissionManager
+import com.vigatec.injector.BuildConfig
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -51,7 +51,6 @@ fun KeyVaultScreen(
             KeyVaultTopBar(
                 onRefresh = { viewModel.loadKeys() },
                 onClearAll = { viewModel.onShowClearAllConfirmation() },
-                onGenerateTestKeys = { viewModel.generateTestKeys() },
                 onImportTestKeys = { viewModel.onImportTestKeys() },
                 onNavigateToExportImport = onNavigateToExportImport,
                 loading = state.loading,
@@ -185,7 +184,6 @@ fun KeyVaultScreen(
 fun KeyVaultTopBar(
     onRefresh: () -> Unit,
     onClearAll: () -> Unit,
-    onGenerateTestKeys: () -> Unit,
     onImportTestKeys: () -> Unit,
     onNavigateToExportImport: () -> Unit,
     loading: Boolean,
@@ -214,23 +212,21 @@ fun KeyVaultTopBar(
             }
             // Solo admins pueden acceder a exportar/importar
             if (isAdmin) {
+                @Suppress("KotlinConstantConditions")
+                val isDevFlavor = BuildConfig.FLAVOR == "dev"
                 IconButton(
                     onClick = onNavigateToExportImport,
                     enabled = !loading
                 ) {
                     Icon(Icons.Default.ImportExport, contentDescription = "Exportar/Importar")
                 }
-                IconButton(
-                    onClick = onImportTestKeys,
-                    enabled = !loading
-                ) {
-                    Icon(Icons.Default.Upload, contentDescription = "Importar Llaves de Prueba")
-                }
-                IconButton(
-                    onClick = onGenerateTestKeys,
-                    enabled = !loading
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Generar Llaves de Prueba")
+                if (isDevFlavor) {
+                    IconButton(
+                        onClick = onImportTestKeys,
+                        enabled = !loading
+                    ) {
+                        Icon(Icons.Default.Upload, contentDescription = "Importar Llaves de Prueba")
+                    }
                 }
                 IconButton(onClick = onClearAll, enabled = !loading) {
                     Icon(Icons.Default.Delete, contentDescription = "Limpiar Almacén")
@@ -241,7 +237,8 @@ fun KeyVaultTopBar(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
             titleContentColor = MaterialTheme.colorScheme.onSurface,
             actionIconContentColor = MaterialTheme.colorScheme.onSurface
-        )
+        ),
+        windowInsets = WindowInsets(0, 0, 0, 0)
     )
 }
 

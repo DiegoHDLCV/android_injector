@@ -42,9 +42,6 @@ import com.vigatec.injector.ui.components.ProfileCardSkeleton
 import com.vigatec.injector.viewmodel.ProfileFormData
 import com.vigatec.injector.viewmodel.ProfileViewModel
 import com.vigatec.injector.viewmodel.KeyInjectionViewModel
-import com.vigatec.injector.viewmodel.InjectionStatus
-import com.vigatec.config.SystemConfig
-import com.vigatec.config.EnumManufacturer
 import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,7 +69,8 @@ fun ProfilesScreen(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
                     titleContentColor = MaterialTheme.colorScheme.onSurface,
                     actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                )
+                ),
+                windowInsets = WindowInsets(0, 0, 0, 0)
             )
         }
     ) { padding ->
@@ -291,8 +289,7 @@ private fun ProfilesContent(
         item {
             SearchBar(
                 query = searchQuery,
-                onQueryChange = onSearchQueryChange,
-                placeholder = "Buscar perfiles..."
+                onQueryChange = onSearchQueryChange
             )
         }
 
@@ -321,14 +318,13 @@ private fun ProfilesContent(
 @Composable
 private fun SearchBar(
     query: String,
-    onQueryChange: (String) -> Unit,
-    placeholder: String
+    onQueryChange: (String) -> Unit
 ) {
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
         modifier = Modifier.fillMaxWidth(),
-        placeholder = { Text(placeholder) },
+        placeholder = { Text("Buscar perfiles...") },
         leadingIcon = {
             Icon(
                 Icons.Default.Search,
@@ -927,16 +923,6 @@ fun getAppTypeConfig(appType: String): AppTypeConfig {
                 colors = listOf(Color(0xFF757575), Color(0xFF616161))
             )
         )
-    }
-}
-
-fun getUsageIcon(usage: String): String {
-    return when (usage.uppercase()) {
-        "PIN" -> "🔐"
-        "MAC" -> "🔒"
-        "DATA" -> "📄"
-        "KTK" -> "🗝️"
-        else -> "🔑"
     }
 }
 
@@ -1858,7 +1844,7 @@ fun KeyConfigurationItem(
                                            else MaterialTheme.colorScheme.error
                                 )
                             },
-                            isError = isDukptKey && config.ksn.length != 20,
+                            isError = config.ksn.length != 20,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -2117,7 +2103,7 @@ fun KeyConfigurationItem(
                                            else MaterialTheme.colorScheme.error
                                 )
                             },
-                            isError = isDukptKey && config.ksn.length != 20,
+                            isError = config.ksn.length != 20,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

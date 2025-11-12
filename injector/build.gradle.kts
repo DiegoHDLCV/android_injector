@@ -70,6 +70,7 @@ android {
         jvmTarget = "11"
     }
 
+    @Suppress("UnstableApiUsage")
     testOptions {
         unitTests {
             isReturnDefaultValues = true
@@ -87,6 +88,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
