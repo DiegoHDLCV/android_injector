@@ -12,9 +12,9 @@ data class ProfileEntity(
     val applicationType: String,
     val keyConfigurations: List<KeyConfiguration>,
 
-    // Configuración de cifrado KEK
-    val useKEK: Boolean = false,          // Activar cifrado con KEK
-    val selectedKEKKcv: String = "",       // KCV de la KEK seleccionada
+    // Configuración de KTK - OBLIGATORIO
+    val useKTK: Boolean = true,            // Activar cifrado con KTK (siempre true, required)
+    val selectedKTKKcv: String = "",       // KCV de la KTK seleccionada (obligatorio)
 
     // Configuración del dispositivo/fabricante
     val deviceType: String = "AISINO"     // AISINO, NEWPOS, etc.

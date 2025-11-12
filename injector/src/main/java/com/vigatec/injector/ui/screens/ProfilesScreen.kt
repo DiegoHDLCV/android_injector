@@ -489,7 +489,8 @@ fun ProfileCard(
     val totalKeys = profile.keyConfigurations.size
     val readyKeys = profile.keyConfigurations.count { it.selectedKey.isNotBlank() }
     val hasAny = totalKeys > 0
-    val isReady = hasAny && readyKeys == totalKeys
+    val ktkConfigured = profile.selectedKTKKcv.isNotBlank()
+    val isReady = hasAny && readyKeys == totalKeys && ktkConfigured
     val statusColor = when {
         isReady -> MaterialTheme.colorScheme.primary
         hasAny  -> MaterialTheme.colorScheme.secondary
@@ -660,7 +661,57 @@ fun ProfileCard(
                 }
             }
 
-            // ====== PROGRESO (si aplica) ======
+            // ====== SECCIÓN DE KTK (OBLIGATORIO) ======
+            Surface(
+                color = if (profile.selectedKTKKcv.isNotBlank()) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                } else {
+                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = if (profile.selectedKTKKcv.isNotBlank()) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "KTK",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (profile.selectedKTKKcv.isNotBlank()) {
+                                "Configurada: ${profile.selectedKTKKcv.take(8)}"
+                            } else {
+                                "Requiere configuración"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (profile.selectedKTKKcv.isNotBlank()) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            }
+                        )
+                    }
+                }
+            }
+
+            // ====== PROGRESO DE LLAVES ======
             if (hasAny) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     LinearProgressIndicator(
@@ -674,9 +725,15 @@ fun ProfileCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 2.dp),
-                        horizontalArrangement = Arrangement.End,
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Text(
+                            text = "Llaves: $readyKeys/$totalKeys",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
+                        )
                         Text(
                             text = "${(progress * 100).toInt()}%",
                             style = MaterialTheme.typography.labelSmall,
@@ -687,7 +744,7 @@ fun ProfileCard(
                 }
             }
 
-            // ====== LLAVES / CHIPS ======
+            // ====== CHIPS DE LLAVES ======
             if (totalKeys > 0) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(
@@ -1158,17 +1215,17 @@ fun CreateProfileModal(
                         }
                     }
 
-                    // --- Configuración de Cifrado KTK ---
+                    // --- Configuración de KTK (OBLIGATORIO) ---
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = "🔐 Configuración de Cifrado",
+                            text = "🔐 Cifrado KTK (Obligatorio)",
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.error
                         )
 
                         Card(
                             colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
                             ),
                             shape = RoundedCornerShape(12.dp)
                         ) {
@@ -1176,30 +1233,32 @@ fun CreateProfileModal(
                                 modifier = Modifier.padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                // Toggle para activar KTK
+                                // Información obligatoria
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "Usar cifrado KTK",
+                                            text = "KTK Requerida",
                                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
                                         )
                                         Text(
-                                            text = "Cifra todas las llaves antes de enviarlas",
+                                            text = "Debes seleccionar una llave como KTK para cifrar",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                         )
                                     }
-                                    Switch(
-                                        checked = formData.useKTK,
-                                        onCheckedChange = { onFormDataChange(formData.copy(useKTK = it)) }
-                                    )
                                 }
 
-                                // Mostrar KTK activa (solo lectura si useKTK está activado)
+                                // Mostrar KTK activa (solo lectura)
                                 if (formData.useKTK) {
                                     if (formData.currentKTK == null) {
                                         // No hay KTK activa
@@ -2226,7 +2285,8 @@ fun ImportProfileModal(
   "name": "Mi Perfil Test",
   "description": "Perfil de prueba",
   "applicationType": "Retail",
-  "useKEK": false,
+  "useKTK": true,
+  "selectedKTKKcv": "ABC123",
   "keyConfigurations": [...]
 }""",
                                     style = MaterialTheme.typography.bodySmall,
@@ -2342,7 +2402,7 @@ fun ImportProfileModal(
                                 )
                             }
                             Text(
-                                text = "• name: Nombre del perfil (requerido)\n• applicationType: Tipo de aplicación (requerido)\n• description: Descripción opcional\n• useKEK: true/false para usar cifrado KEK\n• keyConfigurations: Array de configuraciones de llaves",
+                                text = "• name: Nombre del perfil (requerido)\n• applicationType: Tipo de aplicación (requerido)\n• description: Descripción opcional\n• useKTK: true (siempre requerida)\n• selectedKTKKcv: KCV de la KTK seleccionada (requerida)\n• keyConfigurations: Array de configuraciones de llaves",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                 modifier = Modifier.padding(start = 24.dp)

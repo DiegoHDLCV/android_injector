@@ -40,7 +40,7 @@ data class ProfileFormData(
     val description: String = "",
     val appType: String = "",
     val keyConfigurations: List<KeyConfiguration> = emptyList(),
-    val useKTK: Boolean = false,
+    val useKTK: Boolean = true,  // Siempre true - KTK es obligatoria
     val selectedKTKKcv: String = "",
     val currentKTK: InjectedKeyEntity? = null, // KTK activa del almacén
     val deviceType: String = "AISINO" // AISINO o NEWPOS
@@ -117,8 +117,8 @@ class ProfileViewModel @Inject constructor(
                     description = profile.description,
                     appType = profile.applicationType,
                     keyConfigurations = profile.keyConfigurations,
-                    useKTK = profile.useKEK,
-                    selectedKTKKcv = currentKTK?.kcv ?: profile.selectedKEKKcv, // Usar la KTK activa si existe
+                    useKTK = profile.useKTK,
+                    selectedKTKKcv = currentKTK?.kcv ?: profile.selectedKTKKcv, // Usar la KTK activa si existe
                     currentKTK = currentKTK,
                     deviceType = profile.deviceType
                 )
@@ -210,8 +210,8 @@ class ProfileViewModel @Inject constructor(
                 description = formData.description,
                 applicationType = formData.appType,
                 keyConfigurations = formData.keyConfigurations,
-                useKEK = formData.useKTK,
-                selectedKEKKcv = formData.selectedKTKKcv,
+                useKTK = formData.useKTK,
+                selectedKTKKcv = formData.selectedKTKKcv,
                 deviceType = formData.deviceType
             )
             
@@ -354,8 +354,8 @@ class ProfileViewModel @Inject constructor(
                     description = profileData.description,
                     applicationType = profileData.applicationType,
                     keyConfigurations = keyConfigurations,
-                    useKEK = profileData.useKEK,
-                    selectedKEKKcv = profileData.selectedKEKKcv
+                    useKTK = profileData.useKTK,
+                    selectedKTKKcv = profileData.selectedKTKKcv
                 )
 
                 // Guardar perfil
@@ -377,8 +377,8 @@ class ProfileViewModel @Inject constructor(
         val name: String = "",
         val description: String = "",
         val applicationType: String = "",
-        val useKEK: Boolean = false,
-        val selectedKEKKcv: String = "",
+        val useKTK: Boolean = true,  // Siempre true - KTK es obligatoria
+        val selectedKTKKcv: String = "",
         val keyConfigurations: List<KeyConfiguration> = emptyList()
     )
 
@@ -409,8 +409,8 @@ class ProfileViewModel @Inject constructor(
             name = jsonObject.optString("name", ""),
             description = jsonObject.optString("description", ""),
             applicationType = jsonObject.optString("applicationType", ""),
-            useKEK = jsonObject.optBoolean("useKEK", false),
-            selectedKEKKcv = jsonObject.optString("selectedKEKKcv", ""),
+            useKTK = jsonObject.optBoolean("useKTK", true),  // Siempre true por defecto
+            selectedKTKKcv = jsonObject.optString("selectedKTKKcv", ""),
             keyConfigurations = keyConfigurations
         )
     }

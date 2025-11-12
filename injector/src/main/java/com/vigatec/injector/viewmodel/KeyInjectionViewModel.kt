@@ -167,9 +167,9 @@ class KeyInjectionViewModel @Inject constructor(
 
             Log.i(TAG, "=== INICIANDO PROCESO DE INYECCIÓN FUTUREX ===")
             Log.i(TAG, "Perfil: ${profile.name}")
-            Log.i(TAG, "¿Usa KTK?: ${profile.useKEK}")
-            if (profile.useKEK) {
-                Log.i(TAG, "KTK seleccionada (KCV): ${profile.selectedKEKKcv}")
+            Log.i(TAG, "¿Usa KTK?: ${profile.useKTK}")
+            if (profile.useKTK) {
+                Log.i(TAG, "KTK seleccionada (KCV): ${profile.selectedKTKKcv}")
             }
             Log.i(TAG, "Configuraciones de llave: ${keyConfigs.size}")
             keyConfigs.forEachIndexed { index, config ->
@@ -212,17 +212,17 @@ class KeyInjectionViewModel @Inject constructor(
                 )
 
                 // === PASO 1: SIEMPRE INYECTAR KTK SELECCIONADA ===
-                if (profile.useKEK && profile.selectedKEKKcv.isNotEmpty()) {
+                if (profile.useKTK && profile.selectedKTKKcv.isNotEmpty()) {
                     Log.i(TAG, "=== INYECTANDO KTK SELECCIONADA ===")
                     _state.value = _state.value.copy(
                         log = _state.value.log + "Inyectando KTK seleccionada para cifrado...\n"
                     )
 
                     // Obtener la KTK de la base de datos
-                    val kek = injectedKeyRepository.getKeyByKcv(profile.selectedKEKKcv)
+                    val kek = injectedKeyRepository.getKeyByKcv(profile.selectedKTKKcv)
 
                     if (kek == null) {
-                        Log.e(TAG, "KTK no encontrada con KCV: ${profile.selectedKEKKcv}")
+                        Log.e(TAG, "KTK no encontrada con KCV: ${profile.selectedKTKKcv}")
                         throw Exception("KTK seleccionada no encontrada en la base de datos")
                     }
 
