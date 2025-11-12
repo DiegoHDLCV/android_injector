@@ -11,7 +11,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.persistence"
+    namespace = "com.vigatec.persistence"
     compileSdk = 35
 
     defaultConfig {

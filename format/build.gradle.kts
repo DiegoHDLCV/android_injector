@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.format"
+    namespace = "com.vigatec.format"
     compileSdk = 35
 
     defaultConfig {

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.communication"
+    namespace = "com.vigatec.communication"
     compileSdk = 35
 
     sourceSets {

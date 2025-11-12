@@ -45,6 +45,9 @@ fun KeyVaultScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
 
+    // Verificar si hay KEK Storage oculta
+    val hasHiddenKEKStorage = !state.showKEKStorage && state.isAdmin
+
     Scaffold(
         topBar = {
             KeyVaultTopBar(
@@ -54,7 +57,9 @@ fun KeyVaultScreen(
                 onImportTestKeys = { viewModel.onImportTestKeys() },
                 onNavigateToExportImport = onNavigateToExportImport,
                 loading = state.loading,
-                isAdmin = state.isAdmin
+                isAdmin = state.isAdmin,
+                hasHiddenKEKStorage = hasHiddenKEKStorage,
+                onShowKEKStoragePasswordDialog = { viewModel.onShowKEKStoragePasswordDialog() }
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -95,54 +100,6 @@ fun KeyVaultScreen(
                 }
             } else {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // Botón para mostrar KEK Storage (si existe y está oculta)
-                    // Verificar si hay KEK Storage comparando el total de llaves con las mostradas
-                    val hasKEKStorage = remember(state.keysWithProfiles.size) {
-                        // Si no estamos mostrando KEK Storage pero el usuario es admin, probablemente hay KEK Storage oculta
-                        !state.showKEKStorage && state.isAdmin
-                    }
-                    
-                    if (hasKEKStorage) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "KEK Storage",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "Oculta por seguridad",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                IconButton(
-                                    onClick = { viewModel.onShowKEKStoragePasswordDialog() }
-                                ) {
-                                    Icon(
-                                        Icons.Default.MoreVert,
-                                        contentDescription = "Mostrar KEK Storage",
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    
                     LazyVerticalGrid(
                         columns = GridCells.Adaptive(minSize = 300.dp),
                         contentPadding = PaddingValues(16.dp),
@@ -155,7 +112,8 @@ fun KeyVaultScreen(
                                 assignedProfiles = keyWithProfiles.assignedProfiles,
                                 onDelete = { viewModel.onShowDeleteModal(it) },
                                 onToggleKTK = { viewModel.toggleKeyAsKTK(it) },
-                                isAdmin = state.isAdmin
+                                isAdmin = state.isAdmin,
+                                onHideKEKStorage = { viewModel.hideKEKStorage() }
                             )
                         }
                     }
@@ -221,13 +179,28 @@ fun KeyVaultTopBar(
     onImportTestKeys: () -> Unit,
     onNavigateToExportImport: () -> Unit,
     loading: Boolean,
-    isAdmin: Boolean
+    isAdmin: Boolean,
+    hasHiddenKEKStorage: Boolean = false,
+    onShowKEKStoragePasswordDialog: () -> Unit = {}
 ) {
     TopAppBar(
         title = { Text("Almacén de Llaves", fontWeight = FontWeight.Bold) },
         actions = {
             IconButton(onClick = onRefresh, enabled = !loading) {
                 Icon(Icons.Default.Refresh, contentDescription = "Refrescar")
+            }
+            // Mostrar indicador de KEK Storage oculta si existe
+            if (isAdmin && hasHiddenKEKStorage) {
+                IconButton(
+                    onClick = onShowKEKStoragePasswordDialog,
+                    enabled = !loading
+                ) {
+                    Icon(
+                        Icons.Default.VisibilityOff,
+                        contentDescription = "KEK Storage oculta - Toca para mostrar",
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
             // Solo admins pueden acceder a exportar/importar
             if (isAdmin) {
@@ -268,7 +241,8 @@ fun KeyCard(
     assignedProfiles: List<String> = emptyList(),
     onDelete: (InjectedKeyEntity) -> Unit,
     onToggleKTK: (InjectedKeyEntity) -> Unit,
-    isAdmin: Boolean = false
+    isAdmin: Boolean = false,
+    onHideKEKStorage: (() -> Unit)? = null
 ) {
     val isCeremonyKey = key.keyType == "CEREMONY_KEY"
     val isKEKStorage = key.isKEKStorage() // KEK creada en ceremonia
@@ -432,7 +406,8 @@ fun KeyCard(
             // Botones de acciones
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 // Botón "Marcar como KTK" / "Quitar KTK" - Disponible para todos si NO es KEK Storage
                 if (!isKEKStorage) {
@@ -448,12 +423,25 @@ fun KeyCard(
                     }
                 }
 
+                // Botón Ocultar - Solo para KEK Storage
+                if (isKEKStorage && onHideKEKStorage != null) {
+                    OutlinedButton(
+                        onClick = onHideKEKStorage,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.tertiary
+                        )
+                    ) {
+                        Text("Ocultar", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+
                 // Botón Eliminar - Solo para administradores
                 if (isAdmin) {
                     Button(
                         onClick = { onDelete(key) },
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                        modifier = if (isKEKStorage) Modifier.fillMaxWidth() else Modifier.weight(1f)
+                        modifier = Modifier.weight(1f)
                     ) {
                         Text("Eliminar", style = MaterialTheme.typography.labelMedium)
                     }

@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.config"
+    namespace = "com.vigatec.config"
     compileSdk = 35
 
     defaultConfig {

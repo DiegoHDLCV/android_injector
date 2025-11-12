@@ -27,12 +27,16 @@ fun getManufacturerFromString(deviceName: String): EnumManufacturer {
         deviceName.contains("NEWPOS", ignoreCase = true) -> EnumManufacturer.NEWPOS
         deviceName.contains("NEW9220", ignoreCase = true) -> EnumManufacturer.NEWPOS // <-- AÑADE ESTA LÍNEA
         deviceName.contains("NEW9830", ignoreCase = true) -> EnumManufacturer.NEWPOS
+        deviceName.contains("NEW9220", ignoreCase = true) -> EnumManufacturer.NEWPOS
+        deviceName.contains("NEW9310", ignoreCase = true) -> EnumManufacturer.NEWPOS
+
 
         // Lógica para Vanstone/Aisino
         deviceName.contains("Vanstone", ignoreCase = true) -> EnumManufacturer.AISINO
         deviceName.contains("Aisino", ignoreCase = true) -> EnumManufacturer.AISINO
         deviceName.contains("A90 Pro", ignoreCase = true) -> EnumManufacturer.AISINO
         deviceName.contains("A75 Pro", ignoreCase = true) -> EnumManufacturer.AISINO
+        deviceName.contains("A99", ignoreCase = true) -> EnumManufacturer.AISINO
 
 
         // Otros fabricantes
