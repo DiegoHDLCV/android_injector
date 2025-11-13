@@ -1,6 +1,5 @@
 package com.vigatec.injector.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,8 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.injector.viewmodel.LogsViewModel
-import java.text.SimpleDateFormat
-import java.util.*
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,6 +174,10 @@ fun LogDetailScreen(
 
                         if (log.keySlot >= 0) {
                             LogDetailRow(label = "Slot", value = log.keySlot.toString(), icon = Icons.Default.Storage)
+                        }
+
+                        if (log.deviceInfo.isNotEmpty()) {
+                            LogDetailRow(label = "Dispositivo Receptor", value = log.deviceInfo, icon = Icons.Default.Hardware)
                         }
                     }
                 }
