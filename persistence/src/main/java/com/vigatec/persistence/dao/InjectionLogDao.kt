@@ -82,6 +82,21 @@ interface InjectionLogDao {
     suspend fun getSuccessfulLogsCountByUser(username: String): Int
 
     /**
+     * Cuenta inyecciones exitosas realizadas desde una fecha específica.
+     * Cuenta perfiles únicos inyectados hoy (no llaves individuales).
+     * Útil para obtener estadísticas de inyecciones del día actual.
+     */
+    @Query("SELECT COUNT(DISTINCT profileName) FROM injection_logs WHERE timestamp >= :startOfDay AND operationStatus = 'SUCCESS'")
+    suspend fun getSuccessfulInjectionCountToday(startOfDay: Long): Int
+
+    /**
+     * Obtiene logs exitosos desde una fecha específica como Flow.
+     * Útil para observar cambios en tiempo real en el Dashboard.
+     */
+    @Query("SELECT * FROM injection_logs WHERE timestamp >= :startOfDay AND operationStatus = 'SUCCESS' ORDER BY timestamp DESC")
+    fun getSuccessfulLogsSince(startOfDay: Long): Flow<List<InjectionLogEntity>>
+
+    /**
      * Obtiene un log específico por ID.
      */
     @Query("SELECT * FROM injection_logs WHERE id = :logId LIMIT 1")

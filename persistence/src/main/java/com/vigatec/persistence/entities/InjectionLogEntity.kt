@@ -16,7 +16,9 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["timestamp"], unique = false),
         Index(value = ["username"], unique = false),
-        Index(value = ["profileName"], unique = false)
+        Index(value = ["profileName"], unique = false),
+        Index(value = ["operationStatus"], unique = false),
+        Index(value = ["timestamp", "operationStatus"], unique = false) // Índice compuesto para la query getSuccessfulLogsSince
     ]
 )
 data class InjectionLogEntity(

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.vigatec.injector.viewmodel
 
 import android.util.Log
@@ -28,7 +30,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.nio.charset.Charset
 import javax.inject.Inject
 
 enum class InjectionStatus {
@@ -37,7 +38,7 @@ enum class InjectionStatus {
     INJECTING,
     SUCCESS,
     ERROR,
-    COMPLETED
+    @Suppress("UNUSED") COMPLETED
 }
 
 data class KeyInjectionState(
@@ -54,11 +55,11 @@ data class KeyInjectionState(
 
 @HiltViewModel
 class KeyInjectionViewModel @Inject constructor(
-    private val profileRepository: ProfileRepository,
+    @Suppress("UNUSED") private val profileRepository: ProfileRepository,
     private val injectedKeyRepository: InjectedKeyRepository,
     private val kekManager: com.vigatec.injector.manager.KEKManager,
     private val injectionLogger: com.vigatec.injector.util.InjectionLogger,
-    private val application: android.app.Application
+    @Suppress("UNUSED") private val application: android.app.Application
 ) : ViewModel() {
 
     private val TAG = "KeyInjectionViewModel"
@@ -138,6 +139,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "================================================")
     }
     
+    @Suppress("UNUSED")
     fun setCurrentUsername(username: String) {
         currentUsername = username
         Log.i(TAG, "Usuario establecido para logs: $username")
@@ -295,6 +297,12 @@ class KeyInjectionViewModel @Inject constructor(
                 }
 
                 Log.i(TAG, "=== INYECCIÓN FUTUREX COMPLETADA EXITOSAMENTE ===")
+                Log.i(TAG, "Perfil inyectado: ${profile.name}")
+                Log.i(TAG, "Usuario: $currentUsername")
+                Log.i(TAG, "Total de llaves inyectadas: ${profile.keyConfigurations.size}")
+                Log.i(TAG, "✓ Todos los logs de inyección han sido registrados en la base de datos")
+                Log.i(TAG, "El Dashboard debería actualizar el contador automáticamente")
+                
                 _state.value = _state.value.copy(
                     status = InjectionStatus.SUCCESS,
                     log = _state.value.log + "¡Inyección completada exitosamente!\n"
@@ -311,7 +319,7 @@ class KeyInjectionViewModel @Inject constructor(
                         commandSent = "N/A - Error antes de enviar comando",
                         responseReceived = "N/A - Error en validación o preparación",
                         username = currentUsername,
-                        profileName = profile?.name ?: "Desconocido",
+                        profileName = profile.name,
                         keyType = "N/A",
                         keySlot = -1,
                         notes = "Error durante la inyección: ${e.message}\nStackTrace: ${e.stackTraceToString().take(500)}"
@@ -524,7 +532,7 @@ class KeyInjectionViewModel @Inject constructor(
         val finalKeyData: String
         val ktkSlotStr: String
         val ktkChecksum: String
-        var ktkAlgorithm = "" // Algoritmo de la KTK (vacío para plaintext)
+        var ktkAlgorithm: String // Algoritmo de la KTK (vacío para plaintext)
 
         if (isDukptPlaintext) {
             // === MODO DUKPT PLAINTEXT (EncryptionType 05) ===
@@ -538,6 +546,7 @@ class KeyInjectionViewModel @Inject constructor(
             encryptionType = "05" // DUKPT Plaintext (sin cifrado)
             ktkSlotStr = "00"      // No se usa KTK en plaintext
             ktkChecksum = "0000"   // No se usa checksum de KTK
+            // ktkAlgorithm no se usa en modo DUKPT plaintext
 
             Log.i(TAG, "✓ IPEK DUKPT lista para enviar en plaintext")
             Log.i(TAG, "  - Datos (primeros 32): ${selectedKey.keyData.take(32)}...")
@@ -679,12 +688,12 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "Checksum de llave: $keyChecksum (KCV: ${selectedKey.kcv})")
         Log.i(TAG, "Checksum KTK: $ktkChecksum")
         Log.i(TAG, "KSN: $ksn (20 caracteres)")
-        if (!isDukptPlaintext && ktkData != null) {
-            Log.i(TAG, "Longitud KTK: ${String.format("%03X", ktkData.length / 2)} (${ktkData.length / 2} bytes)")
-        } else if (!isDukptPlaintext) {
-            Log.i(TAG, "Longitud KTK: No disponible (KTK no está cargada)")
-        } else {
+        if (isDukptPlaintext) {
             Log.i(TAG, "Longitud KTK: No aplicable (DUKPT plaintext sin KTK)")
+        } else if (ktkData != null) {
+            Log.i(TAG, "Longitud KTK: ${String.format("%03X", ktkData.length / 2)} (${ktkData.length / 2} bytes)")
+        } else {
+            Log.i(TAG, "Longitud KTK: No disponible (KTK no está cargada)")
         }
         Log.i(TAG, "Longitud de llave: $keyLength ($keyLengthBytes bytes)")
         Log.i(TAG, "  - Formato: ASCII HEX (3 dígitos)")
@@ -758,7 +767,10 @@ class KeyInjectionViewModel @Inject constructor(
 
     /**
      * MÉTODO DE DEBUG: Verifica el cálculo del LRC para un comando Futurex
+     * Nota: El parámetro 'command' siempre es "02" en este contexto, pero se mantiene como parámetro
+     * para mantener la flexibilidad del método de debug.
      */
+    @Suppress("SameParameterValue")
     private fun debugLrcCalculation(command: String, fields: List<String>) {
         Log.i(TAG, "=== DEBUG LRC CALCULATION ===")
         
@@ -980,7 +992,7 @@ class KeyInjectionViewModel @Inject constructor(
         }
     }
 
-    private suspend fun sendData(data: ByteArray) {
+    private fun sendData(data: ByteArray) {
         if (comController == null) {
             throw Exception("Controlador de comunicación no inicializado")
         }
@@ -994,7 +1006,7 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "✓ Enviados ${result} bytes: ${data.toHexString().take(40)}...")
     }
 
-    private suspend fun waitForResponse(): ByteArray {
+    private fun waitForResponse(): ByteArray {
         Log.i(TAG, "Esperando respuesta (timeout: 10s)...")
 
         val buffer = ByteArray(1024)
@@ -1011,7 +1023,7 @@ class KeyInjectionViewModel @Inject constructor(
         return response
     }
 
-    private fun processInjectionResponse(response: ByteArray, keyConfig: KeyConfiguration, commandSent: ByteArray) {
+    private fun processInjectionResponse(response: ByteArray, keyConfig: KeyConfiguration, @Suppress("UNUSED_PARAMETER") commandSent: ByteArray) {
         Log.i(TAG, "=== PROCESANDO RESPUESTA FUTUREX ===")
         Log.i(TAG, "Configuración de llave: ${keyConfig.usage} (Slot: ${keyConfig.slot})")
         Log.i(TAG, "Respuesta recibida: ${response.size} bytes")
@@ -1226,7 +1238,8 @@ class KeyInjectionViewModel @Inject constructor(
     /**
      * Envía comando para leer el número de serie del dispositivo
      */
-    suspend fun readDeviceSerial(): String? {
+    @Suppress("UNUSED")
+    fun readDeviceSerial(): String? {
         if (comController == null) {
             Log.e(TAG, "No se puede leer número de serie: controlador no inicializado")
             return null
@@ -1277,7 +1290,8 @@ class KeyInjectionViewModel @Inject constructor(
     /**
      * Envía comando para escribir el número de serie del dispositivo
      */
-    suspend fun writeDeviceSerial(serialNumber: String): Boolean {
+    @Suppress("UNUSED")
+    fun writeDeviceSerial(serialNumber: String): Boolean {
         if (comController == null) {
             Log.e(TAG, "No se puede escribir número de serie: controlador no inicializado")
             return false
@@ -1333,7 +1347,8 @@ class KeyInjectionViewModel @Inject constructor(
     /**
      * Envía comando para eliminar todas las llaves del dispositivo
      */
-    suspend fun deleteAllKeys(): Boolean {
+    @Suppress("UNUSED")
+    fun deleteAllKeys(): Boolean {
         if (comController == null) {
             Log.e(TAG, "No se puede eliminar llaves: controlador no inicializado")
             return false
@@ -1383,7 +1398,8 @@ class KeyInjectionViewModel @Inject constructor(
     /**
      * Envía comando para eliminar una llave específica
      */
-    suspend fun deleteSingleKey(keySlot: Int, keyType: String): Boolean {
+    @Suppress("UNUSED")
+    fun deleteSingleKey(keySlot: Int, keyType: String): Boolean {
         if (comController == null) {
             Log.e(TAG, "No se puede eliminar llave: controlador no inicializado")
             return false
@@ -1438,7 +1454,7 @@ class KeyInjectionViewModel @Inject constructor(
      * Exporta una KEK al dispositivo SubPOS en claro (sin cifrar)
      * La KEK se envía al slot 00 (fijo para KEKs) usando el comando de inyección Futurex
      */
-    private suspend fun exportKEKToDevice(kek: InjectedKeyEntity) {
+    private fun exportKEKToDevice(kek: InjectedKeyEntity) {
         Log.i(TAG, "=== EXPORTANDO KEK AL SUBPOS ===")
         Log.i(TAG, "KEK a exportar:")
         Log.i(TAG, "  - KCV: ${kek.kcv}")
@@ -1544,7 +1560,7 @@ class KeyInjectionViewModel @Inject constructor(
      *
      * @return true si es DUKPT plaintext, false si es otra llave
      */
-    private fun isDukptPlaintextKey(keyConfig: KeyConfiguration, selectedKey: InjectedKeyEntity): Boolean {
+    private fun isDukptPlaintextKey(keyConfig: KeyConfiguration, @Suppress("UNUSED_PARAMETER") selectedKey: InjectedKeyEntity): Boolean {
         // Detectar si es tipo DUKPT
         val isDukptType = keyConfig.keyType.contains("DUKPT", ignoreCase = true) &&
                          keyConfig.keyType.contains("IPEK", ignoreCase = true)

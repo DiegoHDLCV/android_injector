@@ -12,11 +12,10 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.setValue
+import android.util.Log
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,7 +25,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.vigatec.injector.ui.components.StatCardSkeleton
@@ -44,12 +42,25 @@ private data class QuickActionMeta(
 
 @Composable
 fun DashboardScreen(
-    username: String,
-    navController: NavController,
+    @Suppress("UNUSED_PARAMETER") username: String,
+    @Suppress("UNUSED_PARAMETER") navController: NavController,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val dashboardStateState = viewModel.state.collectAsState()
     val dashboardState = dashboardStateState.value
+    
+    // Observar cambios en injectionsToday para depuración
+    LaunchedEffect(dashboardState.stats.injectionsToday) {
+        Log.d("DashboardScreen", "🔄 UI: injectionsToday cambió a ${dashboardState.stats.injectionsToday}")
+        Log.d("DashboardScreen", "  - Stats completo: profiles=${dashboardState.stats.profilesCount}, keys=${dashboardState.stats.keysCount}, injections=${dashboardState.stats.injectionsToday}, users=${dashboardState.stats.usersCount}")
+    }
+    
+    // Observar cambios en el estado completo para depuración
+    LaunchedEffect(dashboardState) {
+        Log.d("DashboardScreen", "🔄 UI: DashboardState cambió")
+        Log.d("DashboardScreen", "  - isLoading: ${dashboardState.isLoading}")
+        Log.d("DashboardScreen", "  - stats.injectionsToday: ${dashboardState.stats.injectionsToday}")
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -108,6 +119,7 @@ fun DashboardStatsSkeleton() {
     }
 }
 
+@Suppress("UNUSED")
 @Composable
 fun WelcomeCard(username: String) {
     Card(
@@ -146,6 +158,12 @@ fun WelcomeCard(username: String) {
 
 @Composable
 fun DashboardStats(stats: SystemStats) {
+    // Log cuando el composable se recomponiendo
+    LaunchedEffect(stats.injectionsToday) {
+        Log.d("DashboardStats", "🎨 Composable DashboardStats recomponiendo")
+        Log.d("DashboardStats", "  - injectionsToday: ${stats.injectionsToday}")
+    }
+    
     Column {
         Text(
             text = "Estadísticas Rápidas",
@@ -156,22 +174,22 @@ fun DashboardStats(stats: SystemStats) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            StatCard("Perfiles Activos", stats.profilesCount.toString(), Icons.AutoMirrored.Filled.Label, Modifier.weight(1f))
-            StatCard("Llaves Almacenadas", stats.keysCount.toString(), Icons.Default.VpnKey, Modifier.weight(1f))
+            StatCard(Modifier.weight(1f), "Perfiles Activos", stats.profilesCount.toString(), Icons.AutoMirrored.Filled.Label)
+            StatCard(Modifier.weight(1f), "Llaves Almacenadas", stats.keysCount.toString(), Icons.Default.VpnKey)
         }
         Spacer(modifier = Modifier.height(16.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            StatCard("Inyecciones Hoy", stats.injectionsToday.toString(), Icons.Default.BarChart, Modifier.weight(1f))
-            StatCard("Usuarios", stats.usersCount.toString(), Icons.Default.People, Modifier.weight(1f))
+            StatCard(Modifier.weight(1f), "Inyecciones Hoy", stats.injectionsToday.toString(), Icons.Default.BarChart)
+            StatCard(Modifier.weight(1f), "Usuarios", stats.usersCount.toString(), Icons.Default.People)
         }
     }
 }
 
 @Composable
-fun StatCard(title: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
+fun StatCard(modifier: Modifier = Modifier, title: String, value: String, icon: ImageVector) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(12.dp)
@@ -195,6 +213,7 @@ fun StatCard(title: String, value: String, icon: ImageVector, modifier: Modifier
     }
 }
 
+@Suppress("UNUSED")
 @Composable
 fun QuickActionsCard(navController: NavController) {
     Card(
@@ -224,18 +243,18 @@ fun QuickActionsCard(navController: NavController) {
                     QuickActionItem(
                         title = a0.title,
                         icon = a0.icon,
-                        isAdmin = a0.isAdmin,
                         onClick = a0.onClick,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        isAdmin = a0.isAdmin
                     )
                     if (i + 1 < actions.size) {
                         val a1 = actions[i + 1]
                         QuickActionItem(
                             title = a1.title,
                             icon = a1.icon,
-                            isAdmin = a1.isAdmin,
                             onClick = a1.onClick,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            isAdmin = a1.isAdmin
                         )
                     } else {
                         Spacer(modifier = Modifier.weight(1f))
@@ -251,9 +270,9 @@ fun QuickActionsCard(navController: NavController) {
 fun QuickActionItem(
     title: String,
     icon: ImageVector,
-    isAdmin: Boolean = false,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isAdmin: Boolean = false
 ) {
     Button(
         onClick = onClick,
@@ -275,6 +294,7 @@ fun QuickActionItem(
     }
 }
 
+@Suppress("UNUSED")
 @Composable
 fun ConnectionStatusCard(dashboardState: DashboardState, viewModel: DashboardViewModel) {
     Card(
@@ -370,6 +390,7 @@ fun ConnectionStatusCard(dashboardState: DashboardState, viewModel: DashboardVie
     }
 }
 
+@Suppress("UNUSED")
 @Composable
 fun SystemHealthCard(dashboardState: DashboardState) {
     Card(
@@ -391,6 +412,7 @@ fun SystemHealthCard(dashboardState: DashboardState) {
     }
 }
 
+@Suppress("UNUSED")
 @Composable
 fun CommLogsCard(entries: List<CommLogEntry>) {
     Card(

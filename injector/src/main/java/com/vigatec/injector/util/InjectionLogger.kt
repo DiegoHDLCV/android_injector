@@ -45,6 +45,7 @@ class InjectionLogger @Inject constructor(
         // Usar un scope de IO para no bloquear el hilo principal
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                val timestamp = System.currentTimeMillis()
                 val logEntity = InjectionLogEntity(
                     commandSent = commandSent,
                     responseReceived = responseReceived,
@@ -53,14 +54,23 @@ class InjectionLogger @Inject constructor(
                     profileName = profileName,
                     keyType = keyType,
                     keySlot = keySlot,
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = timestamp,
                     deviceInfo = deviceInfo,
                     notes = notes
                 )
-                injectionLogRepository.insertLog(logEntity)
+                val logId = injectionLogRepository.insertLog(logEntity)
+                android.util.Log.i("InjectionLogger", "=== LOG DE INYECCIÓN REGISTRADO ===")
+                android.util.Log.i("InjectionLogger", "  - ID: $logId")
+                android.util.Log.i("InjectionLogger", "  - Estado: $operationStatus")
+                android.util.Log.i("InjectionLogger", "  - Perfil: $profileName")
+                android.util.Log.i("InjectionLogger", "  - Usuario: $username")
+                android.util.Log.i("InjectionLogger", "  - Tipo de llave: $keyType")
+                android.util.Log.i("InjectionLogger", "  - Slot: $keySlot")
+                android.util.Log.i("InjectionLogger", "  - Timestamp: $timestamp (${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.getDefault()).format(java.util.Date(timestamp))})")
+                android.util.Log.i("InjectionLogger", "================================================")
             } catch (e: Exception) {
                 // Log silencioso en caso de error
-                android.util.Log.e("InjectionLogger", "Error al registrar log: ${e.message}")
+                android.util.Log.e("InjectionLogger", "Error al registrar log: ${e.message}", e)
             }
         }
     }

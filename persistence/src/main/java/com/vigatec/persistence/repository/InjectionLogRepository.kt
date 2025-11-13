@@ -23,6 +23,7 @@ class InjectionLogRepository @Inject constructor(
     /**
      * Inserta múltiples registros de log.
      */
+    @Suppress("UNUSED")
     suspend fun insertLogs(logs: List<InjectionLogEntity>) {
         injectionLogDao.insertLogs(logs)
     }
@@ -37,6 +38,7 @@ class InjectionLogRepository @Inject constructor(
     /**
      * Obtiene logs filtrados por usuario.
      */
+    @Suppress("UNUSED")
     fun getLogsByUsername(username: String): Flow<List<InjectionLogEntity>> {
         return injectionLogDao.getLogsByUsername(username)
     }
@@ -44,6 +46,7 @@ class InjectionLogRepository @Inject constructor(
     /**
      * Obtiene logs filtrados por perfil.
      */
+    @Suppress("UNUSED")
     fun getLogsByProfile(profileName: String): Flow<List<InjectionLogEntity>> {
         return injectionLogDao.getLogsByProfile(profileName)
     }
@@ -51,6 +54,7 @@ class InjectionLogRepository @Inject constructor(
     /**
      * Obtiene logs filtrados por rango de fechas.
      */
+    @Suppress("UNUSED")
     fun getLogsByDateRange(startTimestamp: Long, endTimestamp: Long): Flow<List<InjectionLogEntity>> {
         return injectionLogDao.getLogsByDateRange(startTimestamp, endTimestamp)
     }
@@ -58,6 +62,7 @@ class InjectionLogRepository @Inject constructor(
     /**
      * Obtiene logs con múltiples filtros aplicados.
      */
+    @Suppress("UNUSED")
     fun getLogsWithFilters(
         username: String? = null,
         profileName: String? = null,
@@ -70,6 +75,7 @@ class InjectionLogRepository @Inject constructor(
     /**
      * Obtiene logs por estado de operación.
      */
+    @Suppress("UNUSED")
     fun getLogsByStatus(status: String): Flow<List<InjectionLogEntity>> {
         return injectionLogDao.getLogsByStatus(status)
     }
@@ -77,6 +83,7 @@ class InjectionLogRepository @Inject constructor(
     /**
      * Cuenta el total de logs registrados.
      */
+    @Suppress("UNUSED")
     suspend fun getLogsCount(): Int {
         return injectionLogDao.getLogsCount()
     }
@@ -84,13 +91,34 @@ class InjectionLogRepository @Inject constructor(
     /**
      * Cuenta logs exitosos para un usuario específico.
      */
+    @Suppress("UNUSED")
     suspend fun getSuccessfulLogsCountByUser(username: String): Int {
         return injectionLogDao.getSuccessfulLogsCountByUser(username)
     }
 
     /**
+     * Cuenta inyecciones exitosas realizadas desde una fecha específica.
+     * Cuenta perfiles únicos inyectados hoy (no llaves individuales).
+     * Útil para obtener estadísticas de inyecciones del día actual.
+     */
+    @Suppress("UNUSED")
+    suspend fun getSuccessfulInjectionCountToday(startOfDay: Long): Int {
+        return injectionLogDao.getSuccessfulInjectionCountToday(startOfDay)
+    }
+
+    /**
+     * Obtiene logs exitosos desde una fecha específica como Flow.
+     * Útil para observar cambios en tiempo real en el Dashboard.
+     * El ViewModel puede mapear este Flow para contar perfiles únicos.
+     */
+    fun getSuccessfulLogsSince(startOfDay: Long): Flow<List<InjectionLogEntity>> {
+        return injectionLogDao.getSuccessfulLogsSince(startOfDay)
+    }
+
+    /**
      * Obtiene un log específico por ID.
      */
+    @Suppress("UNUSED")
     suspend fun getLogById(logId: Long): InjectionLogEntity? {
         return injectionLogDao.getLogById(logId)
     }
@@ -105,6 +133,7 @@ class InjectionLogRepository @Inject constructor(
     /**
      * Elimina logs más antiguos que una fecha específica.
      */
+    @Suppress("UNUSED")
     suspend fun deleteLogsOlderThan(timestamp: Long): Int {
         return injectionLogDao.deleteLogsOlderThan(timestamp)
     }

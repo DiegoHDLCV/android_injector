@@ -4,18 +4,21 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.vigatec.communication.libraries.CommunicationSDKManager
 import com.vigatec.communication.polling.PollingService
 import com.vigatec.communication.polling.CommLog
 import com.vigatec.persistence.repository.InjectedKeyRepository
 import com.vigatec.persistence.repository.ProfileRepository
+import com.vigatec.persistence.repository.InjectionLogRepository
 import com.vigatec.injector.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import java.util.TimeZone
 import javax.inject.Inject
 
 data class SystemStats(
@@ -37,6 +40,7 @@ data class DashboardState(
 class DashboardViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val injectedKeyRepository: InjectedKeyRepository,
+    private val injectionLogRepository: InjectionLogRepository,
     private val userRepository: UserRepository,
     application: Application
 ) : AndroidViewModel(application) {
@@ -50,6 +54,7 @@ class DashboardViewModel @Inject constructor(
     
     // Estado de conexión del SubPOS
     private val _isSubPosConnected = MutableStateFlow(false)
+    @Suppress("UNUSED")
     val isSubPosConnected: StateFlow<Boolean> = _isSubPosConnected
 
     init {
@@ -61,24 +66,62 @@ class DashboardViewModel @Inject constructor(
 
     private fun loadStats() {
         viewModelScope.launch {
-            // Obtener el inicio del día actual
-            val calendar = Calendar.getInstance()
+            // Obtener el inicio del día actual con zona horaria explícita
+            val timeZone = TimeZone.getDefault()
+            val calendar = Calendar.getInstance(timeZone)
             calendar.set(Calendar.HOUR_OF_DAY, 0)
             calendar.set(Calendar.MINUTE, 0)
             calendar.set(Calendar.SECOND, 0)
             calendar.set(Calendar.MILLISECOND, 0)
             val startOfDay = calendar.timeInMillis
 
+            val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.getDefault())
+            dateFormat.timeZone = timeZone
+
+            Log.d(TAG, "=== CARGANDO ESTADÍSTICAS DEL DASHBOARD ===")
+            Log.d(TAG, "Zona horaria: ${timeZone.id} (${timeZone.displayName})")
+            Log.d(TAG, "Inicio del día: $startOfDay (${dateFormat.format(java.util.Date(startOfDay))})")
+            Log.d(TAG, "Timestamp actual: ${System.currentTimeMillis()} (${dateFormat.format(java.util.Date(System.currentTimeMillis()))})")
+
+            // Obtener Flow de logs exitosos de hoy y mapearlo para contar inyecciones individuales
+            val successfulLogsToday = injectionLogRepository.getSuccessfulLogsSince(startOfDay)
+                .map { logs ->
+                    Log.d(TAG, "🔄 Flow de logs emitió: ${logs.size} logs")
+                    logs.forEach { log ->
+                        val logDate = dateFormat.format(java.util.Date(log.timestamp))
+                        Log.d(TAG, "  - Log ID: ${log.id}, Perfil: ${log.profileName}, Timestamp: ${log.timestamp} ($logDate), Estado: ${log.operationStatus}")
+                        // Verificar que el timestamp esté dentro del rango del día actual
+                        if (log.timestamp < startOfDay) {
+                            Log.w(TAG, "  ⚠️ Log con timestamp anterior al inicio del día: ${log.timestamp} < $startOfDay")
+                        }
+                    }
+                    // Contar inyecciones individuales (no perfiles únicos)
+                    val count = logs.size
+                    val uniqueProfiles = logs.map { it.profileName }.distinct()
+                    Log.d(TAG, "📊 Logs exitosos de hoy: ${logs.size}, Inyecciones individuales: $count")
+                    Log.d(TAG, "📋 Perfiles únicos inyectados hoy: ${uniqueProfiles.size} (${uniqueProfiles.joinToString(", ")})")
+                    count
+                }
+                .distinctUntilChanged() // Solo emitir cuando el conteo cambia realmente
+
             // Combinar todos los flujos de datos
             combine(
                 profileRepository.getAllProfiles(),
-                injectedKeyRepository.getAllInjectedKeys()
-            ) { profiles, injectedKeys ->
+                injectedKeyRepository.getAllInjectedKeys(),
+                successfulLogsToday
+            ) { profiles, injectedKeys, injectionsToday ->
+                Log.d(TAG, "🔄 Combine ejecutado - Nuevos valores recibidos")
+                
                 // Calcular estadísticas en tiempo real
                 val profilesCount = profiles.size
                 val keysCount = injectedKeys.size // Contar todas las llaves almacenadas, sin filtrar por estado
-                val injectionsToday = injectedKeys.count { it.injectionTimestamp >= startOfDay }
                 val usersCount = userRepository.getUserCount()
+
+                Log.d(TAG, "=== ESTADÍSTICAS CALCULADAS ===")
+                Log.d(TAG, "  - Perfiles: $profilesCount")
+                Log.d(TAG, "  - Llaves: $keysCount")
+                Log.d(TAG, "  - Inyecciones hoy: $injectionsToday")
+                Log.d(TAG, "  - Usuarios: $usersCount")
 
                 val stats = SystemStats(
                     profilesCount = profilesCount,
@@ -87,15 +130,36 @@ class DashboardViewModel @Inject constructor(
                     usersCount = usersCount
                 )
 
-                DashboardState(
+                val newState = DashboardState(
                     stats = stats,
                     isLoading = false
                 )
+                
+                Log.d(TAG, "📦 Nuevo DashboardState creado con stats.injectionsToday = ${newState.stats.injectionsToday}")
+                
+                newState
             }.collect { dashboardState ->
+                val previousInjectionsToday = _state.value.stats.injectionsToday
+                val newInjectionsToday = dashboardState.stats.injectionsToday
+                
+                Log.d(TAG, "📥 Collect ejecutado - Actualizando estado")
+                Log.d(TAG, "  - Inyecciones anteriores: $previousInjectionsToday")
+                Log.d(TAG, "  - Inyecciones nuevas: $newInjectionsToday")
+                
+                // Preservar el stats correctamente al actualizar el estado
                 _state.value = dashboardState.copy(
                     isSubPosConnected = _isSubPosConnected.value,
                     isPollingActive = pollingService.isPollingActive.value
                 )
+                
+                Log.d(TAG, "✅ Estado actualizado - stats.injectionsToday = ${_state.value.stats.injectionsToday}")
+                
+                // Verificar que el stats se preservó correctamente
+                if (_state.value.stats.injectionsToday != newInjectionsToday) {
+                    Log.e(TAG, "❌ ERROR: El stats no se preservó correctamente después del copy()")
+                    Log.e(TAG, "  - Esperado: $newInjectionsToday")
+                    Log.e(TAG, "  - Actual: ${_state.value.stats.injectionsToday}")
+                }
             }
         }
     }
@@ -157,6 +221,7 @@ class DashboardViewModel @Inject constructor(
         pollingService.stopPolling()
     }
     
+    @Suppress("UNUSED")
     fun isPollingReady(): Boolean {
         return pollingService.isReadyForMessaging()
     }
