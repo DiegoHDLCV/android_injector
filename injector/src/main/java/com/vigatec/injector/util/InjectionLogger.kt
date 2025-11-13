@@ -85,6 +85,7 @@ class InjectionLogger @Inject constructor(
         profileName: String,
         keyType: String = "",
         keySlot: Int = -1,
+        deviceInfo: String = "",
         notes: String = ""
     ) {
         logInjection(
@@ -95,6 +96,7 @@ class InjectionLogger @Inject constructor(
             profileName = profileName,
             keyType = keyType,
             keySlot = keySlot,
+            deviceInfo = deviceInfo,
             notes = notes
         )
     }
@@ -109,6 +111,7 @@ class InjectionLogger @Inject constructor(
         profileName: String,
         keyType: String = "",
         keySlot: Int = -1,
+        deviceInfo: String = "",
         notes: String = ""
     ) {
         logInjection(
@@ -119,6 +122,7 @@ class InjectionLogger @Inject constructor(
             profileName = profileName,
             keyType = keyType,
             keySlot = keySlot,
+            deviceInfo = deviceInfo,
             notes = notes
         )
     }
@@ -133,6 +137,7 @@ class InjectionLogger @Inject constructor(
         profileName: String,
         keyType: String = "",
         keySlot: Int = -1,
+        deviceInfo: String = "",
         notes: String = ""
     ) {
         logInjection(
@@ -143,6 +148,7 @@ class InjectionLogger @Inject constructor(
             profileName = profileName,
             keyType = keyType,
             keySlot = keySlot,
+            deviceInfo = deviceInfo,
             notes = notes
         )
     }
