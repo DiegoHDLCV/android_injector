@@ -64,7 +64,10 @@ data class CeremonyState(
 
     // Error de llave duplicada
     val showDuplicateKeyError: Boolean = false, // Mostrar modal de error de llave duplicada
-    val duplicateKeyMessage: String? = null    // Mensaje del error de llave duplicada
+    val duplicateKeyMessage: String? = null,    // Mensaje del error de llave duplicada
+
+    // Modal de confirmación de cancelación
+    val showCancelConfirmationModal: Boolean = false // Mostrar modal de confirmación antes de cancelar ceremonia
 )
 
 @HiltViewModel
@@ -122,7 +125,7 @@ class CeremonyViewModel @Inject constructor(
                 val session = sessionManager.getCurrentSession()
 
                 if (session != null) {
-                    val (userId, username, role) = session
+                    val (_, username, role) = session
                     val isAdmin = role == "ADMIN"
 
                     android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario de sesión: username=$username, role=$role")
@@ -564,7 +567,7 @@ class CeremonyViewModel @Inject constructor(
                                 addToLog("Paso 1/5: Descifrando llaves operacionales con KEK antigua...")
 
                                 // Descifrar todas las llaves con la KEK antigua (ANTES de eliminarla)
-                                val decryptedKeys = encryptedKeys.map { key ->
+                                val decryptedKeys = encryptedKeys.associate { key ->
                                     try {
                                         val encryptedData = com.vigatec.utils.security.EncryptedKeyData(
                                             encryptedData = key.encryptedKeyData,
@@ -578,7 +581,7 @@ class CeremonyViewModel @Inject constructor(
                                         addToLog("  ✗ Error al descifrar llave KCV ${key.kcv}: ${e.message}")
                                         throw e
                                     }
-                                }.toMap()
+                                }
 
                                 addToLog("✓ ${decryptedKeys.size} llaves descifradas exitosamente")
                                 addToLog("")
@@ -821,7 +824,26 @@ class CeremonyViewModel @Inject constructor(
         }
     }
 
-    fun cancelCeremony() {
+    /**
+     * Muestra el modal de confirmación antes de cancelar la ceremonia
+     */
+    fun showCancelConfirmationModal() {
+        _uiState.value = _uiState.value.copy(showCancelConfirmationModal = true)
+    }
+
+    /**
+     * Cierra el modal de confirmación sin cancelar
+     */
+    fun dismissCancelConfirmationModal() {
+        _uiState.value = _uiState.value.copy(showCancelConfirmationModal = false)
+    }
+
+    /**
+     * Confirma y cancela la ceremonia (se llama desde el modal de confirmación)
+     */
+    fun confirmCancelCeremony() {
+        dismissCancelConfirmationModal()
+        
         android.util.Log.d("CeremonyViewModel", "Cancelando ceremonia - reinicializando estado")
 
         // Detener el timer de timeout
@@ -844,6 +866,17 @@ class CeremonyViewModel @Inject constructor(
         )
         // Recarga el estado de KEK Storage (por si cambió durante la ceremonia)
         refreshCeremonyState()
+    }
+
+    /**
+     * Cancela la ceremonia mostrando primero un modal de confirmación.
+     * Si el usuario confirma, se cancela la ceremonia y se vuelve a la pantalla principal.
+     * 
+     * Este método es el punto de entrada público para cancelar la ceremonia.
+     * Internamente muestra el modal de confirmación antes de proceder.
+     */
+    fun cancelCeremony() {
+        showCancelConfirmationModal()
     }
 
     fun clearKekValidationError() {

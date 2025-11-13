@@ -7,6 +7,8 @@ import com.vigatec.persistence.dao.InjectedKeyDao
 import com.vigatec.persistence.entities.InjectedKeyEntity
 import com.vigatec.persistence.model.DeletionReason
 import com.vigatec.persistence.model.KeyDeletionValidation
+import com.vigatec.persistence.model.MultipleKeysDeletionValidation
+import com.vigatec.persistence.model.BlockedKeyInfo
 import com.vigatec.utils.security.StorageKeyManager
 import com.vigatec.utils.security.EncryptedKeyData
 import javax.inject.Inject
@@ -237,6 +239,7 @@ class InjectedKeyRepository @Inject constructor(
         }
     }
 
+    @Suppress("UNUSED")
     suspend fun getInjectionCountToday(startOfDay: Long): Int {
         return try {
             injectedKeyDao.getInjectionCountToday(startOfDay)
@@ -246,6 +249,7 @@ class InjectedKeyRepository @Inject constructor(
         }
     }
 
+    @Suppress("UNUSED")
     suspend fun getSuccessfulInjectionCount(): Int {
         return try {
             injectedKeyDao.getSuccessfulInjectionCount()
@@ -369,6 +373,66 @@ class InjectedKeyRepository @Inject constructor(
     }
 
     /**
+     * Valida si todas las llaves pueden ser eliminadas de forma segura.
+     * Verifica cada llave individualmente y retorna información sobre las que no se pueden eliminar.
+     *
+     * @return Validación con información sobre qué llaves no se pueden eliminar y por qué
+     */
+    suspend fun validateAllKeysDeletion(): MultipleKeysDeletionValidation {
+        return try {
+            Log.d(TAG, "=== VALIDANDO ELIMINACIÓN DE TODAS LAS LLAVES ===")
+            
+            // Obtener todas las llaves de forma síncrona
+            val allKeys = injectedKeyDao.getAllInjectedKeysSync()
+            Log.d(TAG, "Total de llaves a validar: ${allKeys.size}")
+            
+            val blockedKeys = mutableListOf<BlockedKeyInfo>()
+            var deletableCount = 0
+            
+            // Validar cada llave
+            allKeys.forEach { key ->
+                val validation = validateKeyDeletion(key)
+                
+                if (!validation.canDelete) {
+                    Log.d(TAG, "Llave bloqueada: KCV=${key.kcv}, Razón=${validation.reason}")
+                    blockedKeys.add(
+                        BlockedKeyInfo(
+                            kcv = key.kcv,
+                            keyType = key.keyType,
+                            reason = validation.reason,
+                            assignedProfiles = validation.assignedProfiles,
+                            isActiveKEKStorage = validation.isActiveKEKStorage,
+                            isActiveKTK = validation.isActiveKTK
+                        )
+                    )
+                } else {
+                    deletableCount++
+                }
+            }
+            
+            val canDeleteAll = blockedKeys.isEmpty()
+            Log.d(TAG, "Resultado validación: canDeleteAll=$canDeleteAll, bloqueadas=${blockedKeys.size}, eliminables=$deletableCount")
+            Log.d(TAG, "=== FIN VALIDACIÓN ===")
+            
+            MultipleKeysDeletionValidation(
+                canDeleteAll = canDeleteAll,
+                blockedKeys = blockedKeys,
+                totalKeys = allKeys.size,
+                deletableKeys = deletableCount
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error validando eliminación de todas las llaves", e)
+            // En caso de error, no permitir eliminación por seguridad
+            MultipleKeysDeletionValidation(
+                canDeleteAll = false,
+                blockedKeys = emptyList(),
+                totalKeys = 0,
+                deletableKeys = 0
+            )
+        }
+    }
+
+    /**
      * NUEVA FUNCIÓN: Llama al DAO para actualizar el estado de todas las llaves.
      */
     suspend fun updateStatusForAllKeys(newStatus: String) {
@@ -412,6 +476,7 @@ class InjectedKeyRepository @Inject constructor(
      * Primero limpia cualquier KEK anterior y luego marca la nueva llave como KEK.
      * USADO POR EL MÓDULO INJECTOR PARA KEK STORAGE.
      */
+    @Suppress("UNUSED")
     suspend fun setKeyAsKEK(kcv: String) {
         try {
             Log.i(TAG, "=== ESTABLECIENDO LLAVE COMO KEK STORAGE ===")
@@ -462,6 +527,7 @@ class InjectedKeyRepository @Inject constructor(
      * La llave vuelve a ser operacional manteniendo su estado original.
      * USADO POR EL MÓDULO INJECTOR PARA KEK STORAGE.
      */
+    @Suppress("UNUSED")
     suspend fun removeKeyAsKEK(kcv: String) {
         try {
             Log.i(TAG, "=== QUITANDO FLAG KEK STORAGE ===")
@@ -503,6 +569,7 @@ class InjectedKeyRepository @Inject constructor(
      * Descifra automáticamente si está cifrada.
      * USADO POR EL MÓDULO INJECTOR PARA KEK STORAGE.
      */
+    @Suppress("UNUSED")
     suspend fun getCurrentKEK(): InjectedKeyEntity? {
         return try {
             val kek = injectedKeyDao.getCurrentKEK()
@@ -547,7 +614,7 @@ class InjectedKeyRepository @Inject constructor(
      *
      * @return Número de llaves migradas
      */
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION", "UNUSED")
     suspend fun migrateLegacyKeysToEncrypted(): Int {
         Log.i(TAG, "=== INICIANDO MIGRACIÓN DE LLAVES LEGACY ===")
 
@@ -599,6 +666,7 @@ class InjectedKeyRepository @Inject constructor(
      * @param backupPassword Contraseña para proteger el backup (mínimo 12 caracteres)
      * @return Backup en formato Base64
      */
+    @Suppress("UNUSED")
     suspend fun createKeysBackup(backupPassword: String): String {
         Log.i(TAG, "=== CREANDO BACKUP DE LLAVES ===")
 
@@ -625,7 +693,7 @@ class InjectedKeyRepository @Inject constructor(
     /**
      * Obtiene el número de llaves legacy (sin cifrar) que necesitan migración.
      */
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION", "UNUSED")
     suspend fun getLegacyKeysCount(): Int {
         val allKeys = injectedKeyDao.getAllInjectedKeysSync()
         return allKeys.count { it.isLegacy() }

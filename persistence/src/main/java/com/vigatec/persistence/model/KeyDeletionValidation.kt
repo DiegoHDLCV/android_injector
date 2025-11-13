@@ -32,3 +32,36 @@ enum class DeletionReason {
     /** La llave está en uso en múltiples contextos */
     MULTIPLE_USES
 }
+
+/**
+ * Resultado de la validación de eliminación de múltiples llaves.
+ * Contiene información sobre qué llaves no se pueden eliminar y por qué.
+ */
+data class MultipleKeysDeletionValidation(
+    /** Indica si todas las llaves pueden ser eliminadas */
+    val canDeleteAll: Boolean,
+    /** Lista de validaciones de llaves que no se pueden eliminar */
+    val blockedKeys: List<BlockedKeyInfo> = emptyList(),
+    /** Total de llaves validadas */
+    val totalKeys: Int = 0,
+    /** Total de llaves que se pueden eliminar */
+    val deletableKeys: Int = 0
+)
+
+/**
+ * Información sobre una llave que no se puede eliminar
+ */
+data class BlockedKeyInfo(
+    /** KCV de la llave */
+    val kcv: String,
+    /** Tipo de llave */
+    val keyType: String,
+    /** Razón por la que no se puede eliminar */
+    val reason: DeletionReason,
+    /** Lista de perfiles que usan esta llave */
+    val assignedProfiles: List<String> = emptyList(),
+    /** Indica si es KEK Storage activa */
+    val isActiveKEKStorage: Boolean = false,
+    /** Indica si es KTK activa */
+    val isActiveKTK: Boolean = false
+)

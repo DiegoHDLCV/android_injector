@@ -13,14 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -28,7 +25,6 @@ import androidx.navigation.NavHostController
 import com.vigatec.injector.viewmodel.CeremonyViewModel
 import com.vigatec.injector.ui.components.HexadecimalTextField
 import com.vigatec.injector.viewmodel.KeyAlgorithmType
-import com.vigatec.injector.ui.navigation.MainScreen
 import com.vigatec.persistence.entities.KEKType
 
 @Composable
@@ -161,7 +157,7 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
         Text("Tipo de Llave:", style = MaterialTheme.typography.titleMedium)
         Spacer(modifier = Modifier.height(8.dp))
         Column(Modifier.selectableGroup()) {
-            KeyAlgorithmType.values().forEach { keyType ->
+            KeyAlgorithmType.entries.forEach { keyType ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
@@ -441,6 +437,8 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
 @Composable
 private fun CustodianStep(viewModel: CeremonyViewModel) {
     val state by viewModel.uiState.collectAsState()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    
     Column {
         // Título principal con el número de custodio prominente
         Row(
@@ -520,7 +518,11 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
             maxLength = state.selectedKeyType.bytesRequired * 2, // Cada byte = 2 caracteres hex
             isError = state.componentError != null,
             errorMessage = state.componentError,
-            onCancel = { viewModel.cancelCeremony() },
+            onCancel = { 
+                // Cerrar el teclado antes de mostrar el modal
+                keyboardController?.hide()
+                viewModel.showCancelConfirmationModal() 
+            },
             onVerifyKCV = { viewModel.addComponent() }
         )
     }
@@ -586,6 +588,76 @@ private fun CustodianStep(viewModel: CeremonyViewModel) {
                     modifier = Modifier.fillMaxWidth(0.45f)
                 ) {
                     Text("Aceptar")
+                }
+            }
+        )
+    }
+
+    // Modal de confirmación para cancelar la ceremonia
+    if (state.showCancelConfirmationModal) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissCancelConfirmationModal() },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(
+                    text = "Cancelar Ceremonia",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "¿Estás seguro de que deseas cancelar la ceremonia?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "⚠️ Advertencia",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Se perderá todo el progreso de la ceremonia actual y se volverá a la pantalla principal.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.confirmCancelCeremony() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Cancelar Ceremonia")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissCancelConfirmationModal() }
+                ) {
+                    Text("Volver")
                 }
             }
         )
@@ -850,10 +922,9 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
                                 )
                                 Text(
                                     text = when (state.selectedKEKType) {
-                                        com.vigatec.persistence.entities.KEKType.NONE -> "Operacional"
-                                        com.vigatec.persistence.entities.KEKType.KEK_STORAGE -> "KEK Storage"
-                                        com.vigatec.persistence.entities.KEKType.KEK_TRANSPORT -> "KEK Transporte"
-                                        else -> "Operacional"
+                                        KEKType.NONE -> "Operacional"
+                                        KEKType.KEK_STORAGE -> "KEK Storage"
+                                        KEKType.KEK_TRANSPORT -> "KEK Transporte"
                                     },
                                     style = MaterialTheme.typography.labelMedium
                                 )
@@ -966,6 +1037,76 @@ private fun FinalizationStep(viewModel: CeremonyViewModel) {
             }
         )
     }
+
+    // Modal de confirmación para cancelar la ceremonia (también en paso de finalización)
+    if (state.showCancelConfirmationModal) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissCancelConfirmationModal() },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+            },
+            title = {
+                Text(
+                    text = "Cancelar Ceremonia",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "¿Estás seguro de que deseas cancelar la ceremonia?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "⚠️ Advertencia",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Se perderá todo el progreso de la ceremonia actual y se volverá a la pantalla principal.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.confirmCancelCeremony() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Cancelar Ceremonia")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.dismissCancelConfirmationModal() }
+                ) {
+                    Text("Volver")
+                }
+            }
+        )
+    }
 }
 
 /**
@@ -978,10 +1119,12 @@ private fun formatTimeoutDisplay(seconds: Int): String {
 }
 
 @Composable
+@Suppress("UNUSED_PARAMETER")
 private fun TimeoutExpiredDialog(
     navController: NavHostController?,
     viewModel: CeremonyViewModel
 ) {
+    // navController no se usa actualmente, pero se mantiene para futuras mejoras
     AlertDialog(
         onDismissRequest = { viewModel.dismissTimeoutDialog() },
         icon = {

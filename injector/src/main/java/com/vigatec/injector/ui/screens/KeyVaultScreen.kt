@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ImportExport
@@ -177,6 +179,14 @@ fun KeyVaultScreen(
             onDismiss = { viewModel.onDismissKeyDeletionValidationDialog() }
         )
     }
+
+    // Diálogo de validación de eliminación de todas las llaves
+    if (state.showMultipleKeysDeletionValidationDialog && state.multipleKeysDeletionValidation != null) {
+        MultipleKeysDeletionValidationDialog(
+            validation = state.multipleKeysDeletionValidation!!,
+            onDismiss = { viewModel.onDismissMultipleKeysDeletionValidationDialog() }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -220,6 +230,7 @@ fun KeyVaultTopBar(
                 ) {
                     Icon(Icons.Default.ImportExport, contentDescription = "Exportar/Importar")
                 }
+                @Suppress("KotlinConstantConditions")
                 if (isDevFlavor) {
                     IconButton(
                         onClick = onImportTestKeys,
@@ -824,6 +835,132 @@ fun KeyDeletionValidationDialog(
                         )
                     }
                 }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("Entendido")
+            }
+        }
+    )
+}
+
+/**
+ * Diálogo que muestra la validación fallida de eliminación de todas las llaves.
+ * Indica qué llaves no se pueden eliminar y por qué.
+ */
+@Composable
+fun MultipleKeysDeletionValidationDialog(
+    validation: com.vigatec.persistence.model.MultipleKeysDeletionValidation,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "No se pueden eliminar todas las llaves",
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text("No se pueden eliminar todas las llaves")
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(max = 400.dp)
+            ) {
+                // Resumen
+                Text(
+                    text = "No se pueden eliminar ${validation.blockedKeys.size} de ${validation.totalKeys} llaves porque están en uso.",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+
+                Text(
+                    text = "Las siguientes llaves están siendo utilizadas y deben ser eliminadas de los perfiles primero:",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium
+                )
+
+                // Lista de llaves bloqueadas
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                            RoundedCornerShape(4.dp)
+                        )
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    validation.blockedKeys.forEach { blockedKey ->
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            // Información de la llave
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text("•", fontWeight = FontWeight.Bold)
+                                Text(
+                                    "KCV: ${blockedKey.kcv} (${blockedKey.keyType})",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            // Razón
+                            Text(
+                                text = "  Motivo: ${getMotivoEliminacion(blockedKey.reason)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            // Perfiles asignados (si aplica)
+                            if (blockedKey.assignedProfiles.isNotEmpty()) {
+                                Text(
+                                    text = "  Perfiles: ${blockedKey.assignedProfiles.joinToString(", ")}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            // KEK Storage o KTK activa
+                            if (blockedKey.isActiveKEKStorage) {
+                                Text(
+                                    text = "  ⚠️ Es la KEK Storage activa",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                            if (blockedKey.isActiveKTK) {
+                                Text(
+                                    text = "  ⚠️ Es la KTK activa",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Text(
+                    "Elimine estas llaves de los perfiles antes de continuar con la eliminación masiva.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         },
         confirmButton = {

@@ -37,7 +37,9 @@ data class KeyVaultState(
     val kekStoragePasswordError: String? = null,  // Error de contraseña al mostrar KEK Storage
     val showKeyDeletionValidationDialog: Boolean = false,  // Diálogo de validación de eliminación
     val keyDeletionValidation: com.vigatec.persistence.model.KeyDeletionValidation? = null,  // Resultado de validación
-    val deletionError: String? = null  // Mensaje de error al validar
+    val deletionError: String? = null,  // Mensaje de error al validar
+    val showMultipleKeysDeletionValidationDialog: Boolean = false,  // Diálogo de validación de eliminación de todas las llaves
+    val multipleKeysDeletionValidation: com.vigatec.persistence.model.MultipleKeysDeletionValidation? = null  // Resultado de validación de todas las llaves
 )
 
 @HiltViewModel
@@ -209,24 +211,60 @@ class KeyVaultViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                // Verificar si existe KEK Storage antes de eliminar
-                if (StorageKeyManager.hasStorageKEK()) {
-                    Log.w(TAG, "Eliminando KEK Storage del Android Keystore (Clear All)...")
-                    StorageKeyManager.deleteStorageKEK()
-                    Log.d(TAG, "✓ KEK Storage eliminada del Keystore")
+                Log.d(TAG, "Iniciando proceso de eliminación de todas las llaves")
+
+                // Validar antes de eliminar
+                val validation = injectedKeyRepository.validateAllKeysDeletion()
+
+                if (!validation.canDeleteAll) {
+                    Log.w(TAG, "Eliminación bloqueada: ${validation.blockedKeys.size} llaves no se pueden eliminar")
+                    _uiState.value = _uiState.value.copy(
+                        showClearAllConfirmation = false,
+                        showMultipleKeysDeletionValidationDialog = true,
+                        multipleKeysDeletionValidation = validation
+                    )
+                    return@launch
                 }
 
-                // Eliminar todas las llaves de la base de datos
-                injectedKeyRepository.deleteAllKeys()
-                Log.d(TAG, "✓ Todas las llaves eliminadas de la base de datos")
+                // Si la validación fue exitosa, proceder a eliminar
+                Log.d(TAG, "Validación exitosa, procediendo a eliminar todas las llaves")
+                performAllKeysDeletion()
 
-                _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
-                loadKeys() // Recargar
             } catch (e: Exception) {
-                Log.e(TAG, "Error al eliminar todas las llaves", e)
-                e.printStackTrace()
-                _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
+                Log.e(TAG, "Error al validar eliminación de todas las llaves", e)
+                _uiState.value = _uiState.value.copy(
+                    showClearAllConfirmation = false,
+                    deletionError = "Error al validar: ${e.message}"
+                )
             }
+        }
+    }
+
+    /**
+     * Realiza la eliminación real de todas las llaves después de validación exitosa
+     */
+    private suspend fun performAllKeysDeletion() {
+        try {
+            // Verificar si existe KEK Storage antes de eliminar
+            if (StorageKeyManager.hasStorageKEK()) {
+                Log.w(TAG, "Eliminando KEK Storage del Android Keystore (Clear All)...")
+                StorageKeyManager.deleteStorageKEK()
+                Log.d(TAG, "✓ KEK Storage eliminada del Keystore")
+            }
+
+            // Eliminar todas las llaves de la base de datos
+            injectedKeyRepository.deleteAllKeys()
+            Log.d(TAG, "✓ Todas las llaves eliminadas de la base de datos")
+
+            _uiState.value = _uiState.value.copy(showClearAllConfirmation = false)
+            loadKeys() // Recargar
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al eliminar todas las llaves", e)
+            e.printStackTrace()
+            _uiState.value = _uiState.value.copy(
+                showClearAllConfirmation = false,
+                deletionError = "Error al eliminar: ${e.message}"
+            )
         }
     }
 
@@ -247,6 +285,17 @@ class KeyVaultViewModel @Inject constructor(
             keyDeletionValidation = null,
             deletionError = null,
             selectedKey = null
+        )
+    }
+
+    /**
+     * Cierra el diálogo de validación de eliminación de todas las llaves
+     */
+    fun onDismissMultipleKeysDeletionValidationDialog() {
+        _uiState.value = _uiState.value.copy(
+            showMultipleKeysDeletionValidationDialog = false,
+            multipleKeysDeletionValidation = null,
+            deletionError = null
         )
     }
 
