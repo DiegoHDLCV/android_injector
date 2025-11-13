@@ -135,8 +135,8 @@ class FuturexMessageParser : IMessageParser {
         reader.read(2) // Omitir Command "02"
 
         val version = reader.read(2).also { Log.i(TAG, "  - Versión: '$it'") }
-        val keySlot = reader.read(2).also { Log.i(TAG, "  - KeySlot: '$it' (${it.toInt(16)})") }.toInt(16)
-        val ktkSlot = reader.read(2).also { Log.i(TAG, "  - KtkSlot: '$it' (${it.toInt(16)})") }.toInt(16)
+        val keySlot = reader.read(2).also { Log.i(TAG, "  - KeySlot: '$it' (${it.toInt(10)})") }.toInt(10)
+        val ktkSlot = reader.read(2).also { Log.i(TAG, "  - KtkSlot: '$it' (${it.toInt(10)})") }.toInt(10)
         val keyType = reader.read(2).also { Log.i(TAG, "  - KeyType: '$it'") }
         val encryptionType = reader.read(2).also { Log.i(TAG, "  - EncryptionType: '$it'") }
         val keyAlgorithm = reader.read(2).also { Log.i(TAG, "  - KeyAlgorithm: '$it'") }  // NUEVO CAMPO
@@ -186,7 +186,7 @@ class FuturexMessageParser : IMessageParser {
         val reader = PayloadReader(fullPayload)
         reader.read(2) // Omitir código de comando
 
-        val keySlot = reader.read(2).toInt(16)
+        val keySlot = reader.read(2).toInt(10)
 
         val ksn = if (commandCode == "00") reader.read(20) else "00000000000000000000"
 
@@ -212,7 +212,7 @@ class FuturexMessageParser : IMessageParser {
         reader.read(2) // Omitir Command "06"
 
         val version = reader.read(2)
-        val keySlot = reader.read(2).toInt(16) // Lee el slot y lo convierte a Int
+        val keySlot = reader.read(2).toInt(10) // Lee el slot y lo convierte a Int (decimal)
         val keyTypeHex = reader.read(2) // Lee el tipo de llave como string HEX
 
         return DeleteSingleKeyCommand(fullPayload, version, keySlot, keyTypeHex)
