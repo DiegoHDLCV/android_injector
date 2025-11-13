@@ -3,7 +3,6 @@ package com.vigatec.format
 import android.util.Log
 import com.vigatec.format.base.IMessageParser
 import com.vigatec.utils.FormatUtils
-import java.nio.charset.Charset
 
 
 
@@ -14,9 +13,6 @@ class FuturexMessageParser : IMessageParser {
     companion object {
         const val STX: Byte = 0x02
         const val ETX: Byte = 0x03
-
-        // Key Types que usan KSN según la Tabla 10 del manual de Futurex
-        val KEY_TYPES_WITH_KSN = setOf("02", "03", "08", "0B", "10")
     }
 
     override fun appendData(newData: ByteArray) {
@@ -34,15 +30,28 @@ class FuturexMessageParser : IMessageParser {
             val parsedMessage = try {
                 when (commandCode) {
                     "02" -> {
-                        // NUEVO: Mejorada heurística para diferenciar respuesta vs comando
-                        // Respuesta: 02 + [00-1D] + xxxx + datos opcionales
-                        // Comando: 02 + versión + slot + ... (estructura mucho más compleja)
-                        val isResponse = if (fullPayload.length >= 4) {
-                            val potentialErrorCode = fullPayload.substring(2, 4)
-                            FuturexErrorCode.fromCode(potentialErrorCode) != null
-                        } else {
-                            false
-                        }
+                        // 🔍 MEJORADA HEURÍSTICA para diferenciar respuesta vs comando
+                        //
+                        // RESPUESTA (estructura corta):
+                        //   02 + [errorCode 2 chars] + [checksum 4 chars] + [serial 16 chars opt] + [model opt]
+                        //   Longitud típica: 8-50 caracteres
+                        //
+                        // COMANDO (estructura larga):
+                        //   02 + [version 2] + [slot 2] + [ktkslot 2] + [type 2] + [encryption 2] +
+                        //   [algorithm 2] + [subtype 2] + [checksum 4] + [ktkchk 4] + [ksn 20] + [keylen 3] + [keydata variable]
+                        //   Longitud típica: 80+ caracteres (siempre mucho más largo)
+
+                        val payloadLength = fullPayload.length
+                        val potentialErrorCode = if (fullPayload.length >= 4) fullPayload.substring(2, 4) else ""
+                        val isValidErrorCode = FuturexErrorCode.fromCode(potentialErrorCode) != null
+
+                        // HEURÍSTICA MEJORADA:
+                        // 1. Si longitud > 60: Es COMANDO (comandos siempre son largos)
+                        // 2. Si longitud <= 60 Y tiene código error válido: Es RESPUESTA
+                        // 3. Si longitud <= 60 Y NO tiene código error válido: Es COMANDO malformado
+                        val isResponse = payloadLength <= 60 && isValidErrorCode
+
+                        Log.d(TAG, "Diferenciador código 02: length=$payloadLength, errorCode='$potentialErrorCode', valid=$isValidErrorCode, isResponse=$isResponse")
 
                         if (isResponse) parseInjectSymmetricKeyResponse(fullPayload)
                         else parseInjectSymmetricKeyCommand(fullPayload)

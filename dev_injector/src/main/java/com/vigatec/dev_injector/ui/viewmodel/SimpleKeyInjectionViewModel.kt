@@ -2,20 +2,19 @@ package com.vigatec.dev_injector.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.manufacturer.KeySDKManager
-import com.example.manufacturer.base.controllers.ped.PedException
-import com.example.manufacturer.base.models.KeyAlgorithm
-import com.example.manufacturer.base.models.KeyType
-import com.example.manufacturer.base.models.PedKeyData
-import com.example.persistence.repository.InjectedKeyRepository
+import com.vigatec.manufacturer.KeySDKManager
+import com.vigatec.manufacturer.base.controllers.ped.PedException
+import com.vigatec.manufacturer.base.models.KeyAlgorithm
+import com.vigatec.manufacturer.base.models.KeyType
+import com.vigatec.manufacturer.base.models.PedKeyData
+import com.vigatec.persistence.repository.InjectedKeyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import android.util.Log
-import com.vigatec.utils.KcvCalculator.calculateKcv
+import com.vigatec.utils.KcvCalculator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.security.MessageDigest
 import javax.inject.Inject
 
 data class SimpleKeyInjectionUiState(
@@ -234,7 +233,7 @@ class SimpleKeyInjectionViewModel @Inject constructor(
                         }
                         
                         // Cifrar la Working Key usando la Master Key (como softwareEncrypt en el test)
-                        val masterKeyBytes = hexToBytes(masterKeyEntity.keyData)
+                        val masterKeyBytes = hexToBytes(masterKeyEntity.encryptedKeyData)
                         val encryptedWorkingKey = softwareEncrypt(masterKeyBytes, keyBytes)
                         
                         Log.d(TAG, "Working key encrypted in software, calling pedController.writeKey")
@@ -242,7 +241,7 @@ class SimpleKeyInjectionViewModel @Inject constructor(
                             keyIndex = slot,
                             keyType = keyType,
                             keyAlgorithm = keyAlgorithm,
-                            keyData = PedKeyData(encryptedWorkingKey),
+                            keyData = PedKeyData(encryptedWorkingKey, null),
                             transportKeyIndex = masterKeySlot,
                             transportKeyType = KeyType.MASTER_KEY
                         )
@@ -253,8 +252,8 @@ class SimpleKeyInjectionViewModel @Inject constructor(
 
                 if (success) {
                     Log.i(TAG, "Key injection SUCCESSFUL for slot $slot")
-                    
-                    val kcv = calculateKcv(state.keyValue)
+
+                    val kcv = KcvCalculator.calculateKcv(state.keyValue)
                     
                     Log.d(TAG, "Calculated KCV: $kcv")
                     
@@ -346,12 +345,4 @@ class SimpleKeyInjectionViewModel @Inject constructor(
         return hexString.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
     }
 
-    private fun calculateSimpleKcv(keyBytes: ByteArray): String {
-        return try {
-            val hash = MessageDigest.getInstance("SHA-256").digest(keyBytes)
-            hash.take(3).joinToString("") { "%02X".format(it) }
-        } catch (e: Exception) {
-            "000000"
-        }
-    }
 }

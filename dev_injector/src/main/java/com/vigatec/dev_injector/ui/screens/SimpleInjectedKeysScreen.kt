@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.entities.InjectedKeyEntity
 import com.vigatec.dev_injector.ui.viewmodel.SimpleInjectedKeysViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -124,7 +124,7 @@ fun SimpleInjectedKeysScreen(
                                             text = info,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            fontFamily = FontFamily.Monospace
                                         )
                                     }
                                 }

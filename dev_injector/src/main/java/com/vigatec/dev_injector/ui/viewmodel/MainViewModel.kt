@@ -3,7 +3,7 @@ package com.vigatec.dev_injector.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.manufacturer.di.SDKInitManager
+import com.vigatec.manufacturer.di.SDKInitManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

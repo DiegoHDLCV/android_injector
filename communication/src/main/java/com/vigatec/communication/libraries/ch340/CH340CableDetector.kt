@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.util.Log
+import android.annotation.TargetApi
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
@@ -229,6 +230,7 @@ class CH340CableDetector(private val context: Context) {
         }
     }
 
+    @TargetApi(26)
     private suspend fun ensureUsbPermission(device: UsbDevice): Boolean {
         if (usbManager.hasPermission(device)) {
             Log.d(TAG, "║ ✓ USB permission already granted for ${device.deviceName}")

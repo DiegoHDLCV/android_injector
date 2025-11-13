@@ -3,15 +3,15 @@ package com.vigatec.dev_injector.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.manufacturer.base.models.KeyType
+import com.vigatec.manufacturer.base.models.KeyType
 import com.vigatec.dev_injector.ui.viewmodel.SimpleKeyInjectionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,7 +67,7 @@ fun SimpleKeyInjectionScreen(
                 expanded = expanded,
                 onDismissRequest = { expanded = false }
             ) {
-                KeyType.values().forEach { type ->
+                KeyType.entries.forEach { type ->
                     DropdownMenuItem(
                         text = { Text(type.name.take(20)) },
                         onClick = {
@@ -150,7 +150,7 @@ fun SimpleKeyInjectionScreen(
                 onClick = onNavigateToKeys,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(18.dp))
+                Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Ver Llaves Inyectadas")
             }

@@ -3,13 +3,19 @@ package com.vigatec.dev_injector.ui.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.manufacturer.KeySDKManager
-import com.example.manufacturer.base.models.KeyType
-import com.example.persistence.entities.InjectedKeyEntity
-import com.example.persistence.repository.InjectedKeyRepository
+import com.vigatec.manufacturer.KeySDKManager
+import com.vigatec.manufacturer.base.models.KeyType
+import com.vigatec.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.repository.InjectedKeyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 

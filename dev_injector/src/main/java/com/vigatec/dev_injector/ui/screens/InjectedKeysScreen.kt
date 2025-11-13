@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.persistence.entities.InjectedKeyEntity
+import com.vigatec.persistence.entities.InjectedKeyEntity
 import com.vigatec.dev_injector.ui.viewmodel.InjectedKeysViewModel
 import kotlinx.coroutines.flow.collectLatest
 import java.text.SimpleDateFormat

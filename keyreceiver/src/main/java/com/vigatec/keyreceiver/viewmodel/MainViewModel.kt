@@ -25,7 +25,6 @@ import com.vigatec.manufacturer.base.models.PedKeyData
 import com.vigatec.persistence.repository.InjectedKeyRepository
 import com.vigatec.keyreceiver.ui.events.UiEvent
 import com.vigatec.communication.polling.CommLog
-import com.vigatec.utils.FormatUtils
 import com.vigatec.keyreceiver.util.UsbCableDetector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -38,11 +37,11 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.nio.charset.Charset
 import javax.inject.Inject
 
 import com.vigatec.manufacturer.base.models.KeyType as GenericKeyType
 import java.util.UUID
+import java.io.IOException
 
 enum class ConnectionStatus {
     DISCONNECTED,
@@ -72,7 +71,16 @@ class MainViewModel @Inject constructor(
     application: Application
 ) : AndroidViewModel(application) {
 
-    private val TAG = "MainViewModel"
+    companion object {
+        private const val TAG = "MainViewModel"
+
+        // USB Error codes that indicate cable disconnection
+        private const val USB_GET_STATUS_FAILED = "USB get_status request failed"
+        private const val USB_PIPE_ERROR = "USB pipe error"
+        private const val USB_NOT_CONNECTED = "not connected"
+    }
+
+    private val TAG = MainViewModel.TAG
 
     private val _uiEvent = MutableSharedFlow<UiEvent>()
     val uiEvent = _uiEvent.asSharedFlow()
@@ -195,6 +203,23 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { _snackbarEvent.emit("Error: $message") }
     }
 
+    /**
+     * Determina si una excepción es una desconexión USB recuperable
+     * @return true si es una desconexión USB (cable desconectado)
+     */
+    private fun isUsbDisconnectError(e: Exception): Boolean {
+        val message = e.message ?: ""
+        return when {
+            message.contains(USB_GET_STATUS_FAILED, ignoreCase = true) -> true
+            message.contains(USB_PIPE_ERROR, ignoreCase = true) -> true
+            message.contains(USB_NOT_CONNECTED, ignoreCase = true) -> true
+            e.cause?.message?.contains(USB_GET_STATUS_FAILED, ignoreCase = true) == true -> true
+            e is IOException && message.contains("USB", ignoreCase = true) -> true
+            e is IOException && message.contains("pipe", ignoreCase = true) -> true
+            else -> false
+        }
+    }
+
     fun startListening(
         baudRate: EnumCommConfBaudRate = EnumCommConfBaudRate.BPS_9600,
         parity: EnumCommConfParity = EnumCommConfParity.NOPAR,
@@ -283,7 +308,6 @@ class MainViewModel @Inject constructor(
 
                 val buffer = ByteArray(1024)
                 var silentReads = 0
-                var anyDataEver = false
                 val loopStartTime = System.currentTimeMillis()
 
                 try {
@@ -295,9 +319,18 @@ class MainViewModel @Inject constructor(
                         // Esto debería esperar ~1 segundo por lectura
                         val bytesRead = try {
                             comController!!.readData(buffer.size, buffer, 1000)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "❌ EXCEPCIÓN en readData() intento #$readAttempts: ${e.message}", e)
-                            throw e
+                        } catch (usbError: Exception) {
+                            // 🔍 Detectar si es una desconexión USB (error recuperable)
+                            if (isUsbDisconnectError(usbError)) {
+                                Log.w(TAG, "⚠️ Desconexión USB detectada en readData() intento #$readAttempts: ${usbError.message}")
+                                CommLog.w(TAG, "Desconexión USB durante lectura: ${usbError.message}")
+                                // Salir gracefully del loop - dejar que el finally lo cierre
+                                break
+                            } else {
+                                // Otros errores se relanza
+                                Log.e(TAG, "❌ EXCEPCIÓN NO-USB en readData() intento #$readAttempts: ${usbError.message}", usbError)
+                                throw usbError
+                            }
                         }
                         val readDuration = System.currentTimeMillis() - readStartTime
 
@@ -314,7 +347,6 @@ class MainViewModel @Inject constructor(
                         }
 
                         if (bytesRead > 0) {
-                            anyDataEver = true
                             silentReads = 0
                             val received = buffer.copyOf(bytesRead)
                             val receivedString = String(received, Charsets.US_ASCII)
@@ -355,8 +387,17 @@ class MainViewModel @Inject constructor(
                         }
                     }
                 } catch (loopException: Exception) {
-                    Log.e(TAG, "⚠️ EXCEPCIÓN CAPTURADA en el loop de lectura (intento #$readAttempts): ${loopException.message}")
-                    throw loopException
+                    // 🔍 Verificar si la excepción es una desconexión USB
+                    if (isUsbDisconnectError(loopException)) {
+                        // Desconexión USB - detener gracefully sin error crítico
+                        Log.w(TAG, "⚠️ Deteniendo escucha por desconexión USB: ${loopException.message}")
+                        CommLog.w(TAG, "Loop de lectura terminado por desconexión USB")
+                        // No relanzar - dejar que el finally maneje el cierre
+                    } else {
+                        // Otras excepciones - relanzar para manejador de errores críticos
+                        Log.e(TAG, "❌ EXCEPCIÓN CRÍTICA en el loop de lectura (intento #$readAttempts): ${loopException.message}", loopException)
+                        throw loopException
+                    }
                 }
             } catch (e: Exception) {
                 if (isActive) {
@@ -429,6 +470,17 @@ class MainViewModel @Inject constructor(
                 is DeleteSingleKeyCommand -> {
                     _snackbarEvent.emit("Recibido CMD: Eliminar Llave en Slot ${message.keySlot}")
                     handleDeleteSingleKey(message)
+                }
+                is InjectSymmetricKeyResponse -> {
+                    // 📤 RESPUESTA ENVIADA: Confirmación de que el keyreceiver envió correctamente la respuesta
+                    // Esto también valida que el serial y modelo se están enviando correctamente
+                    Log.i(TAG, "✅ Respuesta de Inyección procesada:")
+                    Log.i(TAG, "   - Código: ${message.responseCode}")
+                    Log.i(TAG, "   - Serial: ${message.deviceSerial}")
+                    Log.i(TAG, "   - Modelo: ${message.deviceModel}")
+                    Log.i(TAG, "   - Checksum: ${message.keyChecksum}")
+                    CommLog.i(TAG, "Respuesta de inyección enviada - Serial: ${message.deviceSerial}, Modelo: ${message.deviceModel}")
+                    _snackbarEvent.emit("✅ Respuesta de inyección enviada correctamente")
                 }
                 else -> Log.d(TAG, "Comando ${message::class.simpleName} recibido pero no manejado.")
             }
@@ -599,7 +651,7 @@ class MainViewModel @Inject constructor(
                     // Obtener algoritmo de la KTK
                     val ktkAlgorithm = try {
                         KeyAlgorithm.valueOf(ktkFromDb.keyAlgorithm)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         Log.w(TAG, "No se pudo obtener algoritmo de KTK: ${ktkFromDb.keyAlgorithm}, usando genérico como fallback")
                         genericAlgorithm  // Fallback al algoritmo de la llave destino
                     }
@@ -713,7 +765,7 @@ class MainViewModel @Inject constructor(
                     // Obtener el algoritmo de la KTK para pasarlo al PED
                     val ktkAlgorithm = try {
                         KeyAlgorithm.valueOf(ktkFromDb.keyAlgorithm)
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         Log.w(TAG, "No se pudo obtener algoritmo de KTK: ${ktkFromDb.keyAlgorithm}, usando genérico como fallback")
                         genericAlgorithm
                     }
@@ -1091,24 +1143,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun unwrapTr31Payload(encryptedPayload: ByteArray): ByteArray {
-        if (encryptedPayload.size < 2) throw IllegalArgumentException("Payload TR-31 inválido, muy corto.")
-
-        val keyLengthInBits = (encryptedPayload[0].toInt() and 0xFF shl 8) or (encryptedPayload[1].toInt() and 0xFF)
-        val keyLengthInBytes = keyLengthInBits / 8
-        val expectedPayloadSize = 2 + keyLengthInBytes
-
-        Log.d(TAG, "TR-31 unwrap: Payload total: ${encryptedPayload.size} bytes. Longitud de llave declarada: $keyLengthInBits bits ($keyLengthInBytes bytes).")
-
-        if (encryptedPayload.size < expectedPayloadSize) {
-            throw IllegalArgumentException("Payload TR-31 inconsistente. Se necesitan ${expectedPayloadSize} bytes, pero solo hay ${encryptedPayload.size}.")
-        }
-
-        val pureEncryptedKey = encryptedPayload.copyOfRange(2, expectedPayloadSize)
-        Log.d(TAG, "Llave pura extraída: ${pureEncryptedKey.size} bytes.")
-        return pureEncryptedKey
-    }
-
     private fun mapFuturexKeyTypeToGeneric(futurexKeyType: String, keySubType: String): GenericKeyType {
         Log.i(TAG, "Mapeando tipo Futurex '$futurexKeyType' con subtipo '$keySubType'")
         
@@ -1181,59 +1215,6 @@ class MainViewModel @Inject constructor(
             "04" -> "AES-256"
             else -> "UNKNOWN"
         }
-    }
-
-    private fun parseTr31Block(tr31String: String): Tr31KeyBlock {
-        Log.d(TAG, "Iniciando parseo de bloque TR-31...")
-        class Tr31Reader(private val payload: String) {
-            private var cursor = 0
-            fun read(length: Int): String {
-                if (cursor + length > payload.length) {
-                    Log.e(TAG, "TR31Reader: Intento de leer $length chars desde la posición $cursor, pero solo quedan ${payload.length - cursor} chars.")
-                    throw IndexOutOfBoundsException("Fin de payload inesperado en TR-31.")
-                }
-                val field = payload.substring(cursor, cursor + length)
-                Log.v(TAG, "TR31Reader: Leído($length): '$field'")
-                cursor += length
-                return field
-            }
-        }
-
-        val reader = Tr31Reader(tr31String)
-        val versionId = reader.read(1).first()
-        val blockLength = reader.read(4).toInt()
-        val keyUsage = reader.read(2)
-        val algorithm = reader.read(1).first()
-        val modeOfUse = reader.read(1).first()
-        val keyVersionNumber = reader.read(2)
-        val exportability = reader.read(1).first()
-        val numberOfOptionalBlocks = reader.read(2).toIntOrNull() ?: 0
-        reader.read(1) // Key Context
-        reader.read(1) // Reserved
-
-        var optionalBlocksDataLength = 0
-        val optionalBlocks = mutableListOf<Tr31OptionalBlock>()
-        repeat(numberOfOptionalBlocks) {
-            val blockId = reader.read(2)
-            val blockDataLength = reader.read(2).toIntOrNull() ?: 0
-            val blockData = reader.read(blockDataLength)
-            optionalBlocks.add(Tr31OptionalBlock(blockId, blockData))
-            optionalBlocksDataLength += (4 + blockDataLength)
-        }
-
-        val headerLength = 16 + optionalBlocksDataLength
-        val remainingDataString = tr31String.substring(headerLength)
-        val remainingBytes = remainingDataString.hexToByteArray()
-
-        val macSizeInBytes = 8
-        if (remainingBytes.size < macSizeInBytes) throw IllegalArgumentException("Datos restantes insuficientes para MAC.")
-
-        val mac = remainingBytes.takeLast(macSizeInBytes).toByteArray()
-        val encryptedPayload = remainingBytes.dropLast(macSizeInBytes).toByteArray()
-
-        Log.d(TAG, "TR-31 Parseado: Payload Cifrado (${encryptedPayload.size} bytes), MAC (${mac.size} bytes)")
-
-        return Tr31KeyBlock(tr31String, versionId, blockLength, keyUsage, algorithm, modeOfUse, keyVersionNumber, exportability, optionalBlocks, encryptedPayload, mac)
     }
 
     private fun startCableDetection() {
@@ -1575,7 +1556,7 @@ class MainViewModel @Inject constructor(
                 for (slot in 0 until maxSlots) {
                     try {
                         // Intentar verificar si hay llave en este slot
-                        val hasKey = checkSlotForKey(pedController, slot)
+                        val hasKey = checkSlotForKey(slot)
                         if (hasKey) {
                             installedKeys.add("Slot $slot")
                             Log.d(TAG, "✓ Llave encontrada en slot $slot")
@@ -1604,19 +1585,19 @@ class MainViewModel @Inject constructor(
      * Verifica si hay una llave en un slot específico
      * NOTA: Implementación simplificada que no puede verificar llaves reales
      */
-    private suspend fun checkSlotForKey(pedController: IPedController, slot: Int): Boolean {
+    private fun checkSlotForKey(slot: Int): Boolean {
         return try {
             // IMPLEMENTACIÓN SIMPLIFICADA:
             // En un dispositivo real, aquí deberías usar métodos específicos del PED
             // para verificar si hay llaves instaladas sin crearlas
-            
+
             // Por ahora, simulamos que NO hay llaves instaladas
             // Esto evita que se detecten llaves falsas
             Log.d(TAG, "Verificación de slot $slot: No implementado (simulando vacío)")
             false
-            
-        } catch (e: Exception) {
-            Log.d(TAG, "Error verificando slot $slot: ${e.message}")
+
+        } catch (_: Exception) {
+            Log.d(TAG, "Error verificando slot $slot")
             false
         }
     }

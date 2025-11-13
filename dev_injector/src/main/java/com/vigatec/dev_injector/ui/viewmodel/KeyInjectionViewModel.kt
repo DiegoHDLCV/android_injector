@@ -2,12 +2,12 @@ package com.vigatec.dev_injector.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.manufacturer.KeySDKManager
-import com.example.manufacturer.base.controllers.ped.PedException
-import com.example.manufacturer.base.models.KeyAlgorithm
-import com.example.manufacturer.base.models.KeyType
-import com.example.manufacturer.base.models.PedKeyData
-import com.example.persistence.repository.InjectedKeyRepository
+import com.vigatec.manufacturer.KeySDKManager
+import com.vigatec.manufacturer.base.controllers.ped.PedException
+import com.vigatec.manufacturer.base.models.KeyAlgorithm
+import com.vigatec.manufacturer.base.models.KeyType
+import com.vigatec.manufacturer.base.models.PedKeyData
+import com.vigatec.persistence.repository.InjectedKeyRepository
 import com.vigatec.dev_injector.data.models.PredefinedKey
 import dagger.hilt.android.lifecycle.HiltViewModel
 import android.util.Log

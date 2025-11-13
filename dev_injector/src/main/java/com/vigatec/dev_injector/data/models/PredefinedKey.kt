@@ -1,7 +1,7 @@
 package com.vigatec.dev_injector.data.models
 
-import com.example.manufacturer.base.models.KeyAlgorithm
-import com.example.manufacturer.base.models.KeyType
+import com.vigatec.manufacturer.base.models.KeyAlgorithm
+import com.vigatec.manufacturer.base.models.KeyType
 
 data class PredefinedKey(
     val name: String,
