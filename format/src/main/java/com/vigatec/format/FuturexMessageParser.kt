@@ -34,7 +34,17 @@ class FuturexMessageParser : IMessageParser {
             val parsedMessage = try {
                 when (commandCode) {
                     "02" -> {
-                        if (fullPayload.length <= 8) parseInjectSymmetricKeyResponse(fullPayload)
+                        // NUEVO: Mejorada heurística para diferenciar respuesta vs comando
+                        // Respuesta: 02 + [00-1D] + xxxx + datos opcionales
+                        // Comando: 02 + versión + slot + ... (estructura mucho más compleja)
+                        val isResponse = if (fullPayload.length >= 4) {
+                            val potentialErrorCode = fullPayload.substring(2, 4)
+                            FuturexErrorCode.fromCode(potentialErrorCode) != null
+                        } else {
+                            false
+                        }
+
+                        if (isResponse) parseInjectSymmetricKeyResponse(fullPayload)
                         else parseInjectSymmetricKeyCommand(fullPayload)
                     }
                     "00", "01" -> parseLegacyCommands(fullPayload, commandCode)
