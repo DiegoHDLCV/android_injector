@@ -1052,7 +1052,17 @@ class KeyInjectionViewModel @Inject constructor(
                     _state.value = _state.value.copy(
                         log = _state.value.log + "✓ ${keyConfig.usage}: Inyectada exitosamente\n"
                     )
-                    
+
+                    // NUEVO: Extraer información del dispositivo receptor de la respuesta
+                    val deviceInfo = if (parsedMessage.deviceSerial.isNotEmpty()) {
+                        "Serial: ${parsedMessage.deviceSerial}, Modelo: ${parsedMessage.deviceModel}"
+                    } else {
+                        ""
+                    }
+                    if (deviceInfo.isNotEmpty()) {
+                        Log.d(TAG, "Información del dispositivo receptor: $deviceInfo")
+                    }
+
                     // Registrar log de inyección exitosa
                     injectionLogger.logSuccess(
                         commandSent = commandHex,
@@ -1061,13 +1071,24 @@ class KeyInjectionViewModel @Inject constructor(
                         profileName = profile?.name ?: "Desconocido",
                         keyType = keyConfig.keyType,
                         keySlot = keyConfig.slot.toIntOrNull() ?: -1,
+                        deviceInfo = deviceInfo,  // NUEVO: Información del dispositivo receptor
                         notes = "Uso: ${keyConfig.usage}, KCV: ${parsedMessage.keyChecksum}"
                     )
                 } else {
                     val errorCode = FuturexErrorCode.fromCode(parsedMessage.responseCode)
                     val errorMsg = errorCode?.description ?: "Error desconocido"
                     Log.e(TAG, "✗ Error en inyección de ${keyConfig.usage}: $errorMsg (Código: ${parsedMessage.responseCode})")
-                    
+
+                    // NUEVO: Extraer información del dispositivo receptor de la respuesta
+                    val deviceInfo = if (parsedMessage.deviceSerial.isNotEmpty()) {
+                        "Serial: ${parsedMessage.deviceSerial}, Modelo: ${parsedMessage.deviceModel}"
+                    } else {
+                        ""
+                    }
+                    if (deviceInfo.isNotEmpty()) {
+                        Log.d(TAG, "Información del dispositivo receptor en fallo: $deviceInfo")
+                    }
+
                     // Registrar log de inyección fallida
                     injectionLogger.logFailure(
                         commandSent = commandHex,
@@ -1076,9 +1097,10 @@ class KeyInjectionViewModel @Inject constructor(
                         profileName = profile?.name ?: "Desconocido",
                         keyType = keyConfig.keyType,
                         keySlot = keyConfig.slot.toIntOrNull() ?: -1,
+                        deviceInfo = deviceInfo,  // NUEVO: Información del dispositivo receptor
                         notes = "Error: $errorMsg (Código: ${parsedMessage.responseCode})"
                     )
-                    
+
                     throw Exception("Error en inyección de ${keyConfig.usage}: $errorMsg")
                 }
             }

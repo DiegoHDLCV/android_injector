@@ -16,6 +16,7 @@ import com.vigatec.format.*
 import com.vigatec.format.base.IMessageFormatter
 import com.vigatec.format.base.IMessageParser
 import com.vigatec.manufacturer.KeySDKManager
+import com.vigatec.manufacturer.ManufacturerHardwareManager
 import com.vigatec.manufacturer.base.controllers.ped.IPedController
 import com.vigatec.manufacturer.base.controllers.ped.PedKeyException
 import com.vigatec.manufacturer.base.models.KeyAlgorithm
@@ -980,7 +981,31 @@ class MainViewModel @Inject constructor(
             )
         }
 
-        val response = messageFormatter.format("02", listOf(responseCode, command.keyChecksum))
+        // NUEVO: Obtener información del dispositivo receptor usando ManufacturerHardwareManager
+        // Esto permite obtener información específica del fabricante (Aisino, NewPOS, etc.)
+        val deviceSerial = try {
+            ManufacturerHardwareManager.getSerialNumber()
+                .takeIf { it.isNotEmpty() }
+                ?.padEnd(16, '0')
+                ?.take(16)
+                ?: "UNKNOWN_SERIAL".padEnd(16, '0')
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo obtener el serial del dispositivo: ${e.message}")
+            "UNKNOWN_SERIAL".padEnd(16, '0')
+        }
+
+        val deviceModel = try {
+            ManufacturerHardwareManager.getModelName()
+                .takeIf { it.isNotEmpty() }
+                ?.replace(" ", "_")
+                ?: "UNKNOWN_MODEL"
+        } catch (e: Exception) {
+            Log.w(TAG, "No se pudo obtener el modelo del dispositivo: ${e.message}")
+            "UNKNOWN_MODEL"
+        }
+        Log.d(TAG, "Información del dispositivo obtenida - Serial: $deviceSerial, Modelo: $deviceModel")
+
+        val response = messageFormatter.format("02", listOf(responseCode, command.keyChecksum, deviceSerial, deviceModel))
         sendData(response)
         viewModelScope.launch { _snackbarEvent.emit(logMessage) }
     }

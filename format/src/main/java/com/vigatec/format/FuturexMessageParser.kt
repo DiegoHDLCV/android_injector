@@ -202,10 +202,17 @@ class FuturexMessageParser : IMessageParser {
 
     private fun parseInjectSymmetricKeyResponse(fullPayload: String): InjectSymmetricKeyResponse {
         val reader = PayloadReader(fullPayload)
-        reader.read(2)
+        reader.read(2) // Omitir comando "02"
         val responseCode = reader.read(2)
         val keyChecksum = reader.read(4)
-        return InjectSymmetricKeyResponse(fullPayload, responseCode, keyChecksum)
+
+        // NUEVO: Leer información del dispositivo receptor si está disponible (retrocompatibilidad)
+        val deviceSerial = if (reader.hasMore(16)) reader.read(16) else ""
+        val deviceModel = if (reader.hasMore()) reader.readRemaining() else ""
+
+        Log.d(TAG, "Response parseado - Code: $responseCode, Checksum: $keyChecksum, Serial: $deviceSerial, Model: $deviceModel")
+
+        return InjectSymmetricKeyResponse(fullPayload, responseCode, keyChecksum, deviceSerial, deviceModel)
     }
 
     private class PayloadReader(private val payload: String) {
@@ -224,6 +231,11 @@ class FuturexMessageParser : IMessageParser {
             val field = payload.substring(cursor)
             cursor = payload.length
             return field
+        }
+
+        // NUEVO: Verificar si hay al menos N caracteres disponibles
+        fun hasMore(length: Int = 1): Boolean {
+            return cursor + length <= payload.length
         }
     }
 

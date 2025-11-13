@@ -75,7 +75,9 @@ data class InjectSymmetricKeyCommand(
 data class InjectSymmetricKeyResponse(
     override val rawPayload: String,
     val responseCode: String,
-    val keyChecksum: String
+    val keyChecksum: String,
+    val deviceSerial: String = "",      // NUEVO: Serial del dispositivo receptor
+    val deviceModel: String = ""        // NUEVO: Modelo/nombre del dispositivo receptor
 ) : FuturexResponse
 
 
