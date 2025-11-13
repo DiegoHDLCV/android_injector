@@ -11,6 +11,7 @@ import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.injector.data.local.preferences.CustodianTimeoutPreferencesManager
 import com.vigatec.injector.util.PermissionProvider
 import com.vigatec.injector.util.CustodianTimeoutManager
+import com.vigatec.injector.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -78,7 +79,7 @@ class CeremonyViewModel @Inject constructor(
     private val custodianTimeoutPreferencesManager: CustodianTimeoutPreferencesManager
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CeremonyState(component = "E59D620E1A6D311F19342054AB01ABF7"))
+    private val _uiState = MutableStateFlow(CeremonyState(component = BuildConfig.COMPONENT_1_DEFAULT))
     val uiState = _uiState.asStateFlow()
 
     // Gestor de timeout para custodios
@@ -420,7 +421,7 @@ class CeremonyViewModel @Inject constructor(
             timeoutTotalSeconds = 0,
             currentCustodian = 1,
             components = emptyList(),
-            component = "E59D620E1A6D311F19342054AB01ABF7"
+            component = BuildConfig.COMPONENT_1_DEFAULT
         )
 
         // Registrar en log
@@ -464,7 +465,7 @@ class CeremonyViewModel @Inject constructor(
         val next = _uiState.value.currentCustodian + 1
 
         val nextComponent = if (next == 2) {
-            "ED77D12E82AF6099968D6F5653741D09"
+            BuildConfig.COMPONENT_2_DEFAULT
         } else {
             ""
         }
@@ -731,7 +732,7 @@ class CeremonyViewModel @Inject constructor(
                 // Resetear al estado inicial pero preservando datos de KEK Storage e isAdmin
                 // Esto devuelve al usuario a ConfigurationStep (paso 1)
                 _uiState.value = CeremonyState(
-                    component = "E59D620E1A6D311F19342054AB01ABF7",
+                    component = BuildConfig.COMPONENT_1_DEFAULT,
                     hasKEKStorage = updatedHasKEKStorage,  // Actualizar si se creó una KEK Storage
                     isAdmin = _uiState.value.isAdmin,
                     canCreateKEK = _uiState.value.canCreateKEK,
@@ -858,7 +859,7 @@ class CeremonyViewModel @Inject constructor(
 
         // Resetea al estado inicial pero preservando los datos de KEK Storage e isAdmin
         _uiState.value = CeremonyState(
-            component = "E59D620E1A6D311F19342054AB01ABF7",
+            component = BuildConfig.COMPONENT_1_DEFAULT,
             hasKEKStorage = _uiState.value.hasKEKStorage, // Preservar estado actual de KEK
             isAdmin = _uiState.value.isAdmin, // Preservar estado actual de admin
             canCreateKEK = _uiState.value.canCreateKEK,

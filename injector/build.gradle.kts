@@ -39,14 +39,23 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
+            // DEV: Componentes pre-rellenos para agilizar pruebas
+            buildConfigField("String", "COMPONENT_1_DEFAULT", "\"E59D620E1A6D311F19342054AB01ABF7\"")
+            buildConfigField("String", "COMPONENT_2_DEFAULT", "\"ED77D12E82AF6099968D6F5653741D09\"")
         }
         create("qa") {
             dimension = "environment"
             applicationIdSuffix = ".qa"
             versionNameSuffix = "-qa"
+            // QA: Componentes vacíos para que el usuario los ingrese manualmente
+            buildConfigField("String", "COMPONENT_1_DEFAULT", "\"\"")
+            buildConfigField("String", "COMPONENT_2_DEFAULT", "\"\"")
         }
         create("prod") {
             dimension = "environment"
+            // PROD: Componentes vacíos por defecto
+            buildConfigField("String", "COMPONENT_1_DEFAULT", "\"\"")
+            buildConfigField("String", "COMPONENT_2_DEFAULT", "\"\"")
         }
     }
 
