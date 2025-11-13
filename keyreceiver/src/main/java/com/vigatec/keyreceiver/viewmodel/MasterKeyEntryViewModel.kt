@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vigatec.config.KeyCombinationMethod
 import com.vigatec.config.SystemConfig
+import com.vigatec.keyreceiver.BuildConfig
 import com.vigatec.manufacturer.KeySDKManager
 import com.vigatec.manufacturer.base.controllers.ped.PedException
 import com.vigatec.manufacturer.base.controllers.ped.PedKeyException
@@ -22,9 +23,12 @@ class MasterKeyEntryViewModel @Inject constructor(
 ) : ViewModel() {
 
     // --- VALORES POR DEFECTO ---
-    // Asegúrate que estos tienen la longitud correcta (32 caracteres hex en este ejemplo)
-    private val defaultComponent1 = "0123456789ABCDEF0123456789ABCDEF"
-    private val defaultComponent2 = "FEDCBA9876543210FEDCBA9876543210"
+    // Los valores por defecto se configuran por flavor mediante BuildConfig:
+    // - prod: campos vacíos
+    // - dev: campos rellenados con valores de prueba para agilizar pruebas
+    // - qa: campos vacíos para que el usuario los ingrese manualmente
+    private val defaultComponent1 = BuildConfig.DEFAULT_COMPONENT_1
+    private val defaultComponent2 = BuildConfig.DEFAULT_COMPONENT_2
     // --- FIN VALORES POR DEFECTO ---
 
 

@@ -45,14 +45,23 @@ android {
             dimension = "environment"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
+            // DEV: Componentes pre-rellenos para agilizar pruebas
+            buildConfigField("String", "DEFAULT_COMPONENT_1", "\"0123456789ABCDEF0123456789ABCDEF\"")
+            buildConfigField("String", "DEFAULT_COMPONENT_2", "\"FEDCBA9876543210FEDCBA9876543210\"")
         }
         create("qa") {
             dimension = "environment"
             applicationIdSuffix = ".qa"
             versionNameSuffix = "-qa"
+            // QA: Componentes vacíos para que el usuario los ingrese manualmente
+            buildConfigField("String", "DEFAULT_COMPONENT_1", "\"\"")
+            buildConfigField("String", "DEFAULT_COMPONENT_2", "\"\"")
         }
         create("prod") {
             dimension = "environment"
+            // PROD: Componentes vacíos por defecto
+            buildConfigField("String", "DEFAULT_COMPONENT_1", "\"\"")
+            buildConfigField("String", "DEFAULT_COMPONENT_2", "\"\"")
         }
     }
 
@@ -87,6 +96,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
