@@ -27,6 +27,13 @@
     <uses-permission android:name="android.permission.SYSTEM_OVERLAY_WINDOW" />
     <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
 
+    <!-- Permisos para desinstalación remota de la aplicación -->
+    <!-- DELETE_PACKAGES: Permite desinstalación silenciosa (solo si es app de sistema) -->
+    <uses-permission android:name="android.permission.DELETE_PACKAGES"
+        tools:ignore="ProtectedPermissions" />
+    <!-- REQUEST_DELETE_PACKAGES: Solicita confirmación del usuario para desinstalación -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
 
     <application
         android:name=".App"

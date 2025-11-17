@@ -23,3 +23,6 @@ gradle.properties.local
 
 # Mac OS specific files
 .DS_Store
+
+# APK files (compiled binaries)
+*.apk

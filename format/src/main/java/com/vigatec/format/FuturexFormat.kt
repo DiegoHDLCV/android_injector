@@ -54,6 +54,16 @@ data class DeleteSingleKeyCommand(
     val keyTypeHex: String
 ) : FuturexCommand
 
+/**
+ * Comando personalizado ("07") para desinstalar la aplicación KeyReceiver del dispositivo.
+ * Solo funciona si la app es de sistema o tiene permisos DELETE_PACKAGES.
+ */
+data class UninstallAppCommand(
+    override val rawPayload: String,
+    val version: String,
+    val confirmationToken: String  // Token de confirmación para validar origen
+) : FuturexCommand
+
 data class InjectSymmetricKeyCommand(
     override val rawPayload: String,
     val version: String,
@@ -68,6 +78,8 @@ data class InjectSymmetricKeyCommand(
     val ksn: String,
     val keyHex: String,
     val ktkHex: String?,
+    val totalKeys: Int = 0,        // NUEVO: Total de llaves a inyectar (0 = no especificado, para compatibilidad)
+    val currentKeyIndex: Int = 0  // NUEVO: Índice de la llave actual (1-based, 0 = no especificado)
 ) : FuturexCommand
 
 // --- RESPUESTAS (Dispositivo -> Host) ---
@@ -78,6 +90,17 @@ data class InjectSymmetricKeyResponse(
     val keyChecksum: String,
     val deviceSerial: String = "",      // NUEVO: Serial del dispositivo receptor
     val deviceModel: String = ""        // NUEVO: Modelo/nombre del dispositivo receptor
+) : FuturexResponse
+
+/**
+ * Respuesta al comando de desinstalación de app ("07").
+ * El dispositivo responde con confirmación ANTES de auto-desinstalarse.
+ */
+data class UninstallAppResponse(
+    override val rawPayload: String,
+    val responseCode: String,           // "00" = éxito, otro valor = error
+    val deviceSerial: String = "",
+    val deviceModel: String = ""
 ) : FuturexResponse
 
 

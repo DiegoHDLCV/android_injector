@@ -50,7 +50,9 @@
       "Bash(curl:*)",
       "Bash(git checkout:*)",
       "Bash(git merge:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(jar:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

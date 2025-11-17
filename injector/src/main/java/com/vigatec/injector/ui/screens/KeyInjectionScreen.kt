@@ -26,6 +26,8 @@ import com.vigatec.persistence.entities.ProfileEntity
 import com.vigatec.injector.viewmodel.InjectionStatus
 import com.vigatec.injector.viewmodel.KeyInjectionState
 import com.vigatec.injector.viewmodel.KeyInjectionViewModel
+import com.vigatec.injector.viewmodel.KeyInjectionItem
+import com.vigatec.injector.viewmodel.KeyInjectionItemStatus
 import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,6 +37,8 @@ fun KeyInjectionModal(
 ) {
     val state by viewModel.state.collectAsState()
 
+    var showUninstallDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         viewModel.snackbarEvent.collect { message ->
             Log.i("KeyInjectionModal", "=== EVENTO SNACKBAR FUTUREX ===")
@@ -42,6 +46,66 @@ fun KeyInjectionModal(
             Log.i("KeyInjectionModal", "================================================")
             // Aquí podrías mostrar un Snackbar si es necesario
         }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.uninstallDialogEvent.collect { shouldShow ->
+            Log.i("KeyInjectionModal", "=== EVENTO DIALOG DESINSTALACIÓN ===")
+            Log.i("KeyInjectionModal", "Mostrar diálogo: $shouldShow")
+            Log.i("KeyInjectionModal", "================================================")
+            showUninstallDialog = shouldShow
+        }
+    }
+
+    // AlertDialog para confirmar desinstalación
+    if (showUninstallDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                Log.i("KeyInjectionModal", "Diálogo desinstalación cerrado sin respuesta")
+                showUninstallDialog = false
+                viewModel.cancelUninstallDialog()
+            },
+            title = {
+                Text(
+                    text = "Desinstalación de KeyReceiver",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Text(
+                    text = "¿Deseas eliminar la aplicación KeyReceiver del dispositivo receptor?\n\nEsta acción eliminará completamente la aplicación. Para volver a usarla, será necesario reinstalarla.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        Log.i("KeyInjectionModal", "Usuario confirmó desinstalación")
+                        showUninstallDialog = false
+                        viewModel.sendUninstallCommand()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Sí, eliminar")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        Log.i("KeyInjectionModal", "Usuario canceló desinstalación")
+                        showUninstallDialog = false
+                        viewModel.cancelUninstallDialog()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Text("No, mantener")
+                }
+            }
+        )
     }
 
     if (state.showInjectionModal) {
@@ -113,29 +177,21 @@ fun KeyInjectionModal(
                         }
                     }
                     
-                    // Contenido - Optimizado con menos espaciado
+                    // Contenido - Sección unificada
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f)
                             .padding(horizontal = 18.dp, vertical = 14.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .verticalScroll(rememberScrollState())
                     ) {
-                        // Información del perfil
-                        ProfileInfoCard(profile = state.currentProfile)
-
-                        // Indicador de cable USB
-                        CableDetectionCard(cableConnected = state.cableConnected)
-
-                        // Estado de conexión
-                        ConnectionStatusCard(state = state)
-
-                        // Progreso de inyección
-                        InjectionProgressCard(state = state)
-
-                        // Logs de inyección
-                        //InjectionLogsCard(state = state)
+                        // Sección unificada: Perfil + Llaves + Indicador de cable
+                        UnifiedProfileAndKeysCard(
+                            profile = state.currentProfile,
+                            keysToInject = state.keysToInject,
+                            cableConnected = state.cableConnected,
+                            status = state.status
+                        )
                     }
 
                     // Footer con botones - Optimizado
@@ -158,8 +214,10 @@ fun KeyInjectionModal(
                                             Log.i("KeyInjectionModal", "Usuario presionó botón 'Iniciar Inyección'")
                                             viewModel.startKeyInjection() 
                                         },
+                                        enabled = state.cableConnected,
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
                                         )
                                     ) {
                                         Icon(
@@ -244,254 +302,144 @@ fun KeyInjectionModal(
 }
 
 @Composable
-private fun ProfileInfoCard(profile: ProfileEntity?) {
+private fun UnifiedProfileAndKeysCard(
+    profile: ProfileEntity?,
+    keysToInject: List<KeyInjectionItem>,
+    cableConnected: Boolean,
+    status: InjectionStatus
+) {
     if (profile == null) return
 
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
-        ),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.border(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-            shape = RoundedCornerShape(10.dp)
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Icon
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Rounded.Folder,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            // Profile Name and Type
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = profile.name,
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
-                )
-                Text(
-                    text = profile.applicationType,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                    maxLines = 1
-                )
-            }
-
-            // Key Counts (Compact)
-            Row(
-                modifier = Modifier.wrapContentWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "${profile.keyConfigurations.size}",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Total",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
-                Text(
-                    text = "Configuradas",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ConnectionStatusCard(state: KeyInjectionState) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = when (state.status) {
-                InjectionStatus.SUCCESS -> MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                InjectionStatus.ERROR -> MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
-                InjectionStatus.CONNECTING, InjectionStatus.INJECTING -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)
-                else -> MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-            }
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.border(
             width = 1.dp,
-            color = when (state.status) {
-                InjectionStatus.SUCCESS -> MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                InjectionStatus.ERROR -> MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
-                InjectionStatus.CONNECTING, InjectionStatus.INJECTING -> MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
-                else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
-            },
-            shape = RoundedCornerShape(12.dp)
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        when (state.status) {
-                            InjectionStatus.CONNECTING -> MaterialTheme.colorScheme.tertiaryContainer
-                            InjectionStatus.INJECTING -> MaterialTheme.colorScheme.primaryContainer
-                            InjectionStatus.SUCCESS -> MaterialTheme.colorScheme.primaryContainer
-                            InjectionStatus.ERROR -> MaterialTheme.colorScheme.errorContainer
-                            else -> MaterialTheme.colorScheme.surfaceVariant
-                        }
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    when (state.status) {
-                        InjectionStatus.CONNECTING -> Icons.Rounded.Wifi
-                        InjectionStatus.INJECTING -> Icons.Rounded.Sync
-                        InjectionStatus.SUCCESS -> Icons.Rounded.CheckCircle
-                        InjectionStatus.ERROR -> Icons.Rounded.Error
-                        else -> Icons.Rounded.WifiOff
-                    },
-                    contentDescription = null,
-                    tint = when (state.status) {
-                        InjectionStatus.CONNECTING -> MaterialTheme.colorScheme.onTertiaryContainer
-                        InjectionStatus.INJECTING -> MaterialTheme.colorScheme.onPrimaryContainer
-                        InjectionStatus.SUCCESS -> MaterialTheme.colorScheme.onPrimaryContainer
-                        InjectionStatus.ERROR -> MaterialTheme.colorScheme.onErrorContainer
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            
-            Column {
-                Text(
-                    text = when (state.status) {
-                        InjectionStatus.IDLE -> "Listo para conectar"
-                        InjectionStatus.CONNECTING -> "Conectando al dispositivo..."
-                        InjectionStatus.INJECTING -> "Inyectando llaves..."
-                        InjectionStatus.SUCCESS -> "Conexión exitosa"
-                        InjectionStatus.ERROR -> "Error de conexión"
-                        else -> "Estado desconocido"
-                    },
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = when (state.status) {
-                        InjectionStatus.IDLE -> "Presiona 'Iniciar Inyección' para comenzar"
-                        InjectionStatus.CONNECTING -> "Estableciendo comunicación serial..."
-                        InjectionStatus.INJECTING -> "Procesando protocolo FUTUREX..."
-                        InjectionStatus.SUCCESS -> "Todas las llaves fueron inyectadas correctamente"
-                        InjectionStatus.ERROR -> state.error ?: "Error desconocido durante la inyección"
-                        else -> ""
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun InjectionProgressCard(state: KeyInjectionState) {
-    if (state.status == InjectionStatus.IDLE) return
-
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-        ),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.border(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f),
             shape = RoundedCornerShape(12.dp)
         )
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Header: Perfil + Indicador de cable
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Progreso de Inyección",
-                    style = MaterialTheme.typography.titleMedium.copy(
+                // Información del perfil
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Rounded.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = profile.name,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = profile.applicationType,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+                
+                // Indicador de cable integrado
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (cableConnected) Icons.Rounded.Usb else Icons.Default.UsbOff,
+                        contentDescription = null,
+                        tint = if (cableConnected)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = if (cableConnected) "Cable conectado" else "Sin cable",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (cableConnected)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Medium
-                    ),
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                    )
+                }
+            }
+            
+            // Mensaje de estado
+            if (status == InjectionStatus.IDLE) {
                 Text(
-                    text = "${state.currentStep}/${state.totalSteps}",
+                    text = if (cableConnected) 
+                        "Preparado para inyección" 
+                    else 
+                        "Verificar cable USB",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = if (cableConnected)
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    else
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                 )
             }
             
-            LinearProgressIndicator(
-                progress = state.progress,
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            
-            if (state.status == InjectionStatus.INJECTING) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Lista de llaves
+            if (keysToInject.isNotEmpty()) {
+                Divider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+                )
+                
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        strokeWidth = 2.dp
-                    )
                     Text(
-                        text = "Inyectando llave ${state.currentStep} de ${state.totalSteps}...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        text = "Llaves a inyectar (${keysToInject.size})",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                    
+                    keysToInject.forEachIndexed { index, item ->
+                        KeyItemRow(
+                            item = item,
+                            index = index + 1,
+                            total = keysToInject.size
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+
 
 @Composable
 private fun InjectionLogsCard(state: KeyInjectionState) {
@@ -540,83 +488,105 @@ private fun InjectionLogsCard(state: KeyInjectionState) {
     }
 }
 
+
 @Composable
-private fun CableDetectionCard(cableConnected: Boolean) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (cableConnected)
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-            else
-                MaterialTheme.colorScheme.error.copy(alpha = 0.12f)
-        ),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.border(
-            width = 1.5.dp,
-            color = if (cableConnected)
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
-            else
-                MaterialTheme.colorScheme.error.copy(alpha = 0.4f),
-            shape = RoundedCornerShape(12.dp)
-        )
+private fun KeyItemRow(item: KeyInjectionItem, index: Int, total: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp, horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        // Icono de estado
+        Box(
+            modifier = Modifier.size(32.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        if (cableConnected)
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                        else
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.3f)
-                    ),
-                contentAlignment = Alignment.Center
+            when (item.status) {
+                KeyInjectionItemStatus.PENDING -> {
+                    Icon(
+                        Icons.Rounded.RadioButtonUnchecked,
+                        contentDescription = "Pendiente",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                KeyInjectionItemStatus.INJECTING -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.primary,
+                        strokeWidth = 2.dp
+                    )
+                }
+                KeyInjectionItemStatus.INJECTED -> {
+                    Icon(
+                        Icons.Rounded.CheckCircle,
+                        contentDescription = "Inyectada",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                KeyInjectionItemStatus.ERROR -> {
+                    Icon(
+                        Icons.Rounded.Error,
+                        contentDescription = "Error",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+        
+        // Información de la llave
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "${item.keyConfig.usage}",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Medium
+                ),
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (cableConnected) Icons.Rounded.Usb else Icons.Default.UsbOff,
-                    contentDescription = null,
-                    tint = if (cableConnected)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(18.dp)
+                Text(
+                    text = "Slot: ${item.keyConfig.slot}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = "•",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+                Text(
+                    text = item.keyConfig.keyType,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
             }
-
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            if (item.status == KeyInjectionItemStatus.ERROR && item.errorMessage != null) {
                 Text(
-                    text = if (cableConnected)
-                        "🔌 Listo para conectar"
-                    else
-                        "⚠️ Cable no detectado",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = if (cableConnected)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.error
-                )
-                Text(
-                    text = if (cableConnected)
-                        "Cable USB conectado y listo"
-                    else
-                        "Conecte el cable USB para continuar",
+                    text = item.errorMessage,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (cableConnected)
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    else
-                        MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 2
                 )
             }
         }
+        
+        // Número de índice
+        Text(
+            text = "$index/$total",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
     }
 }
+
+

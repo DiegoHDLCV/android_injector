@@ -1,26 +1,36 @@
 package com.vigatec.manufacturer
 
+import android.app.Application
 import android.util.Log
 import com.vigatec.config.EnumManufacturer
 import com.vigatec.config.SystemConfig
 import com.vigatec.manufacturer.base.controllers.hardware.IDeviceController
+import com.vigatec.manufacturer.base.controllers.manager.IHardwareController
+import com.vigatec.manufacturer.base.controllers.system.ISystemController
+import com.vigatec.manufacturer.libraries.aisino.controller.system.AisinoSystemController
 import com.vigatec.manufacturer.libraries.aisino.workflow.hardware.AisinoDeviceController
 import com.vigatec.manufacturer.libraries.newpos.controller.hardware.NewposDeviceController
+import com.vigatec.manufacturer.libraries.newpos.controller.system.NewposSystemController
+import com.vigatec.manufacturer.libraries.urovo.controller.system.UrovoSystemController
 
 /**
- * Manager centralizado para acceso a información del dispositivo.
- * Delega a las implementaciones específicas de cada fabricante de forma automática.
+ * Manager centralizado para acceso a todos los controladores de hardware y sistema.
+ * Implementa IHardwareController y delega a las implementaciones específicas de cada fabricante.
+ *
+ * Proporciona acceso tanto a:
+ * - IDeviceController: Información del dispositivo
+ * - ISystemController: Operaciones del sistema
  *
  * Ejemplo de uso:
  * ```kotlin
- * val serial = ManufacturerHardwareManager.getSerialNumber()
- * val model = ManufacturerHardwareManager.getModelName()
+ * val serial = ManufacturerHardwareManager.deviceController().getSerialNumber()
+ * val success = ManufacturerHardwareManager.systemController().silentUninstall("com.example.app")
  * ```
  */
-object ManufacturerHardwareManager : IDeviceController {
+object ManufacturerHardwareManager : IHardwareController {
     private val TAG = "ManufacturerHardwareManager"
 
-    private val manager: IDeviceController by lazy {
+    private val deviceControllerInstance: IDeviceController by lazy {
         Log.d(TAG, "Seleccionando DeviceController para fabricante: ${SystemConfig.managerSelected}")
         when (SystemConfig.managerSelected) {
             EnumManufacturer.NEWPOS -> NewposDeviceController()
@@ -37,31 +47,72 @@ object ManufacturerHardwareManager : IDeviceController {
         }
     }
 
-    override fun getSerialNumber(): String = manager.getSerialNumber()
+    private val systemControllerInstance: ISystemController by lazy {
+        Log.d(TAG, "Seleccionando SystemController para fabricante: ${SystemConfig.managerSelected}")
+        when (SystemConfig.managerSelected) {
+            EnumManufacturer.NEWPOS -> NewposSystemController()
+            EnumManufacturer.AISINO -> AisinoSystemController()
+            EnumManufacturer.UROVO -> {
+                Log.d(TAG, "Inicializando UrovoSystemController")
+                UrovoSystemController(null) // Context será seteado en initialize()
+            }
+            else -> {
+                Log.w(TAG, "Fabricante desconocido: ${SystemConfig.managerSelected}, usando AisinoSystemController como fallback")
+                AisinoSystemController()  // Fallback por defecto
+            }
+        }
+    }
 
-    override fun getModelName(): String = manager.getModelName()
+    override fun initializeController(application: Application) {
+        Log.i(TAG, "Inicializando ManufacturerHardwareManager para: ${SystemConfig.managerSelected}")
 
-    override fun getFirmwareVersion(): String = manager.getFirmwareVersion()
+        // Inicializar SystemController si es UROVO
+        if (SystemConfig.managerSelected == EnumManufacturer.UROVO) {
+            if (systemControllerInstance is UrovoSystemController) {
+                systemControllerInstance.initialize(application)
+            }
+        }
 
-    override fun getEmvKernelVersions(): String = manager.getEmvKernelVersions()
+        Log.i(TAG, "✓ ManufacturerHardwareManager inicializado")
+    }
 
-    override fun getHardwareVersion(): String = manager.getHardwareVersion()
+    override fun deviceController(): IDeviceController {
+        return deviceControllerInstance
+    }
 
-    override fun getBatteryPercentage(): Int = manager.getBatteryPercentage()
+    override fun systemController(): ISystemController {
+        return systemControllerInstance
+    }
 
-    override fun getBatteryStatus(): Int = manager.getBatteryStatus()
+    /**
+     * Métodos de conveniencia para acceso directo a IDeviceController
+     * (compatibilidad hacia atrás)
+     */
+    fun getSerialNumber(): String = deviceControllerInstance.getSerialNumber()
 
-    override fun getBatteryWearPercentage(): Int = manager.getBatteryWearPercentage()
+    fun getModelName(): String = deviceControllerInstance.getModelName()
 
-    override fun getNFCReaderStatus(): Int = manager.getNFCReaderStatus()
+    fun getFirmwareVersion(): String = deviceControllerInstance.getFirmwareVersion()
 
-    override fun getNFCReaderWearPercentage(): Int = manager.getNFCReaderWearPercentage()
+    fun getEmvKernelVersions(): String = deviceControllerInstance.getEmvKernelVersions()
 
-    override fun getChipReaderStatus(): Int = manager.getChipReaderStatus()
+    fun getHardwareVersion(): String = deviceControllerInstance.getHardwareVersion()
 
-    override fun getChipReaderWearPercentage(): Int = manager.getChipReaderWearPercentage()
+    fun getBatteryPercentage(): Int = deviceControllerInstance.getBatteryPercentage()
 
-    override fun getMagstripeStatus(): Int = manager.getMagstripeStatus()
+    fun getBatteryStatus(): Int = deviceControllerInstance.getBatteryStatus()
 
-    override fun getMagstripeWearPercentage(): Int = manager.getMagstripeWearPercentage()
+    fun getBatteryWearPercentage(): Int = deviceControllerInstance.getBatteryWearPercentage()
+
+    fun getNFCReaderStatus(): Int = deviceControllerInstance.getNFCReaderStatus()
+
+    fun getNFCReaderWearPercentage(): Int = deviceControllerInstance.getNFCReaderWearPercentage()
+
+    fun getChipReaderStatus(): Int = deviceControllerInstance.getChipReaderStatus()
+
+    fun getChipReaderWearPercentage(): Int = deviceControllerInstance.getChipReaderWearPercentage()
+
+    fun getMagstripeStatus(): Int = deviceControllerInstance.getMagstripeStatus()
+
+    fun getMagstripeWearPercentage(): Int = deviceControllerInstance.getMagstripeWearPercentage()
 }

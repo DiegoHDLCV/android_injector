@@ -41,6 +41,19 @@ enum class InjectionStatus {
     @Suppress("UNUSED") COMPLETED
 }
 
+enum class KeyInjectionItemStatus {
+    PENDING,      // Pendiente de inyectar
+    INJECTING,    // Actualmente inyectando
+    INJECTED,    // Inyectada exitosamente
+    ERROR         // Error al inyectar
+}
+
+data class KeyInjectionItem(
+    val keyConfig: KeyConfiguration,
+    val status: KeyInjectionItemStatus = KeyInjectionItemStatus.PENDING,
+    val errorMessage: String? = null
+)
+
 data class KeyInjectionState(
     val status: InjectionStatus = InjectionStatus.IDLE,
     val currentProfile: ProfileEntity? = null,
@@ -50,7 +63,8 @@ data class KeyInjectionState(
     val log: String = "",
     val error: String? = null,
     val showInjectionModal: Boolean = false,
-    val cableConnected: Boolean = false  // Nuevo: estado de conexión de cable
+    val cableConnected: Boolean = false,  // Nuevo: estado de conexión de cable
+    val keysToInject: List<KeyInjectionItem> = emptyList()  // NUEVO: Lista de llaves preparadas para inyectar
 )
 
 @HiltViewModel
@@ -70,6 +84,10 @@ class KeyInjectionViewModel @Inject constructor(
     private val _snackbarEvent = MutableSharedFlow<String>()
     val snackbarEvent = _snackbarEvent.asSharedFlow()
 
+    // Evento para mostrar diálogo de confirmación de desinstalación
+    private val _uninstallDialogEvent = MutableSharedFlow<Boolean>()
+    val uninstallDialogEvent = _uninstallDialogEvent.asSharedFlow()
+
     private var comController: IComController? = null
     private var messageParser: IMessageParser? = null
     private var messageFormatter: IMessageFormatter? = null
@@ -83,6 +101,7 @@ class KeyInjectionViewModel @Inject constructor(
 
     // Detección de cable USB
     private var cableDetectionJob: kotlinx.coroutines.Job? = null
+    private val usbCableDetector = com.vigatec.injector.util.UsbCableDetector(application.applicationContext)
 
     init {
         Log.d(TAG, "Inicializando KeyInjectionViewModel")
@@ -126,10 +145,19 @@ class KeyInjectionViewModel @Inject constructor(
 
         currentUsername = username
 
+        // NUEVO: Preparar lista de llaves para inyectar
+        val keysToInject = profile.keyConfigurations.map { keyConfig ->
+            KeyInjectionItem(
+                keyConfig = keyConfig,
+                status = KeyInjectionItemStatus.PENDING
+            )
+        }
+
         _state.value = _state.value.copy(
             showInjectionModal = true,
             currentProfile = profile,
-            totalSteps = profile.keyConfigurations.size
+            totalSteps = profile.keyConfigurations.size,
+            keysToInject = keysToInject
         )
 
         // Iniciar monitoreo de cable
@@ -278,22 +306,61 @@ class KeyInjectionViewModel @Inject constructor(
                 }
 
                 // Procesar cada configuración de llave
+                val totalKeys = keyConfigs.size
                 for ((index, keyConfig) in keyConfigs.withIndex()) {
-                    Log.i(TAG, "=== PROCESANDO LLAVE ${index + 1}/${keyConfigs.size} ===")
+                    val currentKeyIndex = index + 1
+                    Log.i(TAG, "=== PROCESANDO LLAVE $currentKeyIndex/$totalKeys ===")
                     Log.i(TAG, "Uso: ${keyConfig.usage}")
                     Log.i(TAG, "Slot: ${keyConfig.slot}")
                     Log.i(TAG, "Tipo: ${keyConfig.keyType}")
                     
+                    // NUEVO: Actualizar estado de la llave a "inyectando"
+                    val updatedKeys = _state.value.keysToInject.mapIndexed { idx, item ->
+                        if (idx == index) {
+                            item.copy(status = KeyInjectionItemStatus.INJECTING)
+                        } else {
+                            item
+                        }
+                    }
+                    
                     _state.value = _state.value.copy(
-                        currentStep = index + 1,
-                        progress = (index + 1).toFloat() / keyConfigs.size,
-                        log = _state.value.log + "Inyectando llave ${index + 1}/${keyConfigs.size}: ${keyConfig.usage}\n"
+                        currentStep = currentKeyIndex,
+                        progress = currentKeyIndex.toFloat() / totalKeys,
+                        log = _state.value.log + "Inyectando llave $currentKeyIndex/$totalKeys: ${keyConfig.usage}\n",
+                        keysToInject = updatedKeys
                     )
 
-                    injectKey(keyConfig)
+                    try {
+                        injectKey(keyConfig, totalKeys, currentKeyIndex)
+                        
+                        // NUEVO: Actualizar estado de la llave a "inyectada" exitosamente
+                        val successKeys = _state.value.keysToInject.mapIndexed { idx, item ->
+                            if (idx == index) {
+                                item.copy(status = KeyInjectionItemStatus.INJECTED)
+                            } else {
+                                item
+                            }
+                        }
+                        _state.value = _state.value.copy(keysToInject = successKeys)
+                    } catch (e: Exception) {
+                        // NUEVO: Actualizar estado de la llave a "error"
+                        val errorKeys = _state.value.keysToInject.mapIndexed { idx, item ->
+                            if (idx == index) {
+                                item.copy(
+                                    status = KeyInjectionItemStatus.ERROR,
+                                    errorMessage = e.message
+                                )
+                            } else {
+                                item
+                            }
+                        }
+                        _state.value = _state.value.copy(keysToInject = errorKeys)
+                        throw e // Re-lanzar para que se maneje en el catch principal
+                    }
                     
-                    // Pequeña pausa entre inyecciones
-                    kotlinx.coroutines.delay(500)
+                    // Pausa entre inyecciones para asegurar que el puerto esté listo
+                    // Aumentado a 1000ms para dar tiempo al keyreceiver de procesar y responder
+                    kotlinx.coroutines.delay(1000)
                 }
 
                 Log.i(TAG, "=== INYECCIÓN FUTUREX COMPLETADA EXITOSAMENTE ===")
@@ -302,13 +369,19 @@ class KeyInjectionViewModel @Inject constructor(
                 Log.i(TAG, "Total de llaves inyectadas: ${profile.keyConfigurations.size}")
                 Log.i(TAG, "✓ Todos los logs de inyección han sido registrados en la base de datos")
                 Log.i(TAG, "El Dashboard debería actualizar el contador automáticamente")
-                
+
                 _state.value = _state.value.copy(
                     status = InjectionStatus.SUCCESS,
                     log = _state.value.log + "¡Inyección completada exitosamente!\n"
                 )
-                
+
                 _snackbarEvent.emit("Inyección de llaves completada")
+
+                // NOTA: El diálogo de desinstalación ya no se muestra automáticamente
+                // porque el keyreceiver se auto-elimina después de inyectar la última llave.
+                // El comando 07 (UninstallApp) sigue disponible como funcionalidad opcional
+                // pero debe ser invocado manualmente si es necesario.
+                Log.i(TAG, "✓ Inyección completada. El keyreceiver se auto-eliminará después de la última llave.")
 
             } catch (e: Exception) {
                 Log.e(TAG, "Error durante la inyección de llaves", e)
@@ -336,18 +409,8 @@ class KeyInjectionViewModel @Inject constructor(
                 )
                 _snackbarEvent.emit("Error durante la inyección: ${e.message}")
             } finally {
-                Log.i(TAG, "Cerrando comunicación...")
-                closeCommunication()
-                
-                // Reiniciar el polling después de la inyección
-                viewModelScope.launch {
-                    Log.i(TAG, "Reiniciando polling después de la inyección...")
-                    _state.value = _state.value.copy(
-                        log = _state.value.log + "Reiniciando polling...\n"
-                    )
-                    kotlinx.coroutines.delay(1000) // Esperar un momento
-                    restartPolling()
-                }
+                // NO cerrar comunicación aquí - se cerrará después de resolver el diálogo de desinstalación
+                Log.i(TAG, "Inyección completada, esperando respuesta del usuario para diálogo de desinstalación...")
             }
         }
     }
@@ -403,13 +466,14 @@ class KeyInjectionViewModel @Inject constructor(
         }
     }
 
-    private suspend fun injectKey(keyConfig: KeyConfiguration) {
+    private suspend fun injectKey(keyConfig: KeyConfiguration, totalKeys: Int, currentKeyIndex: Int) {
         Log.i(TAG, "=== INICIANDO INYECCIÓN DE LLAVE FUTUREX ===")
         Log.i(TAG, "Configuración de llave:")
         Log.i(TAG, "  - Uso: ${keyConfig.usage}")
         Log.i(TAG, "  - Slot: ${keyConfig.slot}")
         Log.i(TAG, "  - Tipo: ${keyConfig.keyType}")
         Log.i(TAG, "  - Llave seleccionada: ${keyConfig.selectedKey}")
+        Log.i(TAG, "  - Progreso: Llave $currentKeyIndex de $totalKeys")
 
         try {
             val selectedKey = injectedKeyRepository.getKeyByKcv(keyConfig.selectedKey)
@@ -428,7 +492,7 @@ class KeyInjectionViewModel @Inject constructor(
 
             // Construir el comando de inyección según el protocolo Futurex
             Log.i(TAG, "Construyendo comando Futurex...")
-            val injectionCommand = buildInjectionCommand(keyConfig, selectedKey)
+            val injectionCommand = buildInjectionCommand(keyConfig, selectedKey, totalKeys, currentKeyIndex)
 
             Log.i(TAG, "Comando construido exitosamente:")
             Log.i(TAG, "  - Tamaño: ${injectionCommand.size} bytes")
@@ -479,7 +543,7 @@ class KeyInjectionViewModel @Inject constructor(
         }
     }
 
-    private fun buildInjectionCommand(keyConfig: KeyConfiguration, selectedKey: InjectedKeyEntity): ByteArray {
+    private fun buildInjectionCommand(keyConfig: KeyConfiguration, selectedKey: InjectedKeyEntity, totalKeys: Int = 0, currentKeyIndex: Int = 0): ByteArray {
         // Validaciones adicionales
         if (selectedKey.keyData.isEmpty()) {
             throw Exception("No se puede construir comando para llave sin datos")
@@ -713,9 +777,14 @@ class KeyInjectionViewModel @Inject constructor(
             throw Exception("Formato de longitud inválido: '$keyLength'. Debe ser 3 caracteres ASCII HEX.")
         }
         
+        // NUEVO: Agregar información de inyección (totalKeys y currentKeyIndex) al final del payload
+        // Formato: 3 dígitos para totalKeys + 3 dígitos para currentKeyIndex (ej: "003001" = 3 llaves totales, llave 1)
+        val totalKeysStr = if (totalKeys > 0) totalKeys.toString().padStart(3, '0') else ""
+        val currentKeyIndexStr = if (currentKeyIndex > 0) currentKeyIndex.toString().padStart(3, '0') else ""
+        
         // Para el protocolo Futurex, concatenamos todo en un solo string
         val payload = command + version + keySlot + ktkSlotStr + keyType + encryptionType + keyAlgorithm + keySubType +
-                     keyChecksum + ktkChecksum + ksn + keyLength + keyHex
+                     keyChecksum + ktkChecksum + ksn + keyLength + keyHex + totalKeysStr + currentKeyIndexStr
 
         Log.i(TAG, "=== PAYLOAD FINAL FUTUREX ===")
         Log.i(TAG, "Payload completo: $payload")
@@ -733,11 +802,15 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - KSN: $ksn")
         Log.i(TAG, "  - Longitud: $keyLength (${keyLengthBytes} bytes)")
         Log.i(TAG, "  - Datos: ${keyHex.take(32)}...")
+        if (totalKeys > 0) {
+            Log.i(TAG, "  - TotalKeys: $totalKeys")
+            Log.i(TAG, "  - CurrentKeyIndex: $currentKeyIndex (${if (currentKeyIndex == totalKeys) "ÚLTIMA LLAVE" else "Llave $currentKeyIndex de $totalKeys"})")
+        }
         Log.i(TAG, "================================================")
 
         // Construir el payload manualmente para Futurex
         val payloadString = command + version + keySlot + ktkSlotStr + keyType + encryptionType + keyAlgorithm + keySubType +
-                           keyChecksum + ktkChecksum + ksn + keyLength + keyHex
+                           keyChecksum + ktkChecksum + ksn + keyLength + keyHex + totalKeysStr + currentKeyIndexStr
 
         Log.i(TAG, "=== PAYLOAD MANUAL FUTUREX ===")
         Log.i(TAG, "Payload string: $payloadString")
@@ -748,7 +821,7 @@ class KeyInjectionViewModel @Inject constructor(
         // IMPORTANTE: Para encryptionType 02, la KTK NO va en el payload de este comando
         // La KTK se envía en un comando separado ANTES de este
         val fields = listOf(version, keySlot, ktkSlotStr, keyType, encryptionType, keyAlgorithm, keySubType,
-                           keyChecksum, ktkChecksum, ksn, keyLength, keyHex)
+                           keyChecksum, ktkChecksum, ksn, keyLength, keyHex, totalKeysStr, currentKeyIndexStr)
         debugLrcCalculation(command, fields)
 
         // Usar el formateador Futurex directamente
@@ -997,13 +1070,54 @@ class KeyInjectionViewModel @Inject constructor(
             throw Exception("Controlador de comunicación no inicializado")
         }
 
-        val result = comController!!.write(data, 1000)
+        // Intentar enviar con reintentos
+        var result = comController!!.write(data, 1000)
         if (result < 0) {
-            Log.e(TAG, "❌ Error al enviar datos: $result")
-            throw Exception("Error al enviar datos: $result")
+            Log.w(TAG, "⚠️ Primer intento de escritura falló: $result, reintentando...")
+            
+            // Si el error es por pérdida de interfaz USB, intentar reabrir el puerto
+            if (result == -1) {
+                Log.w(TAG, "⚠️ Posible pérdida de interfaz USB, intentando reabrir puerto...")
+                try {
+                    // Cerrar y reabrir el puerto
+                    comController!!.close()
+                    // Usar runBlocking para delay en función no-suspend
+                    kotlinx.coroutines.runBlocking {
+                        kotlinx.coroutines.delay(200) // Pequeño delay antes de reabrir
+                    }
+                    
+                    comController!!.init(
+                        EnumCommConfBaudRate.BPS_115200,
+                        EnumCommConfParity.NOPAR,
+                        EnumCommConfDataBits.DB_8
+                    )
+                    val openResult = comController!!.open()
+                    if (openResult != 0) {
+                        Log.e(TAG, "❌ Error al reabrir puerto: $openResult")
+                        throw Exception("Error al reabrir puerto USB: $openResult")
+                    }
+                    Log.i(TAG, "✓ Puerto reabierto exitosamente")
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Error al reabrir puerto: ${e.message}")
+                    throw Exception("Error al reabrir puerto USB: ${e.message}")
+                }
+            }
+            
+            // Reintentar escritura después de un pequeño delay
+            kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.delay(200)
+            }
+            
+            result = comController!!.write(data, 1000)
+            if (result < 0) {
+                Log.e(TAG, "❌ Error al enviar datos después de reintento: $result")
+                throw Exception("Error al enviar datos: $result")
+            } else {
+                Log.i(TAG, "✓ Enviados ${result} bytes en segundo intento: ${data.toHexString().take(40)}...")
+            }
+        } else {
+            Log.i(TAG, "✓ Enviados ${result} bytes: ${data.toHexString().take(40)}...")
         }
-
-        Log.i(TAG, "✓ Enviados ${result} bytes: ${data.toHexString().take(40)}...")
     }
 
     private fun waitForResponse(): ByteArray {
@@ -1606,93 +1720,265 @@ class KeyInjectionViewModel @Inject constructor(
 
     /**
      * Inicia el monitoreo de detección de cable USB con hysteresis
-     * Similar a la implementación en MainViewModel.kt del módulo keyreceiver
+     * Usa la misma lógica confiable del keyreceiver
      */
     private fun startCableDetection() {
         // Cancelar job anterior si existe
         cableDetectionJob?.cancel()
 
+        Log.i(TAG, "╔══════════════════════════════════════════════════════════════")
+        Log.i(TAG, "║ INICIANDO DETECCIÓN AUTOMÁTICA DE CABLE USB")
+        Log.i(TAG, "║ Estrategia: Hysteresis para evitar falsos positivos")
+        Log.i(TAG, "╠══════════════════════════════════════════════════════════════")
+
         cableDetectionJob = viewModelScope.launch(Dispatchers.IO) {
             var consecutiveDetectionsToChange = 0
-            val HYSTERESIS_THRESHOLD = 2              // Requiere 2 detecciones para cambiar
-            val DETECTION_INTERVAL_CONNECTED = 3000L  // 3s cuando hay cable
-            val DETECTION_INTERVAL_DISCONNECTED = 5000L // 5s cuando no hay cable
-
-            Log.i(TAG, "🔌 Iniciando monitoreo de cable USB...")
+            val HYSTERESIS_THRESHOLD = 2 // Requiere 2 detecciones consistentes para cambiar estado
+            val DETECTION_INTERVAL_CONNECTED = 3000L // 3s cuando hay cable
+            val DETECTION_INTERVAL_DISCONNECTED = 5000L // 5s cuando no hay cable (menos sensible)
 
             while (isActive) {
                 try {
                     val detected = detectCableConnection()
                     val currentState = _state.value.cableConnected
 
-                    // Si cambia → incrementar contador
-                    if (detected != currentState) {
+                    // Si la detección coincide con el estado actual, resetear contador
+                    if (detected == currentState) {
+                        consecutiveDetectionsToChange = 0
+                    } else {
+                        // Si cambia, incrementar contador
                         consecutiveDetectionsToChange++
-                        Log.d(TAG, "Cambio de estado detectado: $consecutiveDetectionsToChange/$HYSTERESIS_THRESHOLD")
 
+                        // Solo cambiar estado si alcanza hysteresis threshold
                         if (consecutiveDetectionsToChange >= HYSTERESIS_THRESHOLD) {
                             _state.value = _state.value.copy(cableConnected = detected)
-                            Log.i(TAG, if (detected)
-                                "✅ CABLE USB DETECTADO - Listo para inyección"
-                            else
-                                "⚠️ CABLE USB DESCONECTADO"
-                            )
+                            consecutiveDetectionsToChange = 0
+
+                            if (detected) {
+                                Log.i(TAG, "║ ✅ CABLE USB DETECTADO (confirmado $HYSTERESIS_THRESHOLD veces)!")
+                                Log.i(TAG, "║    Listo para inyección")
+                            } else {
+                                Log.w(TAG, "║ ⚠️ CABLE USB DESCONECTADO (confirmado $HYSTERESIS_THRESHOLD veces)")
+                            }
+                        } else {
+                            // Registro de transición pendiente (no se hizo el cambio aún)
+                            Log.d(TAG, "║ 🔄 Detección transitoria (${consecutiveDetectionsToChange}/$HYSTERESIS_THRESHOLD): $detected != $currentState")
                         }
-                    } else {
-                        consecutiveDetectionsToChange = 0
                     }
 
-                    // Ajustar intervalo según estado del cable
-                    val delay = if (detected) DETECTION_INTERVAL_CONNECTED else DETECTION_INTERVAL_DISCONNECTED
+                    // Adaptable interval: más frecuente si no hay cable, menos frecuente si hay cable
+                    val delay = if (currentState) DETECTION_INTERVAL_CONNECTED else DETECTION_INTERVAL_DISCONNECTED
                     kotlinx.coroutines.delay(delay)
+
                 } catch (e: Exception) {
-                    Log.e(TAG, "❌ Error en detección de cable: ${e.message}")
-                    kotlinx.coroutines.delay(DETECTION_INTERVAL_DISCONNECTED)
+                    Log.e(TAG, "║ ❌ Error en detección de cable", e)
+                    consecutiveDetectionsToChange = 0 // Resetear contador en error
+                    kotlinx.coroutines.delay(5000) // Esperar más tiempo si hay error
+                }
+            }
+        }
+
+        Log.i(TAG, "║ ✓ Job de detección de cable iniciado (hysteresis mode)")
+        Log.i(TAG, "╚══════════════════════════════════════════════════════════════")
+    }
+
+    /**
+     * Detecta si hay un cable USB conectado usando la misma lógica confiable del keyreceiver
+     * Usa múltiples métodos para mayor confiabilidad:
+     * 1. UsbManager API (más confiable)
+     * 2. Device Nodes (/dev/) con permisos de acceso
+     * 3. System Files (/sys/bus/usb) con interfaz serial
+     * 4. TTY Class (/sys/class/tty)
+     * 5. CH340 Cable Detection
+     * 
+     * Lógica: Cable presente si AL MENOS 2 de 5 métodos lo detectan
+     * O si el método 1 (UsbManager - más confiable) lo detecta
+     */
+    private fun detectCableConnection(): Boolean {
+        return try {
+            Log.d(TAG, "🔍 Iniciando detección de cable USB (5 métodos)...")
+            
+            // Usar los mismos métodos que keyreceiver
+            val method1Result = usbCableDetector.detectUsingUsbManager()
+            val method2Result = usbCableDetector.detectUsingDeviceNodes()
+            val method3Result = usbCableDetector.detectUsingSystemFiles()
+            val method4Result = usbCableDetector.detectUsingTtyClass()
+            val method5Result = usbCableDetector.detectUsingCH340Cable()
+            
+            // Contar cuántos métodos detectaron
+            val methodsCount = listOf(method1Result, method2Result, method3Result, method4Result, method5Result).count { it }
+            
+            // LÓGICA DEL KEYRECEIVER: Cable presente si AL MENOS 2 de 5 métodos lo detectan
+            // O si el método 1 (UsbManager - más confiable) lo detecta
+            val detected = methodsCount >= 2 || method1Result
+            
+            // Mostrar qué métodos específicos detectaron
+            val detectingMethods = mutableListOf<String>()
+            if (method1Result) detectingMethods.add("UsbManager")
+            if (method2Result) detectingMethods.add("/dev/")
+            if (method3Result) detectingMethods.add("/sys/bus/usb")
+            if (method4Result) detectingMethods.add("/sys/class/tty")
+            if (method5Result) detectingMethods.add("CH340")
+            
+            if (detected) {
+                Log.i(TAG, "✓ Cable USB detectado: ${methodsCount}/5 métodos (${detectingMethods.joinToString(", ")})")
+            } else {
+                Log.w(TAG, "✗ Cable USB no detectado: 0/5 métodos")
+            }
+            
+            detected
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error detectando cable: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * Construye un comando Futurex "07" para desinstalar la aplicación KeyReceiver del dispositivo.
+     * Solo funciona si la app keyreceiver es de sistema o tiene permisos DELETE_PACKAGES.
+     */
+    private fun buildUninstallAppCommand(): ByteArray {
+        Log.i(TAG, "=== CONSTRUYENDO COMANDO DE DESINSTALACIÓN DE APP (07) ===")
+
+        val command = "07" // Comando de desinstalación de app
+        val version = "99" // Versión del comando (99 = no es un código de error válido, para diferenciar de respuesta)
+        // Token de confirmación: timestamp en hex para validar origen del comando
+        val confirmationToken = System.currentTimeMillis().toString(16).toUpperCase().padStart(16, '0')
+
+        Log.i(TAG, "  - Comando: $command")
+        Log.i(TAG, "  - Versión: $version")
+        Log.i(TAG, "  - Token de confirmación: $confirmationToken")
+
+        // Formatear comando Futurex
+        val fields = listOf(version, confirmationToken)
+        val formattedCommand = messageFormatter!!.format(command, fields)
+
+        Log.i(TAG, "  - Tamaño total: ${formattedCommand.size} bytes")
+        Log.i(TAG, "  - Comando formateado exitosamente")
+        Log.i(TAG, "================================================")
+
+        return formattedCommand
+    }
+
+    /**
+     * Envía el comando de desinstalación de KeyReceiver al dispositivo.
+     * Se llama después de que el usuario confirma desde el UI.
+     */
+    fun sendUninstallCommand() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "=== ENVIANDO COMANDO DE DESINSTALACIÓN ===")
+
+                if (comController == null || messageParser == null || messageFormatter == null) {
+                    Log.e(TAG, "Puerto no disponible para desinstalación")
+                    _snackbarEvent.emit("Puerto no disponible para desinstalación")
+                    return@launch
+                }
+
+                // Construir comando de desinstalación
+                val uninstallCommand = buildUninstallAppCommand()
+
+                // Enviar comando
+                Log.i(TAG, "Enviando comando de desinstalación al keyreceiver...")
+                sendData(uninstallCommand)
+
+                // Esperar respuesta (que incluye ACK + Futurex response)
+                Log.i(TAG, "Esperando respuesta del dispositivo (incluyendo ACK)...")
+                val response = waitForResponse()
+
+                // PASO 1: Procesar respuesta que puede incluir ACK (0x06)
+                var processBuffer = response
+                var ackReceived = false
+
+                if (response.isNotEmpty() && response[0].toInt() == 0x06) {
+                    Log.i(TAG, "✓ ACK (0x06) recibido - Dispositivo confirmó recepción del comando")
+                    ackReceived = true
+                    // Saltar el ACK byte y procesar el resto como Futurex response
+                    processBuffer = response.drop(1).toByteArray()
+                }
+
+                if (!ackReceived) {
+                    Log.w(TAG, "⚠️ ACK no recibido en el primer byte")
+                }
+
+                // PASO 2: Parsear respuesta Futurex
+                Log.i(TAG, "Parseando respuesta Futurex del dispositivo...")
+                messageParser!!.appendData(processBuffer)
+                val parsedMessage = messageParser!!.nextMessage()
+
+                // PASO 3: Procesar resultado
+                when (parsedMessage) {
+                    is UninstallAppResponse -> {
+                        if (parsedMessage.responseCode == "00") {
+                            Log.i(TAG, "✓ Comando de desinstalación confirmado por el dispositivo")
+                            Log.i(TAG, "  - ACK recibido: $ackReceived")
+                            Log.i(TAG, "  - Serial: ${parsedMessage.deviceSerial}")
+                            Log.i(TAG, "  - Modelo: ${parsedMessage.deviceModel}")
+                            _snackbarEvent.emit("✓ Desinstalación confirmada en el dispositivo")
+                        } else {
+                            val errorCode = FuturexErrorCode.fromCode(parsedMessage.responseCode)
+                            val errorMsg = errorCode?.description ?: "Error desconocido"
+                            Log.e(TAG, "✗ Error en desinstalación: $errorMsg")
+                            _snackbarEvent.emit("Error en desinstalación: $errorMsg")
+                        }
+                    }
+                    else -> {
+                        Log.w(TAG, "Respuesta inesperada: ${parsedMessage?.javaClass?.simpleName}")
+                        _snackbarEvent.emit("Respuesta inesperada del dispositivo")
+                    }
+                }
+
+                Log.i(TAG, "================================================")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Error enviando comando de desinstalación: ${e.message}", e)
+                _snackbarEvent.emit("Error: ${e.message}")
+            } finally {
+                // Cerrar comunicación después de intentar enviar el comando de desinstalación
+                Log.i(TAG, "Cerrando comunicación después de desinstalación...")
+                closeCommunication()
+
+                // Reiniciar el polling después de la inyección
+                viewModelScope.launch {
+                    Log.i(TAG, "Reiniciando polling después de la inyección...")
+                    _state.value = _state.value.copy(
+                        log = _state.value.log + "Reiniciando polling...\n"
+                    )
+                    kotlinx.coroutines.delay(1000) // Esperar un momento
+                    restartPolling()
                 }
             }
         }
     }
 
     /**
-     * Detecta si hay un cable USB conectado verificando puertos seriales del sistema
-     * Métodos múltiples para mayor confiabilidad:
-     * 1. Buscar archivos de dispositivo USB (/dev/ttyUSB*, /dev/ttyACM*, etc.)
-     * 2. Verificar información del sistema (/sys/bus/usb/devices)
+     * Cancela el diálogo de desinstalación sin enviar el comando.
+     * Se llama cuando el usuario hace click en "No, mantener" o cierra el diálogo.
      */
-    private fun detectCableConnection(): Boolean {
-        return try {
-            // Método 1: Verificar archivos de dispositivo USB
-            val usbDevices = arrayOf(
-                "/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2",
-                "/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyACM2",
-                "/dev/ttyGS0"
-            )
+    fun cancelUninstallDialog() {
+        viewModelScope.launch(Dispatchers.IO) {
+            Log.i(TAG, "=== CANCELANDO DIÁLOGO DE DESINSTALACIÓN ===")
+            Log.i(TAG, "Usuario optó por no desinstalar KeyReceiver")
 
-            val hasDeviceNode = usbDevices.any { devicePath ->
-                val file = java.io.File(devicePath)
-                file.exists()
+            try {
+                // Cerrar comunicación sin enviar comando de desinstalación
+                Log.i(TAG, "Cerrando comunicación (sin enviar comando de desinstalación)...")
+                closeCommunication()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error cerrando comunicación: ${e.message}", e)
             }
 
-            if (hasDeviceNode) {
-                Log.d(TAG, "✓ Cable USB detectado (dispositivo)")
-                return true
+            // Reiniciar polling
+            viewModelScope.launch {
+                Log.i(TAG, "Reiniciando polling después de cancelar desinstalación...")
+                _state.value = _state.value.copy(
+                    log = _state.value.log + "Desinstalación cancelada. Reiniciando polling...\n"
+                )
+                kotlinx.coroutines.delay(1000)
+                restartPolling()
             }
 
-            // Método 2: Verificar información del kernel en /sys
-            val sysPath = "/sys/bus/usb/devices"
-            val sysDir = java.io.File(sysPath)
-            val hasUsbDevices = sysDir.exists() && sysDir.listFiles()?.isNotEmpty() == true
-
-            if (hasUsbDevices) {
-                Log.d(TAG, "✓ Cable USB detectado (kernel)")
-                return true
-            }
-
-            Log.d(TAG, "⚠️ Cable USB no detectado")
-            false
-        } catch (e: Exception) {
-            Log.e(TAG, "Error detectando cable: ${e.message}")
-            false
+            Log.i(TAG, "================================================")
         }
     }
 

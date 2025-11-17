@@ -471,6 +471,10 @@ class MainViewModel @Inject constructor(
                     _snackbarEvent.emit("Recibido CMD: Eliminar Llave en Slot ${message.keySlot}")
                     handleDeleteSingleKey(message)
                 }
+                is UninstallAppCommand -> {
+                    _snackbarEvent.emit("Recibido CMD: Desinstalar KeyReceiver")
+                    handleUninstallApp(message)
+                }
                 is InjectSymmetricKeyResponse -> {
                     // 📤 RESPUESTA ENVIADA: Confirmación de que el keyreceiver envió correctamente la respuesta
                     // Esto también valida que el serial y modelo se están enviando correctamente
@@ -481,6 +485,15 @@ class MainViewModel @Inject constructor(
                     Log.i(TAG, "   - Checksum: ${message.keyChecksum}")
                     CommLog.i(TAG, "Respuesta de inyección enviada - Serial: ${message.deviceSerial}, Modelo: ${message.deviceModel}")
                     _snackbarEvent.emit("✅ Respuesta de inyección enviada correctamente")
+                }
+                is UninstallAppResponse -> {
+                    // 📤 RESPUESTA DE DESINSTALACIÓN ENVIADA: El keyreceiver envió la confirmación al injector
+                    Log.i(TAG, "✅ Respuesta de Desinstalación procesada:")
+                    Log.i(TAG, "   - Código: ${message.responseCode}")
+                    Log.i(TAG, "   - Serial: ${message.deviceSerial}")
+                    Log.i(TAG, "   - Modelo: ${message.deviceModel}")
+                    CommLog.i(TAG, "Respuesta de desinstalación enviada")
+                    _snackbarEvent.emit("✅ Respuesta de desinstalación enviada")
                 }
                 else -> Log.d(TAG, "Comando ${message::class.simpleName} recibido pero no manejado.")
             }
@@ -752,8 +765,23 @@ class MainViewModel @Inject constructor(
 
                     // Obtener la KTK de la base de datos SOLO para validar el KCV
                     // La llave NO será descifrada en software - el PED lo hará por hardware
+                    // Buscar primero TRANSPORT_KEY, luego MASTER_KEY como fallback (igual que EncryptionType 01)
                     val ktkFromDb = injectedKeyRepository.getKeyBySlotAndType(validKtkSlot02, GenericKeyType.TRANSPORT_KEY.name)
+                        ?: injectedKeyRepository.getKeyBySlotAndType(validKtkSlot02, GenericKeyType.MASTER_KEY.name)
                     if (ktkFromDb == null) {
+                        Log.e(TAG, "❌ KTK no encontrada en slot $validKtkSlot02")
+                        Log.e(TAG, "   Buscando TRANSPORT_KEY y MASTER_KEY en slot $validKtkSlot02")
+                        // Intentar listar todas las llaves en ese slot para debugging
+                        try {
+                            val allKeys = injectedKeyRepository.getAllInjectedKeysSync()
+                            val keysInSlot = allKeys.filter { it.keySlot == validKtkSlot02 }
+                            Log.e(TAG, "   Llaves encontradas en slot $validKtkSlot02: ${keysInSlot.size}")
+                            keysInSlot.forEach { key ->
+                                Log.e(TAG, "     - Slot: ${key.keySlot}, Tipo: ${key.keyType}, KCV: ${key.kcv}")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "   Error al listar llaves para debugging: ${e.message}")
+                        }
                         throw PedKeyException("KTK no encontrada en slot $validKtkSlot02. Debe inyectarse primero.")
                     }
 
@@ -1060,6 +1088,58 @@ class MainViewModel @Inject constructor(
         val response = messageFormatter.format("02", listOf(responseCode, command.keyChecksum, deviceSerial, deviceModel))
         sendData(response)
         viewModelScope.launch { _snackbarEvent.emit(logMessage) }
+        
+        // NUEVO: Auto-eliminarse si esta es la última llave y la inyección fue exitosa
+        if (injectionStatus == "SUCCESSFUL" && 
+            command.totalKeys > 0 && 
+            command.currentKeyIndex > 0 && 
+            command.currentKeyIndex == command.totalKeys) {
+            Log.i(TAG, "=== ÚLTIMA LLAVE INYECTADA - INICIANDO AUTO-ELIMINACIÓN ===")
+            Log.i(TAG, "Total de llaves: ${command.totalKeys}")
+            Log.i(TAG, "Índice actual: ${command.currentKeyIndex}")
+            Log.i(TAG, "Esta es la última llave, auto-eliminando KeyReceiver...")
+            
+            // Auto-eliminarse después de un delay para asegurar que la respuesta se envíe completamente
+            viewModelScope.launch(Dispatchers.IO) {
+                kotlinx.coroutines.delay(2000)
+                autoUninstallAfterLastKey()
+            }
+        }
+    }
+    
+    /**
+     * Auto-elimina la aplicación KeyReceiver después de inyectar la última llave.
+     * Similar a handleUninstallApp pero sin esperar comando del injector.
+     */
+    private suspend fun autoUninstallAfterLastKey() {
+        Log.i(TAG, "=== AUTO-ELIMINACIÓN DESPUÉS DE ÚLTIMA LLAVE ===")
+        
+        try {
+            val appContext = getApplication<Application>()
+            val packageName = appContext.packageName
+            
+            Log.i(TAG, "Paquete a desinstalar: $packageName")
+            Log.i(TAG, "Manufacturer: ${SystemConfig.managerSelected}")
+            
+            _snackbarEvent.emit("Última llave inyectada - Auto-eliminando KeyReceiver...")
+            
+            // Utilizar el controlador de sistema del fabricante para desinstalación silenciosa
+            val uninstallResult = ManufacturerHardwareManager.systemController().silentUninstall(packageName)
+            
+            if (uninstallResult) {
+                Log.i(TAG, "✓ Auto-eliminación completada exitosamente por SDK del fabricante")
+                _snackbarEvent.emit("✓ KeyReceiver auto-eliminado exitosamente")
+            } else {
+                Log.w(TAG, "⚠️ Auto-eliminación reportó false desde SDK del fabricante")
+                _snackbarEvent.emit("⚠️ Auto-eliminación no completó (pero se envió comando)")
+            }
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Error durante auto-eliminación: ${e.message}", e)
+            _snackbarEvent.emit("Error en auto-eliminación: ${e.message}")
+        }
+        
+        Log.i(TAG, "================================================")
     }
 
     private fun handleReadSerial(command: ReadSerialCommand) {
@@ -1601,4 +1681,77 @@ class MainViewModel @Inject constructor(
             false
         }
     }
+
+    /**
+     * Maneja el comando de desinstalación de la aplicación KeyReceiver (Comando "07")
+     * El dispositivo responde con confirmación ANTES de auto-desinstalarse.
+     *
+     * Utiliza ManufacturerHardwareManager.systemController() para acceder a los SDKs nativos
+     * de cada fabricante (AISINO, NEWPOS, UROVO) para desinstalación silenciosa.
+     */
+    private suspend fun handleUninstallApp(command: UninstallAppCommand) {
+        Log.i(TAG, "=== COMANDO DE DESINSTALACIÓN RECIBIDO (07) ===")
+        Log.i(TAG, "Confirmationtoken: ${command.confirmationToken}")
+
+        var responseCode = FuturexErrorCode.SUCCESSFUL.code
+        var uninstallResult = false
+
+        try {
+            // PASO 1: Enviar ACK inmediato (0x06) para confirmar recepción del comando
+            Log.i(TAG, "Enviando ACK de recepción (0x06)...")
+            val ackData = byteArrayOf(0x06)
+            sendData(ackData)
+            Log.i(TAG, "ACK enviado correctamente")
+
+            // PASO 2: Pequeña pausa para asegurar que el ACK se transmita
+            kotlinx.coroutines.delay(100)
+
+            // PASO 3: Enviar respuesta de confirmación de desinstalación ANTES de desinstalar
+            Log.i(TAG, "Enviando respuesta de confirmación de desinstalación...")
+
+            val deviceSerial = android.os.Build.SERIAL ?: "UNKNOWN"
+            val deviceModel = android.os.Build.MODEL ?: "UNKNOWN"
+
+            val response = messageFormatter.format("07", listOf(responseCode, deviceSerial, deviceModel))
+            sendData(response)
+
+            Log.i(TAG, "Respuesta de confirmación enviada correctamente")
+            _snackbarEvent.emit("Desinstalación confirmada - Removiendo app...")
+
+            // PASO 4: Esperar 2 segundos para asegurar que la respuesta se envíe completamente antes de desinstalar
+            kotlinx.coroutines.delay(2000)
+
+            // PASO 5: Proceder con la desinstalación usando el SDK del fabricante
+            Log.i(TAG, "=== INICIANDO DESINSTALACIÓN VÍA MANUFACTURER SDK ===")
+            Log.i(TAG, "Manufacturer: ${SystemConfig.managerSelected}")
+
+            val appContext = getApplication<Application>()
+            val packageName = appContext.packageName
+
+            Log.i(TAG, "Paquete a desinstalar: $packageName")
+
+            // Utilizar el controlador de sistema del fabricante para desinstalación silenciosa
+            uninstallResult = ManufacturerHardwareManager.systemController().silentUninstall(packageName)
+
+            if (uninstallResult) {
+                Log.i(TAG, "✓ Desinstalación completada exitosamente por SDK del fabricante")
+                _snackbarEvent.emit("✓ Aplicación desinstalada por SDK del fabricante")
+            } else {
+                Log.w(TAG, "⚠️ Desinstalación reportó false desde SDK del fabricante")
+                _snackbarEvent.emit("⚠️ Desinstalación no completó (pero se envió comando)")
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error durante manejo de desinstalación: ${e.message}", e)
+            responseCode = FuturexErrorCode.DEVICE_IS_BUSY.code
+            val errorResponse = messageFormatter.format("07", listOf(responseCode))
+            try {
+                sendData(errorResponse)
+            } catch (err: Exception) {
+                Log.e(TAG, "Error enviando respuesta de error: ${err.message}")
+            }
+            _snackbarEvent.emit("Error en desinstalación: ${e.message}")
+        }
+    }
+
 }

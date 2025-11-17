@@ -12,6 +12,7 @@ import android.annotation.TargetApi
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
+import com.hoho.android.usbserial.driver.SerialTimeoutException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -571,20 +572,72 @@ class CH340CableDetector(private val context: Context) {
         return try {
             val buffer = ByteArray(bufferSize)
             val effectiveTimeout = if (timeout > 0) timeout else 100 // Default 100ms if not specified
-
-            // usb-serial-for-android read() call with timeout
-            val bytesRead = usbSerialPort!!.read(buffer, effectiveTimeout)
-
-            if (bytesRead > 0) {
-                val data = buffer.copyOf(bytesRead)
-                val hexString = toHexString(data)
-                Log.d(TAG, "📥 Read ${bytesRead} bytes: $hexString")
-                data
-            } else if (bytesRead < 0) {
-                Log.d(TAG, "⏱️ Read timeout or error: $bytesRead")
-                ByteArray(0)
+            
+            // Si el timeout es grande (>500ms), hacer polling con timeouts más cortos
+            // para poder detectar datos que lleguen en cualquier momento
+            if (effectiveTimeout > 500) {
+                val startTime = System.currentTimeMillis()
+                val pollInterval = 200 // Poll cada 200ms
+                val accumulatedData = mutableListOf<Byte>()
+                
+                while (System.currentTimeMillis() - startTime < effectiveTimeout) {
+                    val remainingTime = effectiveTimeout - (System.currentTimeMillis() - startTime).toInt()
+                    val pollTimeout = minOf(pollInterval, remainingTime)
+                    
+                    if (pollTimeout <= 0) break
+                    
+                    val tempBuffer = ByteArray(bufferSize)
+                    val bytesRead = usbSerialPort!!.read(tempBuffer, pollTimeout)
+                    
+                    if (bytesRead > 0) {
+                        // Datos recibidos - agregar al buffer acumulado
+                        accumulatedData.addAll(tempBuffer.take(bytesRead))
+                        
+                        // Si recibimos datos, intentar leer más inmediatamente (puede haber más datos en el buffer)
+                        // pero con un timeout corto para no bloquear
+                        var additionalBytes = usbSerialPort!!.read(tempBuffer, 50)
+                        while (additionalBytes > 0 && accumulatedData.size < bufferSize) {
+                            accumulatedData.addAll(tempBuffer.take(additionalBytes))
+                            additionalBytes = usbSerialPort!!.read(tempBuffer, 50)
+                        }
+                        
+                        val data = accumulatedData.toByteArray()
+                        val hexString = toHexString(data)
+                        Log.d(TAG, "📥 Read ${data.size} bytes (polling): $hexString")
+                        return data
+                    } else if (bytesRead < 0) {
+                        // Error en la lectura
+                        Log.d(TAG, "⏱️ Read error during polling: $bytesRead")
+                        break
+                    }
+                    // bytesRead == 0 significa timeout, continuar polling
+                }
+                
+                // Timeout sin datos
+                if (accumulatedData.isEmpty()) {
+                    Log.d(TAG, "⏱️ Read timeout after ${System.currentTimeMillis() - startTime}ms (polling)")
+                    return ByteArray(0)
+                } else {
+                    val data = accumulatedData.toByteArray()
+                    val hexString = toHexString(data)
+                    Log.d(TAG, "📥 Read ${data.size} bytes (final): $hexString")
+                    return data
+                }
             } else {
-                ByteArray(0)
+                // Timeout corto - lectura directa
+                val bytesRead = usbSerialPort!!.read(buffer, effectiveTimeout)
+
+                if (bytesRead > 0) {
+                    val data = buffer.copyOf(bytesRead)
+                    val hexString = toHexString(data)
+                    Log.d(TAG, "📥 Read ${bytesRead} bytes: $hexString")
+                    data
+                } else if (bytesRead < 0) {
+                    Log.d(TAG, "⏱️ Read timeout or error: $bytesRead")
+                    ByteArray(0)
+                } else {
+                    ByteArray(0)
+                }
             }
 
         } catch (e: Exception) {
@@ -617,6 +670,23 @@ class CH340CableDetector(private val context: Context) {
             Log.d(TAG, "📤 Wrote ${data.size} bytes: $hexString")
             data.size
 
+        } catch (e: SerialTimeoutException) {
+            // Error específico de timeout - puede ser que el puerto esté ocupado
+            Log.e(TAG, "❌ SerialTimeoutException writing data: ${e.message}")
+            -1
+        } catch (e: IOException) {
+            // Error de IO - puede ser que el puerto perdió la interfaz
+            val errorMsg = e.message ?: "Unknown"
+            if (errorMsg.contains("claim", ignoreCase = true) || 
+                errorMsg.contains("interface", ignoreCase = true) ||
+                errorMsg.contains("get_status", ignoreCase = true)) {
+                Log.e(TAG, "❌ USB interface lost or not claimed: ${e.message}")
+                // Marcar como desconectado para que se pueda reabrir
+                isConnected = false
+            } else {
+                Log.e(TAG, "❌ IOException writing data: ${e.message}")
+            }
+            -1
         } catch (e: Exception) {
             Log.e(TAG, "❌ Exception writing data: ${e.message}", e)
             -1

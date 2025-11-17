@@ -63,6 +63,18 @@ class FuturexMessageParser : IMessageParser {
                     // --- INICIO: NUEVO CASO PARA BORRADO ESPECÍFICO ---
                     "06" -> parseDeleteSingleKeyCommand(fullPayload)
                     // --- FIN: NUEVO CASO PARA BORRADO ESPECÍFICO ---
+                    // --- INICIO: NUEVO CASO PARA DESINSTALACIÓN DE APP ---
+                    "07" -> {
+                        // Heurística: Si longitud <= 60 es respuesta, si es mayor es comando
+                        val payloadLength = fullPayload.length
+                        val potentialErrorCode = if (fullPayload.length >= 4) fullPayload.substring(2, 4) else ""
+                        val isValidErrorCode = FuturexErrorCode.fromCode(potentialErrorCode) != null
+                        val isResponse = payloadLength <= 60 && isValidErrorCode
+
+                        if (isResponse) parseUninstallAppResponse(fullPayload)
+                        else parseUninstallAppCommand(fullPayload)
+                    }
+                    // --- FIN: NUEVO CASO PARA DESINSTALACIÓN DE APP ---
                     else -> UnknownCommand(fullPayload, commandCode)
                 }
             } catch (e: Exception) {
@@ -161,6 +173,29 @@ class FuturexMessageParser : IMessageParser {
         // NO se parsea KTK del payload
         val ktkHex: String? = null
 
+        // NUEVO: Leer campos opcionales de información de inyección (totalKeys y currentKeyIndex)
+        // Estos campos son opcionales para mantener compatibilidad con comandos antiguos
+        var totalKeys = 0
+        var currentKeyIndex = 0
+        
+        // Verificar si hay más datos después de keyHex (6 caracteres: 3 para totalKeys + 3 para currentKeyIndex)
+        // Usar hasMore() para verificar sin lanzar excepción
+        if (reader.hasMore(6)) {
+            try {
+                val totalKeysStr = reader.read(3)
+                val currentKeyIndexStr = reader.read(3)
+                totalKeys = totalKeysStr.toInt(10)
+                currentKeyIndex = currentKeyIndexStr.toInt(10)
+                Log.i(TAG, "  - TotalKeys: $totalKeys")
+                Log.i(TAG, "  - CurrentKeyIndex: $currentKeyIndex")
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Error parseando campos opcionales de inyección: ${e.message}")
+                // Mantener valores por defecto (0) si hay error
+            }
+        } else {
+            Log.d(TAG, "  - Campos opcionales de inyección no presentes (comando antiguo)")
+        }
+
         Log.i(TAG, "=== RESUMEN DEL COMANDO PARSEADO ===")
         Log.i(TAG, "  - Comando: 02 (Inyección de llave simétrica)")
         Log.i(TAG, "  - Versión: $version")
@@ -175,10 +210,14 @@ class FuturexMessageParser : IMessageParser {
         Log.i(TAG, "  - KSN: $ksn")
         Log.i(TAG, "  - KeyLength: $keyLengthStr ($keyLengthBytes bytes)")
         Log.i(TAG, "  - KeyHex: ${keyHex.take(32)}...")
+        if (totalKeys > 0) {
+            Log.i(TAG, "  - TotalKeys: $totalKeys")
+            Log.i(TAG, "  - CurrentKeyIndex: $currentKeyIndex (${if (currentKeyIndex == totalKeys) "ÚLTIMA LLAVE" else "Llave $currentKeyIndex de $totalKeys"})")
+        }
         Log.i(TAG, "✓ Parseo de comando '02' completado exitosamente")
         Log.i(TAG, "================================================")
         
-        return InjectSymmetricKeyCommand(fullPayload, version, keySlot, ktkSlot, keyType, encryptionType, keyAlgorithm, keySubType, keyChecksum, ktkChecksum, ksn, keyHex, ktkHex)
+        return InjectSymmetricKeyCommand(fullPayload, version, keySlot, ktkSlot, keyType, encryptionType, keyAlgorithm, keySubType, keyChecksum, ktkChecksum, ksn, keyHex, ktkHex, totalKeys, currentKeyIndex)
     }
 
     private fun parseLegacyCommands(fullPayload: String, commandCode: String): InjectSymmetricKeyCommand {
@@ -219,6 +258,36 @@ class FuturexMessageParser : IMessageParser {
     }
     // --- FIN: NUEVA FUNCIÓN DE PARSEO ---
 
+    // --- INICIO: FUNCIONES DE PARSEO PARA DESINSTALACIÓN DE APP (COMANDO "07") ---
+    private fun parseUninstallAppCommand(fullPayload: String): UninstallAppCommand {
+        Log.d(TAG, "Parseando Comando de Desinstalación de App '07'")
+        val reader = PayloadReader(fullPayload)
+        reader.read(2) // Omitir Command "07"
+
+        val version = reader.read(2)
+        val confirmationToken = reader.readRemaining() // Token de confirmación
+
+        Log.i(TAG, "Comando '07' parseado - Version: $version, ConfirmationToken: $confirmationToken")
+
+        return UninstallAppCommand(fullPayload, version, confirmationToken)
+    }
+
+    private fun parseUninstallAppResponse(fullPayload: String): UninstallAppResponse {
+        Log.d(TAG, "Parseando Respuesta de Desinstalación de App '07'")
+        val reader = PayloadReader(fullPayload)
+        reader.read(2) // Omitir comando "07"
+        val responseCode = reader.read(2)
+
+        // Leer información del dispositivo receptor si está disponible
+        val deviceSerial = if (reader.hasMore(16)) reader.read(16) else ""
+        val deviceModel = if (reader.hasMore()) reader.readRemaining() else ""
+
+        Log.i(TAG, "Respuesta '07' parseada - Code: $responseCode, Serial: $deviceSerial, Model: $deviceModel")
+
+        return UninstallAppResponse(fullPayload, responseCode, deviceSerial, deviceModel)
+    }
+    // --- FIN: FUNCIONES DE PARSEO PARA DESINSTALACIÓN DE APP ---
+
     private fun parseInjectSymmetricKeyResponse(fullPayload: String): InjectSymmetricKeyResponse {
         val reader = PayloadReader(fullPayload)
         reader.read(2) // Omitir comando "02"
@@ -255,6 +324,11 @@ class FuturexMessageParser : IMessageParser {
         // NUEVO: Verificar si hay al menos N caracteres disponibles
         fun hasMore(length: Int = 1): Boolean {
             return cursor + length <= payload.length
+        }
+        
+        // NUEVO: Obtener cantidad de caracteres restantes
+        fun remaining(): Int {
+            return payload.length - cursor
         }
     }
 
