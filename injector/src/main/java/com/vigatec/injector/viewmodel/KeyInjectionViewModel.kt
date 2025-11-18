@@ -241,8 +241,8 @@ class KeyInjectionViewModel @Inject constructor(
             Log.i(TAG, "  - Marca esperada: ${profile.deviceType}")
             Log.i(TAG, "  - Código de marca: $expectedDeviceTypeCode")
 
-            // Construir comando: 08 + version(01) + expectedDeviceType
-            val commandBytes = messageFormatter!!.format("08", listOf("01", expectedDeviceTypeCode))
+            // Construir comando: 08 + version(AA) + expectedDeviceType
+            val commandBytes = messageFormatter!!.format("08", listOf("AA", expectedDeviceTypeCode))
 
             Log.i(TAG, "Enviando comando de validación...")
             sendData(commandBytes)
