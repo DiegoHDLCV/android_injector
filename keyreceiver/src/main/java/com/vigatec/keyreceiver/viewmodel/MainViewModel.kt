@@ -26,6 +26,7 @@ import com.vigatec.persistence.repository.InjectedKeyRepository
 import com.vigatec.keyreceiver.ui.events.UiEvent
 import com.vigatec.communication.polling.CommLog
 import com.vigatec.keyreceiver.util.UsbCableDetector
+import com.vigatec.keyreceiver.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1094,26 +1095,52 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { _snackbarEvent.emit(logMessage) }
         
         // NUEVO: Auto-eliminarse si esta es la última llave y la inyección fue exitosa
-        if (injectionStatus == "SUCCESSFUL" && 
-            command.totalKeys > 0 && 
-            command.currentKeyIndex > 0 && 
+        // NOTA: La auto-eliminación SOLO se ejecuta en flavores QA y PROD
+        // En DEV, la aplicación se mantiene para facilitar debugging
+        if (injectionStatus == "SUCCESSFUL" &&
+            command.totalKeys > 0 &&
+            command.currentKeyIndex > 0 &&
             command.currentKeyIndex == command.totalKeys) {
-            Log.i(TAG, "=== ÚLTIMA LLAVE INYECTADA - INICIANDO AUTO-ELIMINACIÓN ===")
+            Log.i(TAG, "=== ÚLTIMA LLAVE INYECTADA ===")
             Log.i(TAG, "Total de llaves: ${command.totalKeys}")
             Log.i(TAG, "Índice actual: ${command.currentKeyIndex}")
-            Log.i(TAG, "Esta es la última llave, auto-eliminando KeyReceiver...")
-            
-            // Auto-eliminarse después de un delay para asegurar que la respuesta se envíe completamente
-            viewModelScope.launch(Dispatchers.IO) {
-                kotlinx.coroutines.delay(2000)
-                autoUninstallAfterLastKey()
+            Log.i(TAG, "Flavor actual: ${BuildConfig.FLAVOR}")
+
+            // Verificar si debe hacer auto-eliminación basado en el flavor
+            if (shouldAutoUninstallAfterLastKey()) {
+                Log.i(TAG, "INICIANDO AUTO-ELIMINACIÓN (Flavor: QA/PROD)")
+
+                // Auto-eliminarse después de un delay para asegurar que la respuesta se envíe completamente
+                viewModelScope.launch(Dispatchers.IO) {
+                    kotlinx.coroutines.delay(2000)
+                    autoUninstallAfterLastKey()
+                }
+            } else {
+                Log.i(TAG, "⚠️ AUTO-ELIMINACIÓN DESHABILITADA (Flavor DEV) - Manteniendo aplicación para debugging")
+                _snackbarEvent.emit("⚠️ Última llave inyectada - Auto-eliminación deshabilitada en DEV")
             }
         }
     }
-    
+
+    /**
+     * Determina si la aplicación debe auto-eliminarse después de inyectar la última llave.
+     * La auto-eliminación está HABILITADA solo en flavores QA y PROD.
+     * En el flavor DEV, está DESHABILITADA para facilitar debugging.
+     *
+     * @return true si el flavor es QA o PROD, false si es DEV
+     */
+    private fun shouldAutoUninstallAfterLastKey(): Boolean {
+        val isDevFlavor = BuildConfig.FLAVOR.equals("dev", ignoreCase = true)
+        Log.d(TAG, "shouldAutoUninstallAfterLastKey: Flavor=${BuildConfig.FLAVOR}, isDev=$isDevFlavor, permitirDesinstalación=${!isDevFlavor}")
+        return !isDevFlavor  // No desinstalar si es DEV
+    }
+
     /**
      * Auto-elimina la aplicación KeyReceiver después de inyectar la última llave.
      * Similar a handleUninstallApp pero sin esperar comando del injector.
+     *
+     * NOTA: Esta función solo se invoca si shouldAutoUninstallAfterLastKey() retorna true,
+     * lo que significa que está habilitada para QA y PROD, pero no para DEV.
      */
     private suspend fun autoUninstallAfterLastKey() {
         Log.i(TAG, "=== AUTO-ELIMINACIÓN DESPUÉS DE ÚLTIMA LLAVE ===")
