@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,6 +39,9 @@ fun KeyInjectionModal(
     val state by viewModel.state.collectAsState()
 
     var showUninstallDialog by remember { mutableStateOf(false) }
+    var showBrandMismatchDialog by remember { mutableStateOf(false) }
+    var brandMismatchInfo by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var showBrandMismatchWarning by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.snackbarEvent.collect { message ->
@@ -54,6 +58,18 @@ fun KeyInjectionModal(
             Log.i("KeyInjectionModal", "Mostrar diálogo: $shouldShow")
             Log.i("KeyInjectionModal", "================================================")
             showUninstallDialog = shouldShow
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.brandMismatchDialogEvent.collect { event ->
+            Log.i("KeyInjectionModal", "=== EVENTO DIALOG MISMATCH DE MARCA ===")
+            Log.i("KeyInjectionModal", "Marca esperada: ${event.expectedBrand}")
+            Log.i("KeyInjectionModal", "Marca real: ${event.actualBrand}")
+            Log.i("KeyInjectionModal", "================================================")
+            brandMismatchInfo = Pair(event.expectedBrand, event.actualBrand)
+            showBrandMismatchDialog = true
+            showBrandMismatchWarning = true  // Mostrar advertencia en el modal también
         }
     }
 
@@ -103,6 +119,115 @@ fun KeyInjectionModal(
                     )
                 ) {
                     Text("No, mantener")
+                }
+            }
+        )
+    }
+
+    // AlertDialog para mismatch de marca del dispositivo
+    if (showBrandMismatchDialog && brandMismatchInfo != null) {
+        val (expectedBrand, actualBrand) = brandMismatchInfo!!
+        AlertDialog(
+            onDismissRequest = {
+                Log.i("KeyInjectionModal", "Diálogo mismatch de marca cerrado")
+                showBrandMismatchDialog = false
+            },
+            title = {
+                Text(
+                    text = "⚠️ ADVERTENCIA: Mismatch de Marca del Dispositivo",
+                    style = MaterialTheme.typography.titleLarge
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Se detectó una discrepancia en la marca del dispositivo receptor:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                MaterialTheme.colorScheme.errorContainer,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Esperada:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                text = expectedBrand,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+
+                        Text(
+                            text = "→",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.align(Alignment.CenterVertically),
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.End
+                        ) {
+                            Text(
+                                text = "Detectada:",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Text(
+                                text = actualBrand,
+                                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "\n¿Deseas continuar con la inyección a pesar de este mismatch?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        Log.i("KeyInjectionModal", "Usuario confirmó continuar a pesar del mismatch de marca")
+                        showBrandMismatchDialog = false
+                        viewModel.onBrandMismatchResponse(true)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
+                ) {
+                    Text("Continuar")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = {
+                        Log.i("KeyInjectionModal", "Usuario canceló la inyección por mismatch de marca")
+                        showBrandMismatchDialog = false
+                        viewModel.onBrandMismatchResponse(false)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Cancelar")
                 }
             }
         )
@@ -185,6 +310,63 @@ fun KeyInjectionModal(
                             .padding(horizontal = 18.dp, vertical = 14.dp)
                             .verticalScroll(rememberScrollState())
                     ) {
+                        // Advertencia de mismatch de marca si aplica
+                        if (showBrandMismatchWarning && brandMismatchInfo != null) {
+                            val (expectedBrand, actualBrand) = brandMismatchInfo!!
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                ),
+                                border = BorderStroke(
+                                    width = 2.dp,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Warning,
+                                            contentDescription = "Advertencia",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Text(
+                                            text = "ADVERTENCIA: Mismatch de Marca",
+                                            style = MaterialTheme.typography.titleSmall.copy(
+                                                fontWeight = FontWeight.Bold
+                                            ),
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                    }
+
+                                    Text(
+                                        text = "La marca del dispositivo receptor ($actualBrand) no coincide con la esperada ($expectedBrand).",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.padding(top = 8.dp)
+                                    )
+
+                                    Text(
+                                        text = "Se requiere confirmación para continuar con la inyección.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
                         // Sección unificada: Perfil + Llaves + Indicador de cable
                         UnifiedProfileAndKeysCard(
                             profile = state.currentProfile,
