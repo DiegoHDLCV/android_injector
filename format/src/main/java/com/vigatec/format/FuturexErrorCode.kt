@@ -34,7 +34,8 @@ enum class FuturexErrorCode(val code: String, val description: String) {
     INVALID_MODE_OF_USE("1A", "Invalid mode of use"),
     MAC_VERIFICATION_FAILED("1B", "MAC verification failed"),
     DECRYPTION_FAILED("1C", "Decryption failed"),
-    INVALID_FORMAT("1D", "Invalid message format or data");
+    INVALID_FORMAT("1D", "Invalid message format or data"),
+    DEVICE_BRAND_MISMATCH("2A", "Device brand does not match the injection profile");
 
     companion object {
         /**

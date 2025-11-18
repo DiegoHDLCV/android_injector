@@ -64,6 +64,20 @@ data class UninstallAppCommand(
     val confirmationToken: String  // Token de confirmación para validar origen
 ) : FuturexCommand
 
+/**
+ * Comando personalizado ("08") para validar que la marca del dispositivo POS
+ * coincida con el perfil de inyección antes de proceder con la inyección de llaves.
+ *
+ * Formato: 08<version><expectedDeviceType>
+ * - version: 2 caracteres (ej. "01")
+ * - expectedDeviceType: 2 caracteres (00=AISINO, 01=NEWPOS, 02=UROVO, FF=UNKNOWN)
+ */
+data class ValidateDeviceBrandCommand(
+    override val rawPayload: String,
+    val version: String,
+    val expectedDeviceType: String  // 2 chars: Marca esperada según el perfil
+) : FuturexCommand
+
 data class InjectSymmetricKeyCommand(
     override val rawPayload: String,
     val version: String,
@@ -101,6 +115,19 @@ data class UninstallAppResponse(
     val responseCode: String,           // "00" = éxito, otro valor = error
     val deviceSerial: String = "",
     val deviceModel: String = ""
+) : FuturexResponse
+
+/**
+ * Respuesta al comando de validación de marca ("08").
+ *
+ * Formato: 08<responseCode><actualDeviceType>
+ * - responseCode: 2 caracteres ("00" = marca válida y coincide, otro = error)
+ * - actualDeviceType: 2 caracteres (marca detectada en el dispositivo receptor)
+ */
+data class ValidateDeviceBrandResponse(
+    override val rawPayload: String,
+    val responseCode: String,           // "00" = coincide, "2A" = mismatch, otro = error
+    val actualDeviceType: String = ""   // 2 chars: Marca detectada en el dispositivo
 ) : FuturexResponse
 
 

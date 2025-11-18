@@ -475,6 +475,10 @@ class MainViewModel @Inject constructor(
                     _snackbarEvent.emit("Recibido CMD: Desinstalar KeyReceiver")
                     handleUninstallApp(message)
                 }
+                is ValidateDeviceBrandCommand -> {
+                    _snackbarEvent.emit("Recibido CMD: Validar Marca del Dispositivo")
+                    handleValidateDeviceBrand(message)
+                }
                 is InjectSymmetricKeyResponse -> {
                     // 📤 RESPUESTA ENVIADA: Confirmación de que el keyreceiver envió correctamente la respuesta
                     // Esto también valida que el serial y modelo se están enviando correctamente
@@ -1752,6 +1756,58 @@ class MainViewModel @Inject constructor(
             }
             _snackbarEvent.emit("Error en desinstalación: ${e.message}")
         }
+    }
+
+    /**
+     * Maneja el comando 08 de validación de marca del dispositivo.
+     * Obtiene la marca real del dispositivo y la compara con la esperada en el perfil.
+     *
+     * @param command Comando de validación de marca recibido desde el Injector
+     */
+    private suspend fun handleValidateDeviceBrand(command: ValidateDeviceBrandCommand) {
+        Log.i(TAG, "=== COMANDO DE VALIDACIÓN DE MARCA RECIBIDO (08) ===")
+        Log.i(TAG, "Marca esperada: ${command.expectedDeviceType}")
+
+        var responseCode = FuturexErrorCode.SUCCESSFUL.code
+        var actualDeviceType = ""
+
+        try {
+            // Obtener la marca real del dispositivo usando el manufacturer hardware manager
+            Log.i(TAG, "Obteniendo marca real del dispositivo...")
+            val realManufacturer = SystemConfig.managerSelected
+            actualDeviceType = com.vigatec.config.manufacturerToDeviceTypeCode(realManufacturer)
+
+            Log.i(TAG, "Marca real del dispositivo: ${realManufacturer.name} (código: $actualDeviceType)")
+            Log.i(TAG, "Marca esperada en el perfil (código): ${command.expectedDeviceType}")
+
+            // Comparar marcas
+            if (command.expectedDeviceType == actualDeviceType) {
+                Log.i(TAG, "✓ Validación exitosa - Las marcas coinciden")
+                responseCode = FuturexErrorCode.SUCCESSFUL.code
+            } else {
+                // Mismatch detectado
+                Log.w(TAG, "⚠️ Mismatch de marca detectado:")
+                Log.w(TAG, "  - Esperada (código): ${command.expectedDeviceType}")
+                Log.w(TAG, "  - Real (código): $actualDeviceType")
+                responseCode = FuturexErrorCode.DEVICE_BRAND_MISMATCH.code
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error durante validación de marca", e)
+            responseCode = FuturexErrorCode.DEVICE_IS_BUSY.code
+            _snackbarEvent.emit("Error en validación de marca: ${e.message}")
+        }
+
+        // Enviar respuesta
+        Log.i(TAG, "Enviando respuesta de validación...")
+        Log.i(TAG, "  - Código de respuesta: $responseCode")
+        Log.i(TAG, "  - Marca real: $actualDeviceType")
+
+        val response = messageFormatter.format("08", listOf(responseCode, actualDeviceType))
+        sendData(response)
+
+        Log.i(TAG, "Respuesta de validación enviada correctamente")
+        _snackbarEvent.emit("Respuesta de validación de marca enviada")
     }
 
 }

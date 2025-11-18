@@ -75,6 +75,18 @@ class FuturexMessageParser : IMessageParser {
                         else parseUninstallAppCommand(fullPayload)
                     }
                     // --- FIN: NUEVO CASO PARA DESINSTALACIÓN DE APP ---
+                    // --- INICIO: NUEVO CASO PARA VALIDACIÓN DE MARCA DE DISPOSITIVO ---
+                    "08" -> {
+                        // Heurística: Si longitud <= 20 es respuesta (08 + 2 chars + 2 chars), si es mayor es comando
+                        val payloadLength = fullPayload.length
+                        val potentialErrorCode = if (fullPayload.length >= 4) fullPayload.substring(2, 4) else ""
+                        val isValidErrorCode = FuturexErrorCode.fromCode(potentialErrorCode) != null
+                        val isResponse = payloadLength <= 20 && isValidErrorCode
+
+                        if (isResponse) parseValidateDeviceBrandResponse(fullPayload)
+                        else parseValidateDeviceBrandCommand(fullPayload)
+                    }
+                    // --- FIN: NUEVO CASO PARA VALIDACIÓN DE MARCA DE DISPOSITIVO ---
                     else -> UnknownCommand(fullPayload, commandCode)
                 }
             } catch (e: Exception) {
@@ -287,6 +299,33 @@ class FuturexMessageParser : IMessageParser {
         return UninstallAppResponse(fullPayload, responseCode, deviceSerial, deviceModel)
     }
     // --- FIN: FUNCIONES DE PARSEO PARA DESINSTALACIÓN DE APP ---
+
+    // --- INICIO: FUNCIONES DE PARSEO PARA VALIDACIÓN DE MARCA DE DISPOSITIVO (COMANDO "08") ---
+    private fun parseValidateDeviceBrandCommand(fullPayload: String): ValidateDeviceBrandCommand {
+        Log.d(TAG, "Parseando Comando de Validación de Marca '08'")
+        val reader = PayloadReader(fullPayload)
+        reader.read(2) // Omitir Command "08"
+
+        val version = reader.read(2)
+        val expectedDeviceType = reader.read(2)
+
+        Log.i(TAG, "Comando '08' parseado - Version: $version, ExpectedDeviceType: $expectedDeviceType")
+
+        return ValidateDeviceBrandCommand(fullPayload, version, expectedDeviceType)
+    }
+
+    private fun parseValidateDeviceBrandResponse(fullPayload: String): ValidateDeviceBrandResponse {
+        Log.d(TAG, "Parseando Respuesta de Validación de Marca '08'")
+        val reader = PayloadReader(fullPayload)
+        reader.read(2) // Omitir comando "08"
+        val responseCode = reader.read(2)
+        val actualDeviceType = if (reader.hasMore(2)) reader.read(2) else ""
+
+        Log.i(TAG, "Respuesta '08' parseada - Code: $responseCode, ActualDeviceType: $actualDeviceType")
+
+        return ValidateDeviceBrandResponse(fullPayload, responseCode, actualDeviceType)
+    }
+    // --- FIN: FUNCIONES DE PARSEO PARA VALIDACIÓN DE MARCA DE DISPOSITIVO ---
 
     private fun parseInjectSymmetricKeyResponse(fullPayload: String): InjectSymmetricKeyResponse {
         val reader = PayloadReader(fullPayload)

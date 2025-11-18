@@ -15,6 +15,8 @@ import com.vigatec.config.SystemConfig
 import com.vigatec.format.*
 import com.vigatec.format.base.IMessageFormatter
 import com.vigatec.format.base.IMessageParser
+import com.vigatec.config.manufacturerToDeviceTypeCode
+import com.vigatec.config.deviceTypeCodeToManufacturer
 import com.vigatec.persistence.entities.InjectedKeyEntity
 import com.vigatec.persistence.entities.KeyConfiguration
 import com.vigatec.persistence.entities.ProfileEntity
@@ -87,6 +89,17 @@ class KeyInjectionViewModel @Inject constructor(
     // Evento para mostrar diálogo de confirmación de desinstalación
     private val _uninstallDialogEvent = MutableSharedFlow<Boolean>()
     val uninstallDialogEvent = _uninstallDialogEvent.asSharedFlow()
+
+    // Evento para mostrar diálogo de validación de marca del dispositivo
+    data class BrandMismatchEvent(
+        val expectedBrand: String,
+        val actualBrand: String
+    )
+    private val _brandMismatchDialogEvent = MutableSharedFlow<BrandMismatchEvent>()
+    val brandMismatchDialogEvent = _brandMismatchDialogEvent.asSharedFlow()
+
+    // Flag para controlar si el usuario confirmó continuar a pesar del mismatch
+    private var userConfirmedBrandMismatch = false
 
     private var comController: IComController? = null
     private var messageParser: IMessageParser? = null
@@ -175,7 +188,7 @@ class KeyInjectionViewModel @Inject constructor(
 
     fun hideInjectionModal() {
         Log.i(TAG, "=== OCULTANDO MODAL DE INYECCIÓN FUTUREX ===")
-        
+
         _state.value = _state.value.copy(
             showInjectionModal = false,
             currentProfile = null,
@@ -185,9 +198,124 @@ class KeyInjectionViewModel @Inject constructor(
             log = "",
             error = null
         )
-        
+
         Log.i(TAG, "✓ Modal de inyección ocultado")
         Log.i(TAG, "================================================")
+    }
+
+    /**
+     * Maneja la respuesta del usuario sobre el diálogo de mismatch de marca.
+     * @param confirmed true si el usuario decidió continuar, false si canceló
+     */
+    fun onBrandMismatchResponse(confirmed: Boolean) {
+        Log.i(TAG, "Respuesta del usuario sobre mismatch de marca: confirmed=$confirmed")
+        userConfirmedBrandMismatch = confirmed
+    }
+
+    /**
+     * Valida que la marca del dispositivo receptor coincida con la esperada en el perfil.
+     * Si hay mismatch, muestra un diálogo de advertencia al usuario.
+     *
+     * @return true si la validación fue exitosa o el usuario confirmó continuar, false si el usuario canceló
+     */
+    private suspend fun validateDeviceBrand(profile: ProfileEntity): Boolean {
+        Log.i(TAG, "=== VALIDANDO MARCA DEL DISPOSITIVO ===")
+        Log.i(TAG, "Marca esperada del perfil: ${profile.deviceType}")
+
+        // Resetear el flag de confirmación
+        userConfirmedBrandMismatch = false
+
+        try {
+            // Verificar si la comunicación está inicializada
+            if (comController == null || messageFormatter == null || messageParser == null) {
+                Log.w(TAG, "Comunicación no inicializada, omitiendo validación de marca")
+                return true
+            }
+
+            // Construir comando 08 de validación
+            val expectedDeviceTypeCode = manufacturerToDeviceTypeCode(
+                com.vigatec.config.getManufacturerFromString(profile.deviceType)
+            )
+
+            Log.i(TAG, "Construyendo comando de validación de marca (08)...")
+            Log.i(TAG, "  - Marca esperada: ${profile.deviceType}")
+            Log.i(TAG, "  - Código de marca: $expectedDeviceTypeCode")
+
+            // Construir comando: 08 + version(01) + expectedDeviceType
+            val commandBytes = messageFormatter!!.format("08", listOf("01", expectedDeviceTypeCode))
+
+            Log.i(TAG, "Enviando comando de validación...")
+            sendData(commandBytes)
+
+            // Esperar respuesta (timeout por defecto: 10 segundos)
+            Log.i(TAG, "Esperando respuesta de validación...")
+            val response = try {
+                waitForResponse()
+            } catch (e: Exception) {
+                Log.w(TAG, "No se recibió respuesta del comando de validación: ${e.message}")
+                return true  // Permitir continuar si no hay respuesta
+            }
+
+            // Parsear la respuesta
+            messageParser!!.appendData(response)
+            val parsedMessage = messageParser!!.nextMessage()
+            if (parsedMessage is ValidateDeviceBrandResponse) {
+                val responseCode = parsedMessage.responseCode
+                val actualDeviceType = parsedMessage.actualDeviceType
+
+                Log.i(TAG, "Respuesta de validación recibida:")
+                Log.i(TAG, "  - Código de respuesta: $responseCode")
+                Log.i(TAG, "  - Marca real del dispositivo: $actualDeviceType")
+
+                // Verificar si la respuesta es exitosa (código "00")
+                if (responseCode == "00") {
+                    Log.i(TAG, "✓ Validación de marca exitosa - Las marcas coinciden")
+                    return true
+                } else if (responseCode == FuturexErrorCode.DEVICE_BRAND_MISMATCH.code) {
+                    // Mismatch detectado
+                    val actualBrandEnum = deviceTypeCodeToManufacturer(actualDeviceType)
+
+                    Log.w(TAG, "⚠️ Mismatch de marca detectado:")
+                    Log.w(TAG, "  - Esperada: ${profile.deviceType}")
+                    Log.w(TAG, "  - Real: ${actualBrandEnum.name}")
+
+                    // Emitir evento de diálogo
+                    _brandMismatchDialogEvent.emit(
+                        BrandMismatchEvent(
+                            expectedBrand = profile.deviceType,
+                            actualBrand = actualBrandEnum.name
+                        )
+                    )
+
+                    // Esperar respuesta del usuario (máximo 30 segundos)
+                    var waited = 0
+                    while (waited < 30000 && !userConfirmedBrandMismatch) {
+                        kotlinx.coroutines.delay(100)
+                        waited += 100
+                    }
+
+                    if (userConfirmedBrandMismatch) {
+                        Log.i(TAG, "Usuario confirmó continuar a pesar del mismatch")
+                        return true
+                    } else {
+                        Log.i(TAG, "Usuario canceló la inyección debido al mismatch")
+                        return false
+                    }
+                } else {
+                    // Otro error
+                    val errorDesc = FuturexErrorCode.fromCode(responseCode)?.description ?: "Error desconocido"
+                    Log.e(TAG, "Error en validación de marca: $errorDesc")
+                    return true  // Permitir continuar si hay otro tipo de error
+                }
+            } else {
+                Log.w(TAG, "Respuesta no es de tipo ValidateDeviceBrandResponse: ${parsedMessage?.javaClass?.simpleName}")
+                return true  // Permitir continuar si no podemos parsear
+            }
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error durante validación de marca", e)
+            return true  // Permitir continuar si hay error en la validación
+        }
     }
 
     fun startKeyInjection() {
@@ -195,16 +323,20 @@ class KeyInjectionViewModel @Inject constructor(
             val profile = _state.value.currentProfile ?: return@launch
             val keyConfigs = profile.keyConfigurations
 
-            Log.i(TAG, "=== INICIANDO PROCESO DE INYECCIÓN FUTUREX ===")
-            Log.i(TAG, "Perfil: ${profile.name}")
-            Log.i(TAG, "¿Usa KTK?: ${profile.useKTK}")
+            val injectionStartTime = System.currentTimeMillis()
+            Log.i(TAG, "╔═══════════════════════════════════════════════════════════════")
+            Log.i(TAG, "║ === INICIANDO PROCESO DE INYECCIÓN FUTUREX ===")
+            Log.i(TAG, "║ Timestamp: $injectionStartTime")
+            Log.i(TAG, "║ Perfil: ${profile.name}")
+            Log.i(TAG, "║ ¿Usa KTK?: ${profile.useKTK}")
             if (profile.useKTK) {
-                Log.i(TAG, "KTK seleccionada (KCV): ${profile.selectedKTKKcv}")
+                Log.i(TAG, "║ KTK seleccionada (KCV): ${profile.selectedKTKKcv}")
             }
-            Log.i(TAG, "Configuraciones de llave: ${keyConfigs.size}")
+            Log.i(TAG, "║ Configuraciones de llave: ${keyConfigs.size}")
             keyConfigs.forEachIndexed { index, config ->
-                Log.i(TAG, "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
+                Log.i(TAG, "║   ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
             }
+            Log.i(TAG, "╚═══════════════════════════════════════════════════════════════")
 
             if (keyConfigs.isEmpty()) {
                 Log.w(TAG, "El perfil no tiene configuraciones de llaves")
@@ -238,7 +370,28 @@ class KeyInjectionViewModel @Inject constructor(
 
                 _state.value = _state.value.copy(
                     status = InjectionStatus.INJECTING,
-                    log = _state.value.log + "Conexión establecida. Iniciando inyección...\n"
+                    log = _state.value.log + "Conexión establecida.\n"
+                )
+
+                // === PASO 0: VALIDAR MARCA DEL DISPOSITIVO ===
+                Log.i(TAG, "=== VALIDANDO MARCA DEL DISPOSITIVO ===")
+                _state.value = _state.value.copy(
+                    log = _state.value.log + "Validando marca del dispositivo...\n"
+                )
+
+                val brandValidationResult = validateDeviceBrand(profile)
+                if (!brandValidationResult) {
+                    Log.i(TAG, "Usuario canceló la inyección debido a mismatch de marca")
+                    _state.value = _state.value.copy(
+                        status = InjectionStatus.IDLE,
+                        log = _state.value.log + "Inyección cancelada por el usuario (mismatch de marca)\n"
+                    )
+                    _snackbarEvent.emit("Inyección cancelada por el usuario")
+                    return@launch
+                }
+
+                _state.value = _state.value.copy(
+                    log = _state.value.log + "✓ Validación de marca completada. Iniciando inyección...\n"
                 )
 
                 // === PASO 1: SIEMPRE INYECTAR KTK SELECCIONADA ===
@@ -363,12 +516,17 @@ class KeyInjectionViewModel @Inject constructor(
                     kotlinx.coroutines.delay(1000)
                 }
 
-                Log.i(TAG, "=== INYECCIÓN FUTUREX COMPLETADA EXITOSAMENTE ===")
-                Log.i(TAG, "Perfil inyectado: ${profile.name}")
-                Log.i(TAG, "Usuario: $currentUsername")
-                Log.i(TAG, "Total de llaves inyectadas: ${profile.keyConfigurations.size}")
-                Log.i(TAG, "✓ Todos los logs de inyección han sido registrados en la base de datos")
-                Log.i(TAG, "El Dashboard debería actualizar el contador automáticamente")
+                val injectionEndTime = System.currentTimeMillis()
+                val totalDurationMs = injectionEndTime - injectionStartTime
+                Log.i(TAG, "╔═══════════════════════════════════════════════════════════════")
+                Log.i(TAG, "║ === INYECCIÓN FUTUREX COMPLETADA EXITOSAMENTE ===")
+                Log.i(TAG, "║ Perfil inyectado: ${profile.name}")
+                Log.i(TAG, "║ Usuario: $currentUsername")
+                Log.i(TAG, "║ Total de llaves inyectadas: ${profile.keyConfigurations.size}")
+                Log.i(TAG, "║ Tiempo total: ${totalDurationMs}ms (${totalDurationMs / 1000}s)")
+                Log.i(TAG, "║ ✓ Todos los logs de inyección han sido registrados en la base de datos")
+                Log.i(TAG, "║ El Dashboard debería actualizar el contador automáticamente")
+                Log.i(TAG, "╚═══════════════════════════════════════════════════════════════")
 
                 _state.value = _state.value.copy(
                     status = InjectionStatus.SUCCESS,
@@ -475,6 +633,9 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "  - Llave seleccionada: ${keyConfig.selectedKey}")
         Log.i(TAG, "  - Progreso: Llave $currentKeyIndex de $totalKeys")
 
+        val startTime = System.currentTimeMillis()
+        Log.d(TAG, "Timestamp: $startTime (inicio de inyección)")
+
         try {
             val selectedKey = injectedKeyRepository.getKeyByKcv(keyConfig.selectedKey)
                 ?: throw Exception("Llave con KCV ${keyConfig.selectedKey} no encontrada")
@@ -510,7 +671,10 @@ class KeyInjectionViewModel @Inject constructor(
             Log.i(TAG, "Procesando respuesta del dispositivo...")
             processInjectionResponse(response, keyConfig, injectionCommand)
 
+            val endTime = System.currentTimeMillis()
+            val durationMs = endTime - startTime
             Log.i(TAG, "=== INYECCIÓN DE LLAVE FUTUREX COMPLETADA ===")
+            Log.i(TAG, "Tiempo total de inyección: ${durationMs}ms (${durationMs / 1000}s)")
 
         } catch (e: Exception) {
             Log.e(TAG, "Error durante inyección de llave individual", e)
@@ -1070,11 +1234,21 @@ class KeyInjectionViewModel @Inject constructor(
             throw Exception("Controlador de comunicación no inicializado")
         }
 
+        Log.d(TAG, "📤 Iniciando envío de datos...")
+        Log.d(TAG, "  Tamaño del buffer a enviar: ${data.size} bytes")
+        Log.d(TAG, "  Primeros 40 caracteres (hex): ${data.toHexString().take(40)}...")
+        Log.d(TAG, "  Todos los bytes (hex): ${data.toHexString()}")
+
+        val sendStartTime = System.currentTimeMillis()
+
         // Intentar enviar con reintentos
         var result = comController!!.write(data, 1000)
+        val sendEndTime = System.currentTimeMillis()
+        val sendDurationMs = sendEndTime - sendStartTime
+
         if (result < 0) {
             Log.w(TAG, "⚠️ Primer intento de escritura falló: $result, reintentando...")
-            
+
             // Si el error es por pérdida de interfaz USB, intentar reabrir el puerto
             if (result == -1) {
                 Log.w(TAG, "⚠️ Posible pérdida de interfaz USB, intentando reabrir puerto...")
@@ -1085,7 +1259,7 @@ class KeyInjectionViewModel @Inject constructor(
                     kotlinx.coroutines.runBlocking {
                         kotlinx.coroutines.delay(200) // Pequeño delay antes de reabrir
                     }
-                    
+
                     comController!!.init(
                         EnumCommConfBaudRate.BPS_115200,
                         EnumCommConfParity.NOPAR,
@@ -1102,29 +1276,32 @@ class KeyInjectionViewModel @Inject constructor(
                     throw Exception("Error al reabrir puerto USB: ${e.message}")
                 }
             }
-            
+
             // Reintentar escritura después de un pequeño delay
             kotlinx.coroutines.runBlocking {
                 kotlinx.coroutines.delay(200)
             }
-            
+
             result = comController!!.write(data, 1000)
             if (result < 0) {
                 Log.e(TAG, "❌ Error al enviar datos después de reintento: $result")
                 throw Exception("Error al enviar datos: $result")
             } else {
-                Log.i(TAG, "✓ Enviados ${result} bytes en segundo intento: ${data.toHexString().take(40)}...")
+                Log.i(TAG, "✓ Enviados ${result} bytes en segundo intento (duración: ${sendDurationMs}ms): ${data.toHexString().take(40)}...")
             }
         } else {
-            Log.i(TAG, "✓ Enviados ${result} bytes: ${data.toHexString().take(40)}...")
+            Log.i(TAG, "✓ Enviados ${result} bytes (duración: ${sendDurationMs}ms): ${data.toHexString().take(40)}...")
         }
     }
 
     private fun waitForResponse(): ByteArray {
         Log.i(TAG, "Esperando respuesta (timeout: 10s)...")
+        val readStartTime = System.currentTimeMillis()
 
         val buffer = ByteArray(1024)
         val bytesRead = comController!!.readData(buffer.size, buffer, 10000)
+        val readEndTime = System.currentTimeMillis()
+        val readDurationMs = readEndTime - readStartTime
 
         if (bytesRead <= 0) {
             Log.e(TAG, "❌ Timeout o error al leer respuesta: $bytesRead bytes leídos")
@@ -1132,7 +1309,9 @@ class KeyInjectionViewModel @Inject constructor(
         }
 
         val response = buffer.copyOf(bytesRead)
-        Log.i(TAG, "✓ Recibidos $bytesRead bytes: ${response.toHexString().take(40)}...")
+        Log.i(TAG, "✓ Recibidos $bytesRead bytes en ${readDurationMs}ms")
+        Log.i(TAG, "  Primeros 40 caracteres hex: ${response.toHexString().take(40)}...")
+        Log.d(TAG, "  Respuesta completa (hex): ${response.toHexString()}")
 
         return response
     }
@@ -1141,25 +1320,32 @@ class KeyInjectionViewModel @Inject constructor(
         Log.i(TAG, "=== PROCESANDO RESPUESTA FUTUREX ===")
         Log.i(TAG, "Configuración de llave: ${keyConfig.usage} (Slot: ${keyConfig.slot})")
         Log.i(TAG, "Respuesta recibida: ${response.size} bytes")
-        
+        Log.d(TAG, "  Primeros 40 caracteres (hex): ${response.toHexString().take(40)}...")
+        Log.d(TAG, "  Respuesta completa (hex): ${response.toHexString()}")
+
         val profile = _state.value.currentProfile
         val commandHex = commandSent.toHexString()
         val responseHex = response.toHexString()
-        
+
         // Agregar datos al parser
         Log.i(TAG, "Agregando datos al parser Futurex...")
         messageParser!!.appendData(response)
-        
+
         // Intentar parsear la respuesta
         Log.i(TAG, "Parseando respuesta del dispositivo...")
+        val parseStartTime = System.currentTimeMillis()
         val parsedMessage = messageParser!!.nextMessage()
-        
+        val parseEndTime = System.currentTimeMillis()
+        Log.d(TAG, "Respuesta parseada en ${parseEndTime - parseStartTime}ms")
+
         when (parsedMessage) {
             is InjectSymmetricKeyResponse -> {
                 Log.i(TAG, "Respuesta parseada como InjectSymmetricKeyResponse:")
                 Log.i(TAG, "  - Código de respuesta: ${parsedMessage.responseCode}")
                 Log.i(TAG, "  - Checksum de llave: ${parsedMessage.keyChecksum}")
                 Log.i(TAG, "  - Payload completo: ${parsedMessage.rawPayload}")
+                Log.d(TAG, "  - Serial del dispositivo: ${parsedMessage.deviceSerial}")
+                Log.d(TAG, "  - Modelo del dispositivo: ${parsedMessage.deviceModel}")
                 
                 if (parsedMessage.responseCode == "00") {
                     Log.i(TAG, "✓ Inyección exitosa para ${keyConfig.usage}")

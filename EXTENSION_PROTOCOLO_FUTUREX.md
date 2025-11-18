@@ -253,3 +253,244 @@ Para verificar que la extensión funciona:
 - **Retrocompatible**: Comandos legacy usan `keySubType = "00"`
 - **Extensible**: Nuevos subtipos pueden agregarse fácilmente
 - **Multi-PED**: Funciona con diferentes tipos de PED (NewPOS, Aisino, etc.)
+
+---
+
+# Extensión del Protocolo Futurex - Comando 08: Validación de Marca del Dispositivo
+
+## Descripción
+
+Este comando implementa un mecanismo de validación de la marca del dispositivo POS (Punto de Venta) antes de proceder con la inyección de llaves. Permite verificar que el dispositivo receptor coincide con el configurado en el perfil de inyección, previniendo inyecciones accidentales en dispositivos incorrectos.
+
+## Motivación
+
+- **Seguridad**: Evitar inyectar llaves en dispositivos incorrectos
+- **Validación de Perfil**: Verificar que el dispositivo receptor coincide con el perfil seleccionado
+- **Advertencia al Usuario**: Mostrar un diálogo si la marca no coincide, permitiendo al usuario confirmar o cancelar
+
+## Estructura del Comando 08
+
+### Comando (Injector → KeyReceiver)
+
+```
+[Comando][Versión][MarcaEsperada]
+08       01       00/01/02/FF
+```
+
+**Campos:**
+- **Comando**: `08` (2 bytes)
+- **Versión**: `01` (2 bytes) - Versión del protocolo de validación
+- **MarcaEsperada**: Código de marca esperada según el perfil (2 bytes):
+  - `00` = AISINO / Vanstone
+  - `01` = NEWPOS
+  - `02` = UROVO
+  - `FF` = UNKNOWN/No especificado
+
+**Tamaño Total**: 6 bytes
+
+### Respuesta (KeyReceiver → Injector)
+
+```
+[Comando][CodigoRespuesta][MarcaReal]
+08       00/2A/otro        00/01/02/FF
+```
+
+**Campos:**
+- **Comando**: `08` (2 bytes)
+- **CodigoRespuesta**: (2 bytes):
+  - `00` = Éxito - Las marcas coinciden
+  - `2A` = DEVICE_BRAND_MISMATCH - Las marcas no coinciden
+  - Otro = Error en la validación (código de error Futurex)
+- **MarcaReal**: Marca detectada en el dispositivo (2 bytes)
+
+**Tamaño Total**: 6 bytes
+
+## Flujo de Operación
+
+### Caso 1: Validación Exitosa (Marcas coinciden)
+
+```
+Injector (Aisino)  --[CMD 08, marca=00]-->  KeyReceiver (Aisino)
+                                              |
+                                              ✓ Valida marca
+                                              |
+Injector (Aisino)  <--[RSP 08, código=00]--  KeyReceiver (Aisino)
+
+Injector: Mostrar confirmación
+         Proceder con inyección de KTK
+         Proceder con inyección de llaves
+```
+
+### Caso 2: Mismatch Detectado (Marcas no coinciden)
+
+```
+Injector (Aisino)  --[CMD 08, marca=00]-->  KeyReceiver (NEWPOS)
+                                              |
+                                              ✗ Detecta mismatch
+                                              |
+Injector (Aisino)  <--[RSP 08, código=2A]--  KeyReceiver (NEWPOS)
+                    <--[MarcaReal=01]------
+
+Injector: Mostrar diálogo de advertencia
+         "Marca esperada: AISINO"
+         "Marca real: NEWPOS"
+         ¿Continuar de todas formas?
+
+         Si usuario elige SÍ:
+           → Proceder con inyección
+         Si usuario elige NO:
+           → Cancelar inyección
+```
+
+## Mapeo de Códigos de Marca
+
+| Código | Fabricante | Descripción |
+|--------|-----------|-------------|
+| `00` | AISINO | Vanstone/Aisino A90 Pro, A75 Pro, A99, etc. |
+| `01` | NEWPOS | NEWPOS 9220, 9310, 9830, etc. |
+| `02` | UROVO | UROVO C3, D7 Pro, etc. |
+| `FF` | UNKNOWN | Marca desconocida o no especificada |
+
+## Códigos de Respuesta Estándar
+
+| Código | Descripción |
+|--------|-------------|
+| `00` | Validación exitosa |
+| `2A` | Mismatch de marca |
+| `05` | Device is busy |
+| `FF` | Error no especificado |
+
+## Implementación
+
+### 1. Módulo `format`
+
+**Archivo**: `FuturexFormat.kt`
+- Agregado `ValidateDeviceBrandCommand` - Comando de validación
+- Agregado `ValidateDeviceBrandResponse` - Respuesta de validación
+
+**Archivo**: `FuturexMessageParser.kt`
+- Agregado `parseValidateDeviceBrandCommand()` - Parser del comando
+- Agregado `parseValidateDeviceBrandResponse()` - Parser de la respuesta
+- Heurística: payloads <= 20 bytes con código de error válido = respuesta
+
+**Archivo**: `FuturexErrorCode.kt`
+- Agregado error `DEVICE_BRAND_MISMATCH("2A", "Device brand does not match the injection profile")`
+
+**Archivo**: `EnumManufacturer.kt`
+- Agregado `manufacturerToDeviceTypeCode(manufacturer: EnumManufacturer): String`
+- Agregado `deviceTypeCodeToManufacturer(code: String): EnumManufacturer`
+
+### 2. Módulo `injector`
+
+**Archivo**: `KeyInjectionViewModel.kt`
+- Agregado evento `brandMismatchDialogEvent` para mostrar diálogo
+- Agregado método `validateDeviceBrand(profile: ProfileEntity): Boolean`
+- Agregado método `onBrandMismatchResponse(confirmed: Boolean)`
+- Modificado `startKeyInjection()` para llamar a validación antes de inyectar
+
+**Flujo:**
+1. Inicializar comunicación
+2. Validar marca del dispositivo (comando 08)
+3. Si mismatch: mostrar diálogo
+4. Si usuario confirma o no hay mismatch: proceder con inyección
+5. Si usuario cancela: abortar
+
+### 3. Módulo `keyreceiver`
+
+**Archivo**: `MainViewModel.kt`
+- Agregado case en `processParsedCommand()` para `ValidateDeviceBrandCommand`
+- Agregado método `handleValidateDeviceBrand(command: ValidateDeviceBrandCommand)`
+
+**Lógica:**
+1. Obtener marca real usando `SystemConfig.managerSelected`
+2. Convertir a código usando `manufacturerToDeviceTypeCode()`
+3. Comparar con marca esperada del comando
+4. Responder con código "00" o "2A"
+5. Incluir marca real en la respuesta
+
+## Ejemplo de Payload
+
+### Comando (Injector → KeyReceiver)
+
+Validar marca AISINO:
+```
+08 01 00
+```
+
+Validar marca NEWPOS:
+```
+08 01 01
+```
+
+### Respuesta - Caso Exitoso (KeyReceiver AISINO)
+
+```
+08 00 00
+   |  |
+   |  Marca real: AISINO (00)
+   Código: Éxito (00)
+```
+
+### Respuesta - Caso Mismatch (KeyReceiver NEWPOS cuando se espera AISINO)
+
+```
+08 2A 01
+   |  |
+   |  Marca real: NEWPOS (01)
+   Código: Mismatch (2A)
+```
+
+## Timeouts y Reintentos
+
+- **Timeout de respuesta**: 5 segundos
+- **Espera de confirmación del usuario**: 30 segundos máximo
+- **Sin reintentos**: Se intenta una sola vez; si falla se permite continuar
+
+## Manejo de Errores
+
+- **Si no hay respuesta**: Se permite continuar (validación no crítica)
+- **Si hay error**: Se registra en logs pero se permite continuar
+- **Si mismatch y usuario cancela**: Se aborta la inyección inmediatamente
+
+## Integración con el Flujo de Inyección
+
+El comando 08 se ejecuta como **PASO 0** antes de cualquier inyección:
+
+```
+1. Conectar
+2. PASO 0: Validar marca (CMD 08)
+3. PASO 1: Inyectar KTK (CMD 02)
+4. PASO 2+: Inyectar llaves (CMD 02)
+5. Mostrar resultado
+```
+
+## Beneficios
+
+1. **Seguridad**: Previene inyecciones accidentales en dispositivos incorrectos
+2. **Validación**: Verifica la configuración del perfil antes de cualquier operación
+3. **UX**: Diálogo claro permite al usuario confirmar o cancelar
+4. **Logging**: Registra discrepancias de marca para auditoría
+5. **Extensible**: Permite agregar validaciones adicionales en el futuro
+
+## Archivos Modificados
+
+1. `format/src/main/java/com/vigatec/format/FuturexFormat.kt`
+2. `format/src/main/java/com/vigatec/format/FuturexMessageParser.kt`
+3. `format/src/main/java/com/vigatec/format/FuturexErrorCode.kt`
+4. `config/src/main/java/com/vigatec/config/EnumManufacturer.kt`
+5. `injector/src/main/java/com/vigatec/injector/viewmodel/KeyInjectionViewModel.kt`
+6. `keyreceiver/src/main/java/com/vigatec/keyreceiver/viewmodel/MainViewModel.kt`
+7. `EXTENSION_PROTOCOLO_FUTUREX.md` (este archivo)
+
+## Validación y Testing
+
+Para verificar que el comando 08 funciona:
+
+1. Compilar ambas aplicaciones (injector y keyreceiver)
+2. Crear perfil con marca AISINO
+3. Ejecutar injector en dispositivo AISINO (debe validar exitosamente)
+4. Crear perfil con marca NEWPOS
+5. Ejecutar injector en dispositivo AISINO (debe mostrar diálogo de mismatch)
+6. Confirmar en diálogo y verificar que continúa la inyección
+7. Cancelar en diálogo y verificar que se aborta la inyección
+8. Verificar logs para confirmar que el comando 08 se envía y responde correctamente

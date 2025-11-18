@@ -45,3 +45,35 @@ fun getManufacturerFromString(deviceName: String): EnumManufacturer {
         else -> EnumManufacturer.UNKNOWN
     }
 }
+
+/**
+ * Convierte un EnumManufacturer a su código hexadecimal equivalente (2 caracteres).
+ * Se utiliza para transmitir la marca del dispositivo en el protocolo Futurex.
+ *
+ * @param manufacturer El fabricante a convertir.
+ * @return El código hexadecimal de 2 caracteres (ej: "00", "01", "02", "FF").
+ */
+fun manufacturerToDeviceTypeCode(manufacturer: EnumManufacturer): String {
+    return when (manufacturer) {
+        EnumManufacturer.AISINO -> "00"
+        EnumManufacturer.NEWPOS -> "01"
+        EnumManufacturer.UROVO -> "02"
+        else -> "FF"  // UNKNOWN
+    }
+}
+
+/**
+ * Convierte un código hexadecimal de marca a su EnumManufacturer equivalente.
+ * Se utiliza para parsear la marca del dispositivo desde el protocolo Futurex.
+ *
+ * @param code El código hexadecimal de 2 caracteres (ej: "00", "01", "02", "FF").
+ * @return El EnumManufacturer correspondiente.
+ */
+fun deviceTypeCodeToManufacturer(code: String): EnumManufacturer {
+    return when (code) {
+        "00" -> EnumManufacturer.AISINO
+        "01" -> EnumManufacturer.NEWPOS
+        "02" -> EnumManufacturer.UROVO
+        else -> EnumManufacturer.UNKNOWN
+    }
+}
