@@ -27,6 +27,10 @@ data class ProfilesScreenState(
     val showInjectModal: Boolean = false,
     val formData: ProfileFormData = ProfileFormData(),
     val searchQuery: String = "",
+    // Campos para selector de KTK
+    val availableKTKs: List<InjectedKeyEntity> = emptyList(),
+    val filteredKTKs: List<InjectedKeyEntity> = emptyList(),
+    val ktkSearchQuery: String = "",
     // Campos para importación de perfiles
     val showImportModal: Boolean = false,
     val importJsonText: String = "",
@@ -109,6 +113,9 @@ class ProfileViewModel @Inject constructor(
         viewModelScope.launch {
             // Obtener la KTK activa del almacén (KEK_TRANSPORT, no KEK_STORAGE)
             val currentKTK = injectedKeyRepository.getCurrentKTK()
+            
+            // Obtener todas las KTK disponibles para el selector
+            val availableKTKs = injectedKeyRepository.getAllKTKKeys()
 
             val formData = if (profile != null) {
                 ProfileFormData(
@@ -118,7 +125,7 @@ class ProfileViewModel @Inject constructor(
                     appType = profile.applicationType,
                     keyConfigurations = profile.keyConfigurations,
                     useKTK = profile.useKTK,
-                    selectedKTKKcv = currentKTK?.kcv ?: profile.selectedKTKKcv, // Usar la KTK activa si existe
+                    selectedKTKKcv = profile.selectedKTKKcv, // Mantener la KTK del perfil
                     currentKTK = currentKTK,
                     deviceType = profile.deviceType
                 )
@@ -130,10 +137,17 @@ class ProfileViewModel @Inject constructor(
                 )
             }
 
-            // Filtrar llaves compatibles y generar advertencia si aplica
-            updateCompatibleKeys(currentKTK)
+            // Filtrar llaves compatibles basadas en la KTK seleccionada
+            val selectedKTK = availableKTKs.find { it.kcv == formData.selectedKTKKcv }
+            updateCompatibleKeys(selectedKTK)
 
-            _state.value = _state.value.copy(showCreateModal = true, selectedProfile = profile, formData = formData)
+            _state.value = _state.value.copy(
+                showCreateModal = true,
+                selectedProfile = profile,
+                formData = formData,
+                availableKTKs = availableKTKs,
+                filteredKTKs = availableKTKs // Inicialmente sin filtro
+            )
         }
     }
 
@@ -413,5 +427,45 @@ class ProfileViewModel @Inject constructor(
             selectedKTKKcv = jsonObject.optString("selectedKTKKcv", ""),
             keyConfigurations = keyConfigurations
         )
+    }
+
+    // === FUNCIONES PARA SELECTOR DE KTK ===
+
+    /**
+     * Actualiza la query de búsqueda de KTK y filtra la lista.
+     */
+    fun onKTKSearchQueryChange(query: String) {
+        _state.value = _state.value.copy(ktkSearchQuery = query)
+        filterKTKs(query)
+    }
+
+    /**
+     * Filtra las KTK disponibles por KCV, nombre o algoritmo.
+     */
+    private fun filterKTKs(query: String) {
+        val filtered = if (query.isBlank()) {
+            _state.value.availableKTKs
+        } else {
+            _state.value.availableKTKs.filter { ktk ->
+                ktk.kcv.contains(query, ignoreCase = true) ||
+                ktk.customName.contains(query, ignoreCase = true) ||
+                ktk.keyAlgorithm.contains(query, ignoreCase = true)
+            }
+        }
+        _state.value = _state.value.copy(filteredKTKs = filtered)
+    }
+
+    /**
+     * Selecciona una KTK y actualiza las llaves compatibles.
+     */
+    fun onSelectKTK(ktk: InjectedKeyEntity) {
+        val updatedFormData = _state.value.formData.copy(
+            selectedKTKKcv = ktk.kcv,
+            currentKTK = ktk
+        )
+        _state.value = _state.value.copy(formData = updatedFormData)
+        
+        // Actualizar llaves compatibles basadas en la nueva KTK
+        updateCompatibleKeys(ktk)
     }
 } 

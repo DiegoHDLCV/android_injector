@@ -167,4 +167,12 @@ interface InjectedKeyDao {
     @Query("SELECT * FROM injected_keys WHERE kekType = 'KEK_TRANSPORT' LIMIT 1")
     suspend fun getCurrentKTK(): InjectedKeyEntity?
 
+    /**
+     * Obtiene todas las llaves disponibles que pueden ser seleccionadas como KTK.
+     * Retorna TODAS las llaves del almacén, ordenadas por timestamp.
+     * Útil para mostrar selector de KTK en perfiles (cada perfil puede tener su propia KTK).
+     */
+    @Query("SELECT * FROM injected_keys ORDER BY injectionTimestamp DESC")
+    suspend fun getAllKTKKeys(): List<InjectedKeyEntity>
+
 }

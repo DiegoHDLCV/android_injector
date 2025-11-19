@@ -111,6 +111,10 @@ fun ProfilesScreen(
         CreateProfileModal(
             formData = state.formData,
             availableKeys = state.compatibleKeys, // Usar llaves compatibles en lugar de todas
+            availableKTKs = state.filteredKTKs, // NUEVO: Lista filtrada de KTK
+            ktkSearchQuery = state.ktkSearchQuery, // NUEVO: Query de búsqueda
+            onKTKSearchChange = { viewModel.onKTKSearchQueryChange(it) }, // NUEVO: Callback de búsqueda
+            onSelectKTK = { viewModel.onSelectKTK(it) }, // NUEVO: Callback de selección
             ktkCompatibilityWarning = state.ktkCompatibilityWarning, // Pasar advertencia
             onDismiss = { viewModel.onDismissCreateModal() },
             onSave = { viewModel.onSaveProfile() },
@@ -952,6 +956,10 @@ fun deriveUsageFromKeyType(keyType: String): String {
 fun CreateProfileModal(
     formData: ProfileFormData,
     availableKeys: List<InjectedKeyEntity>,
+    availableKTKs: List<InjectedKeyEntity>, // NUEVO: Lista de KTK disponibles
+    ktkSearchQuery: String, // NUEVO: Query de búsqueda de KTK
+    onKTKSearchChange: (String) -> Unit, // NUEVO: Callback para cambio de búsqueda
+    onSelectKTK: (InjectedKeyEntity) -> Unit, // NUEVO: Callback para selección de KTK
     ktkCompatibilityWarning: String? = null, // Advertencia de compatibilidad KTK
     onDismiss: () -> Unit,
     onSave: () -> Unit,
@@ -1237,127 +1245,21 @@ fun CreateProfileModal(
                                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
                                         )
                                         Text(
-                                            text = "Debes seleccionar una llave como KTK para cifrar",
+                                            text = "Selecciona una llave como KTK para cifrar",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                         )
                                     }
                                 }
 
-                                // Mostrar KTK activa (solo lectura)
-                                if (formData.useKTK) {
-                                    if (formData.currentKTK == null) {
-                                        // No hay KTK activa
-                                        Card(
-                                            colors = CardDefaults.cardColors(
-                                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-                                            ),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier.padding(12.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Warning,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.error
-                                                )
-                                                Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = "No hay KTK activa en el almacén",
-                                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                    Text(
-                                                        text = "Ve al almacén de llaves y selecciona una llave AES-256 como KTK activa.",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        // Mostrar KTK activa (solo lectura)
-                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Text(
-                                                text = "KTK activa seleccionada del almacén:",
-                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold)
-                                            )
-
-                                            Card(
-                                                colors = CardDefaults.cardColors(
-                                                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                                ),
-                                                shape = RoundedCornerShape(8.dp),
-                                                border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(12.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Lock,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                        modifier = Modifier.size(32.dp)
-                                                    )
-                                                    Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = formData.currentKTK.customName.ifEmpty { "KTK ${formData.currentKTK.kcv.take(6)}" },
-                                                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
-                                                    )
-                                                        Text(
-                                                            text = "KCV: ${formData.currentKTK.kcv}",
-                                                            style = MaterialTheme.typography.bodySmall,
-                                                            fontFamily = FontFamily.Monospace,
-                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                                        )
-                                                        Text(
-                                                            text = "Creada: ${java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault()).format(java.util.Date(formData.currentKTK.injectionTimestamp))}",
-                                                            style = MaterialTheme.typography.labelSmall,
-                                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                                        )
-                                                    }
-                                                    Icon(
-                                                        imageVector = Icons.Default.CheckCircle,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary
-                                                    )
-                                                }
-                                            }
-
-                                            // Info sobre el uso de KTK
-                                            Card(
-                                                colors = CardDefaults.cardColors(
-                                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-                                                ),
-                                                shape = RoundedCornerShape(8.dp)
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(12.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Info,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.tertiary
-                                                    )
-                                                    Text(
-                                                        text = "Esta KTK se usará para cifrar las llaves antes de enviarlas al SubPOS.",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                                // NUEVO: Selector de KTK con búsqueda
+                                KTKSelectorComponent(
+                                    availableKTKs = availableKTKs,
+                                    selectedKTKKcv = formData.selectedKTKKcv,
+                                    searchQuery = ktkSearchQuery,
+                                    onSearchChange = onKTKSearchChange,
+                                    onSelectKTK = onSelectKTK
+                                )
                             }
                         }
                     }
@@ -2429,3 +2331,188 @@ fun ImportProfileModal(
 }
 
 
+
+// === COMPONENTES PARA SELECTOR DE KTK ===
+
+@Composable
+fun KTKSelectorComponent(
+    availableKTKs: List<InjectedKeyEntity>,
+    selectedKTKKcv: String,
+    searchQuery: String,
+    onSearchChange: (String) -> Unit,
+    onSelectKTK: (InjectedKeyEntity) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Barra de búsqueda
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = onSearchChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Buscar por KCV, nombre o algoritmo...") },
+            leadingIcon = {
+                Icon(Icons.Default.Search, contentDescription = "Buscar")
+            },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { onSearchChange("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                    }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(8.dp)
+        )
+
+        // Lista de KTK disponibles
+        if (availableKTKs.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Text(
+                        text = if (searchQuery.isEmpty()) {
+                            "No hay llaves KTK disponibles en el almacén"
+                        } else {
+                            "No se encontraron KTK que coincidan con \"$searchQuery\""
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        } else {
+            // Contenedor scrolleable con altura máxima
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                shape = RoundedCornerShape(8.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 300.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    availableKTKs.forEachIndexed { index, ktk ->
+                        KTKListItem(
+                            ktk = ktk,
+                            isSelected = ktk.kcv == selectedKTKKcv,
+                            onClick = { onSelectKTK(ktk) }
+                        )
+                        if (index < availableKTKs.size - 1) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun KTKListItem(
+    ktk: InjectedKeyEntity,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = if (isSelected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        } else {
+            Color.Transparent
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Icono de selección
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Seleccionada",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.RadioButtonUnchecked,
+                    contentDescription = "No seleccionada",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            // Información de la llave
+            Column(modifier = Modifier.weight(1f)) {
+                // Nombre o KCV
+                Text(
+                    text = ktk.customName.ifEmpty { "KTK ${ktk.kcv.take(8)}" },
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                // KCV
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "KCV:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = ktk.kcv,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                    )
+                }
+                
+                // Algoritmo
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = "Algoritmo:",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = ktk.keyAlgorithm,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

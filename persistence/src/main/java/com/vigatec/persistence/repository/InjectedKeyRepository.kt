@@ -609,6 +609,24 @@ class InjectedKeyRepository @Inject constructor(
     }
 
     /**
+     * Obtiene todas las llaves disponibles que pueden ser seleccionadas como KTK.
+     * Retorna TODAS las llaves del almacén (no solo KEK_TRANSPORT).
+     * Cada perfil puede designar cualquier llave como su KTK.
+     * Descifra automáticamente si están cifradas.
+     * USADO POR EL MÓDULO INJECTOR PARA SELECTOR DE KTK EN PERFILES.
+     */
+    suspend fun getAllKTKKeys(): List<InjectedKeyEntity> {
+        return try {
+            val allKeys = injectedKeyDao.getAllKTKKeys()
+            Log.d(TAG, "Llaves disponibles para selección de KTK: ${allKeys.size}")
+            allKeys.map { key -> decryptKeyIfNeeded(key) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error al obtener llaves para selector de KTK", e)
+            emptyList()
+        }
+    }
+
+    /**
      * Migra todas las llaves legacy (sin cifrar) a formato cifrado.
      * Requiere que exista KEK Storage inicializada.
      *

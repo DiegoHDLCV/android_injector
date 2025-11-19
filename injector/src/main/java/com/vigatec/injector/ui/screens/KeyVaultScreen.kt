@@ -65,13 +65,13 @@ fun KeyVaultScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             // Indicador de rol del usuario
-            val (roleBackground, roleTextColor, roleLabel) = when (state.userRole) {
-                PermissionManager.ROLE_SUPERVISOR -> Triple(
+            val (roleBackground, roleTextColor, roleLabel) = when {
+                state.isAdmin || state.userRole == PermissionManager.ROLE_SUPERVISOR -> Triple(
                     MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f),
                     MaterialTheme.colorScheme.tertiary,
                     "👤 SUPERVISOR"
                 )
-                PermissionManager.ROLE_OPERATOR -> Triple(
+                state.userRole == PermissionManager.ROLE_OPERATOR -> Triple(
                     MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f),
                     MaterialTheme.colorScheme.tertiary,
                     "👤 OPERADOR"
