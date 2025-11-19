@@ -97,7 +97,7 @@ class UsbCableDetector(private val context: Context) {
                 }
                 true
             } else {
-                Log.w(TAG, "✗ Método 2 (/dev/): No hay puertos seriales accesibles")
+                //Log.w(TAG, "✗ Método 2 (/dev/): No hay puertos seriales accesibles")
                 false
             }
             
@@ -116,7 +116,7 @@ class UsbCableDetector(private val context: Context) {
             val usbDevicesFile = File("/sys/bus/usb/devices")
             
             if (!usbDevicesFile.exists() || !usbDevicesFile.isDirectory) {
-                Log.w(TAG, "✗ Método 3 (/sys/bus/usb): directorio no disponible")
+//                Log.w(TAG, "✗ Método 3 (/sys/bus/usb): directorio no disponible")
                 return false
             }
             
@@ -169,7 +169,7 @@ class UsbCableDetector(private val context: Context) {
             val ttyClassDir = File("/sys/class/tty")
             
             if (!ttyClassDir.exists() || !ttyClassDir.isDirectory) {
-                Log.w(TAG, "✗ Método 4 (/sys/class/tty): directorio no disponible")
+//                Log.w(TAG, "✗ Método 4 (/sys/class/tty): directorio no disponible")
                 return false
             }
             
@@ -209,7 +209,7 @@ class UsbCableDetector(private val context: Context) {
     suspend fun detectUsingCH340Cable(): Boolean {
         return try {
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                Log.d(TAG, "🔌 Método 5 (CH340): Detectando cable especial con timeout (1s)...")
+//                Log.d(TAG, "🔌 Método 5 (CH340): Detectando cable especial con timeout (1s)...")
 
                 // Usar el detector CH340 con timeout para evitar bloqueos
                 val ch340Detector = CH340CableDetector(context)
@@ -220,7 +220,7 @@ class UsbCableDetector(private val context: Context) {
                         ch340Detector.detectCable()
                     } ?: false
                 } catch (e: Exception) {
-                    Log.w(TAG, "⚠️ Método 5 (CH340) timeout: ${e.message}")
+//                    Log.w(TAG, "⚠️ Método 5 (CH340) timeout: ${e.message}")
                     false
                 }
             }.also { detected ->

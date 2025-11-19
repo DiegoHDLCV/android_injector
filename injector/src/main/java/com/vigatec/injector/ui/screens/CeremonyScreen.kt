@@ -129,24 +129,29 @@ private fun ConfigurationStep(viewModel: CeremonyViewModel) {
         // Indicador de rol del usuario
         Surface(
             shape = RoundedCornerShape(8.dp),
-            color = if (state.isAdmin) 
-                MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
-            else 
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+            color = when (state.userRole) {
+                "ADMIN", "SUPERVISOR" -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            },
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier.padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val roleLabel = when (state.userRole) {
+                    "ADMIN", "SUPERVISOR" -> "👤 SUPERVISOR"
+                    "OPERATOR" -> "👤 OPERADOR"
+                    else -> "👤 USUARIO"
+                }
                 Text(
-                    text = if (state.isAdmin) "👤 ADMINISTRADOR" else "👤 USUARIO",
+                    text = roleLabel,
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (state.isAdmin) 
-                        MaterialTheme.colorScheme.tertiary
-                    else 
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                    color = when (state.userRole) {
+                        "ADMIN", "SUPERVISOR" -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
                 )
             }
         }

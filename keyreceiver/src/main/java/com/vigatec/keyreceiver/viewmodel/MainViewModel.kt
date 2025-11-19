@@ -1424,7 +1424,7 @@ class MainViewModel @Inject constructor(
         // SIEMPRE hacer detección real del cable, incluso si está LISTENING
         // para detectar desconexiones mientras se escucha
         return try {
-            CommLog.d(TAG, "🔍 Iniciando detección de cable USB (4 métodos)...")
+//            CommLog.d(TAG, "🔍 Iniciando detección de cable USB (4 métodos)...")
             
             // NUEVA DETECCIÓN: Usar 4 métodos diferentes para mayor confiabilidad
             // Método 1: UsbManager (detecta dispositivos USB físicamente conectados) - MÁS CONFIABLE

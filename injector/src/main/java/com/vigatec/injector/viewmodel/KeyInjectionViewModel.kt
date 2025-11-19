@@ -2011,7 +2011,7 @@ class KeyInjectionViewModel @Inject constructor(
      */
     private suspend fun detectCableConnection(): Boolean {
         return try {
-            Log.d(TAG, "🔍 Iniciando detección de cable USB (5 métodos)...")
+//            Log.d(TAG, "🔍 Iniciando detección de cable USB (5 métodos)...")
             
             // Usar los mismos métodos que keyreceiver
             val method1Result = usbCableDetector.detectUsingUsbManager()

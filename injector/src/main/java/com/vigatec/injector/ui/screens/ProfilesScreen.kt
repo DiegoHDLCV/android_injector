@@ -100,7 +100,8 @@ fun ProfilesScreen(
                             Log.i("ProfilesScreen", "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
                         }
                         keyInjectionViewModel.showInjectionModal(it, username)
-                    }
+                    },
+                    canManageProfiles = state.canManageProfiles // NUEVO: Pasar permiso
                 )
             }
         }
@@ -277,7 +278,8 @@ private fun ProfilesContent(
     onSearchQueryChange: (String) -> Unit,
     onEdit: (ProfileEntity) -> Unit,
     onDelete: (ProfileEntity) -> Unit,
-    onInject: (ProfileEntity) -> Unit
+    onInject: (ProfileEntity) -> Unit,
+    canManageProfiles: Boolean = true // NUEVO: Permiso para gestionar perfiles
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -313,7 +315,8 @@ private fun ProfilesContent(
                 profile = profile,
                 onEdit = { onEdit(profile) },
                 onDelete = { onDelete(profile) },
-                onInject = { onInject(profile) }
+                onInject = { onInject(profile) },
+                canManageProfiles = canManageProfiles // NUEVO: Pasar permiso
             )
         }
     }
@@ -482,6 +485,7 @@ fun ProfileCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onInject: () -> Unit,
+    canManageProfiles: Boolean = true, // NUEVO: Permiso para editar/eliminar
     modifier: Modifier = Modifier
 ) {
     // --- Estado derivado y helpers de UI ---
@@ -632,7 +636,7 @@ fun ProfileCard(
                     }
                 }
 
-                // Menú de desborde
+                // Menú de desborde (solo para usuarios con permisos de gestión)
                 Box {
                     IconButton(
                         onClick = { showOverflow = true },
@@ -647,16 +651,38 @@ fun ProfileCard(
                         expanded = showOverflow,
                         onDismissRequest = { showOverflow = false }
                     ) {
-                        DropdownMenuItem(
-                            text = { Text("Editar") },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                            onClick = { showOverflow = false; onEdit() }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Eliminar") },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
-                            onClick = { showOverflow = false; showDeleteConfirm = true }
-                        )
+                        if (canManageProfiles) {
+                            DropdownMenuItem(
+                                text = { Text("Editar") },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                onClick = { showOverflow = false; onEdit() }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Eliminar") },
+                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
+                                onClick = { showOverflow = false; showDeleteConfirm = true }
+                            )
+                        } else {
+                            // Mensaje informativo para usuarios sin permisos
+                            DropdownMenuItem(
+                                text = { 
+                                    Text(
+                                        "Solo lectura",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ) 
+                                },
+                                leadingIcon = { 
+                                    Icon(
+                                        Icons.Default.Lock, 
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ) 
+                                },
+                                onClick = { showOverflow = false },
+                                enabled = false
+                            )
+                        }
                     }
                 }
             }

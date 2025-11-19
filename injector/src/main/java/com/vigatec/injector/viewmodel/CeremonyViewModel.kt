@@ -46,6 +46,7 @@ data class CeremonyState(
     val selectedKEKType: KEKType = KEKType.NONE,  // Tipo de KEK: NONE, KEK_STORAGE, KEK_TRANSPORT
     val hasKEKStorage: Boolean = false,       // Si existe KEK Storage (necesaria para llaves operacionales)
     val isAdmin: Boolean = false,             // Si el usuario actual es administrador
+    val userRole: String = "",                // NUEVO: Rol del usuario actual
     val kekValidationError: String? = null,   // Error cuando no hay KEK y se intenta crear llave operacional
     val canCreateKEK: Boolean = false,        // Si el usuario tiene permiso para crear KEK
     val canCreateOperational: Boolean = false, // Si el usuario tiene permiso para crear llaves operacionales
@@ -151,6 +152,7 @@ class CeremonyViewModel @Inject constructor(
 
                     _uiState.value = _uiState.value.copy(
                         isAdmin = isAdmin,
+                        userRole = role, // NUEVO: Guardar el rol
                         canCreateKEK = canCreateKEK,
                         canCreateOperational = canCreateOperational
                     )

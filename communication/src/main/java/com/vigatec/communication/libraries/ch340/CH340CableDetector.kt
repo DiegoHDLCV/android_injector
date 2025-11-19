@@ -93,16 +93,16 @@ class CH340CableDetector(private val context: Context) {
      */
     suspend fun detectCable(): Boolean = withContext(Dispatchers.Default) {
         try {
-            Log.i(TAG, "╔═══════════════════════════════════════════════════════════════")
-            Log.i(TAG, "║ CH340 CABLE DETECTION (usb-serial-for-android v3.9.0)")
-            Log.i(TAG, "╠═══════════════════════════════════════════════════════════════")
+//            Log.i(TAG, "╔═══════════════════════════════════════════════════════════════")
+//            Log.i(TAG, "║ CH340 CABLE DETECTION (usb-serial-for-android v3.9.0)")
+//            Log.i(TAG, "╠═══════════════════════════════════════════════════════════════")
 
             // Step 1: Check USB Host support (informative only, not blocking)
             if (context.packageManager.hasSystemFeature("android.hardware.usb.host")) {
-                Log.i(TAG, "║ ✓ USB Host mode supported")
+//                Log.i(TAG, "║ ✓ USB Host mode supported")
             } else {
-                Log.w(TAG, "║ ⚠️ USB Host mode not reported, but CH340 may still work")
-                Log.i(TAG, "║ ℹ️ Continuing with CH340 detection anyway...")
+//                Log.w(TAG, "║ ⚠️ USB Host mode not reported, but CH340 may still work")
+//                Log.i(TAG, "║ ℹ️ Continuing with CH340 detection anyway...")
             }
 
             // Step 1.5: Verificar si hay dispositivos USB conectados antes de intentar detectarlos

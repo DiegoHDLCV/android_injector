@@ -35,7 +35,9 @@ data class ProfilesScreenState(
     val showImportModal: Boolean = false,
     val importJsonText: String = "",
     val importError: String? = null,
-    val importWarnings: List<String> = emptyList()
+    val importWarnings: List<String> = emptyList(),
+    // Permisos de usuario
+    val canManageProfiles: Boolean = false // NUEVO: Permiso para editar/eliminar perfiles
 )
 
 data class ProfileFormData(
@@ -53,7 +55,9 @@ data class ProfileFormData(
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
-    private val injectedKeyRepository: InjectedKeyRepository
+    private val injectedKeyRepository: InjectedKeyRepository,
+    private val sessionManager: com.vigatec.injector.data.local.preferences.SessionManager, // NUEVO: Para verificar permisos
+    private val userRepository: com.vigatec.injector.repository.UserRepository // NUEVO: Para obtener permisos del usuario
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ProfilesScreenState())
@@ -66,6 +70,21 @@ class ProfileViewModel @Inject constructor(
     private fun loadData() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true)
+            
+            // Obtener usuario actual y verificar permisos usando SessionManager
+            val session = sessionManager.getCurrentSession()
+            val canManage = if (session != null) {
+                val (userId, _, role) = session
+                // Obtener permisos del usuario
+                val userPermissions = userRepository.getUserPermissionsSync(userId)
+                val permissionIds = userPermissions.map { it.id }.toSet()
+                
+                // Verificar si puede gestionar perfiles (supervisores siempre pueden)
+                role == "SUPERVISOR" || role == "ADMIN" || permissionIds.contains(com.vigatec.injector.util.PermissionsCatalog.MANAGE_PROFILES)
+            } else {
+                false // Sin sesión, sin permisos
+            }
+            
             combine(
                 profileRepository.getAllProfiles(),
                 injectedKeyRepository.getAllInjectedKeys()
@@ -74,7 +93,8 @@ class ProfileViewModel @Inject constructor(
                     profiles = profiles,
                     filteredProfiles = profiles, // Inicialmente sin filtro
                     availableKeys = keys,
-                    isLoading = false
+                    isLoading = false,
+                    canManageProfiles = canManage // NUEVO: Pasar permiso al estado
                 )
             }.collect {
                 _state.value = it

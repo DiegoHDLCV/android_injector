@@ -186,8 +186,8 @@ fun UserInfoCard(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 val (roleLabel, roleColor, contentColor) = when (role) {
-                    "ADMIN" -> Triple(
-                        "Administrador",
+                    "ADMIN", "SUPERVISOR" -> Triple(
+                        "Supervisor",
                         MaterialTheme.colorScheme.primaryContainer,
                         MaterialTheme.colorScheme.onPrimaryContainer
                     )
