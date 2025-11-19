@@ -10,8 +10,7 @@ import com.vigatec.injector.data.local.entity.User
 object PermissionManager {
 
     // Roles del sistema
-    const val ROLE_ADMIN = "ADMIN"
-    const val ROLE_USER = "USER"
+    const val ROLE_SUPERVISOR = "SUPERVISOR"
     const val ROLE_OPERATOR = "OPERATOR"
 
     /**
@@ -19,35 +18,35 @@ object PermissionManager {
      * (crear, editar, eliminar usuarios)
      */
     fun canManageUsers(user: User?): Boolean {
-        return user?.role == ROLE_ADMIN
+        return user?.role == ROLE_SUPERVISOR
     }
 
     /**
      * Verifica si un usuario tiene permiso para eliminar llaves del almacén
      */
     fun canDeleteKeys(user: User?): Boolean {
-        return user?.role == ROLE_ADMIN
+        return user?.role == ROLE_SUPERVISOR
     }
 
     /**
      * Verifica si un usuario tiene permiso para limpiar todo el almacén
      */
     fun canClearAllKeys(user: User?): Boolean {
-        return user?.role == ROLE_ADMIN
+        return user?.role == ROLE_SUPERVISOR
     }
 
     /**
      * Verifica si un usuario tiene permiso para configurar llaves como KEK
      */
     fun canConfigureKEK(user: User?): Boolean {
-        return user?.role == ROLE_ADMIN
+        return user?.role == ROLE_SUPERVISOR
     }
 
     /**
      * Verifica si un usuario tiene permiso para crear/editar/eliminar perfiles
      */
     fun canManageProfiles(user: User?, permissions: Set<String> = emptySet()): Boolean {
-        if (user?.role == ROLE_ADMIN) return true
+        if (user?.role == ROLE_SUPERVISOR) return true
         if (user == null || !user.isActive) return false
         if (permissions.isEmpty()) return false
         return permissions.contains(PermissionsCatalog.MANAGE_PROFILES)
@@ -64,7 +63,7 @@ object PermissionManager {
      * Verifica si un usuario puede ver el almacén de llaves
      */
     fun canViewKeyVault(user: User?, permissions: Set<String> = emptySet()): Boolean {
-        if (user?.role == ROLE_ADMIN) return user.isActive
+        if (user?.role == ROLE_SUPERVISOR) return user.isActive
         if (user == null || !user.isActive) return false
         if (permissions.isEmpty()) return true
         return permissions.contains(PermissionsCatalog.KEY_VAULT)
@@ -74,7 +73,7 @@ object PermissionManager {
      * Verifica si un usuario puede ejecutar inyección de llaves
      */
     fun canInjectKeys(user: User?, permissions: Set<String> = emptySet()): Boolean {
-        if (user?.role == ROLE_ADMIN) return user.isActive
+        if (user?.role == ROLE_SUPERVISOR) return user.isActive
         if (user == null || !user.isActive) return false
         if (permissions.isEmpty()) return true
         return permissions.contains(PermissionsCatalog.EXECUTE_INJECTION)
@@ -84,7 +83,7 @@ object PermissionManager {
      * Verifica si un usuario puede ver logs
      */
     fun canViewLogs(user: User?, permissions: Set<String> = emptySet()): Boolean {
-        if (user?.role == ROLE_ADMIN) return user.isActive
+        if (user?.role == ROLE_SUPERVISOR) return user.isActive
         if (user == null || !user.isActive) return false
         if (permissions.isEmpty()) return true
         return permissions.contains(PermissionsCatalog.VIEW_LOGS)
@@ -94,7 +93,7 @@ object PermissionManager {
      * Verifica si un usuario puede ver perfiles
      */
     fun canViewProfiles(user: User?, permissions: Set<String> = emptySet()): Boolean {
-        if (user?.role == ROLE_ADMIN) return user.isActive
+        if (user?.role == ROLE_SUPERVISOR) return user.isActive
         if (user == null || !user.isActive) return false
         if (permissions.isEmpty()) return true
         return permissions.contains(PermissionsCatalog.KEY_VAULT) || permissions.contains(PermissionsCatalog.SELECT_KTK)

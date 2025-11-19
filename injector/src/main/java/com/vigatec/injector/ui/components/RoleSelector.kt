@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 /**
- * Componente reutilizable para seleccionar rol (OPERATOR/USER/ADMIN)
+ * Componente reutilizable para seleccionar rol (OPERATOR/SUPERVISOR)
  */
 @Composable
 fun RoleSelector(
@@ -37,19 +37,11 @@ fun RoleSelector(
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 RadioButton(
-                    selected = selectedRole == "USER",
-                    onClick = { onRoleChange("USER") },
+                    selected = selectedRole == "SUPERVISOR",
+                    onClick = { onRoleChange("SUPERVISOR") },
                     enabled = enabled
                 )
-                Text("Usuario")
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(
-                    selected = selectedRole == "ADMIN",
-                    onClick = { onRoleChange("ADMIN") },
-                    enabled = enabled
-                )
-                Text("Administrador")
+                Text("Supervisor")
             }
         }
     }

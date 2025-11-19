@@ -147,10 +147,10 @@ class UserManagementViewModel @Inject constructor(
                 if (userId > 0) {
                     // Asignar permisos
                     when (role) {
-                        "ADMIN" -> {
+                        "SUPERVISOR" -> {
                             val allPermissionIds = _uiState.value.allPermissions.map { it.id }
                             userRepository.updateUserPermissions(userId.toInt(), allPermissionIds)
-                            Log.d(TAG, "✓ Usuario ADMIN creado con TODOS los permisos")
+                            Log.d(TAG, "✓ Usuario SUPERVISOR creado con TODOS los permisos")
                         }
                         "OPERATOR" -> {
                             val operatorPermissions = PermissionsCatalog.OPERATOR_DEFAULT_PERMISSION_IDS.toList()
@@ -159,7 +159,7 @@ class UserManagementViewModel @Inject constructor(
                         }
                         else -> {
                             userRepository.updateUserPermissions(userId.toInt(), selectedPermissions)
-                            Log.d(TAG, "✓ Usuario USER creado con ${selectedPermissions.size} permisos")
+                            Log.d(TAG, "✓ Usuario creado con ${selectedPermissions.size} permisos")
                         }
                     }
                     
@@ -188,10 +188,10 @@ class UserManagementViewModel @Inject constructor(
                 
                 // Actualizar permisos
                 when (user.role) {
-                    "ADMIN" -> {
+                    "SUPERVISOR" -> {
                         val allPermissionIds = _uiState.value.allPermissions.map { it.id }
                         userRepository.updateUserPermissions(user.id, allPermissionIds)
-                        Log.d(TAG, "✓ Usuario ADMIN actualizado con TODOS los permisos")
+                        Log.d(TAG, "✓ Usuario SUPERVISOR actualizado con TODOS los permisos")
                     }
                     "OPERATOR" -> {
                         val operatorPermissions = PermissionsCatalog.OPERATOR_DEFAULT_PERMISSION_IDS.toList()
@@ -200,7 +200,7 @@ class UserManagementViewModel @Inject constructor(
                     }
                     else -> {
                         userRepository.updateUserPermissions(user.id, selectedPermissions)
-                        Log.d(TAG, "✓ Usuario USER actualizado con ${selectedPermissions.size} permisos")
+                        Log.d(TAG, "✓ Usuario actualizado con ${selectedPermissions.size} permisos")
                     }
                 }
                 
@@ -228,12 +228,12 @@ class UserManagementViewModel @Inject constructor(
     fun deleteUser(user: User) {
         viewModelScope.launch {
             try {
-                // Verificar que no sea el último admin
-                if (user.role == "ADMIN") {
+                // Verificar que no sea el último supervisor
+                if (user.role == "SUPERVISOR") {
                     val adminCount = userRepository.getAdminCount()
                     if (adminCount <= 1) {
                         _uiState.value = _uiState.value.copy(
-                            errorMessage = "No se puede eliminar el último administrador del sistema"
+                            errorMessage = "No se puede eliminar el último supervisor del sistema"
                         )
                         return@launch
                     }
@@ -254,12 +254,12 @@ class UserManagementViewModel @Inject constructor(
     fun toggleUserActiveStatus(user: User) {
         viewModelScope.launch {
             try {
-                // Si es el último admin activo, no permitir desactivarlo
-                if (user.role == "ADMIN" && user.isActive) {
+                // Si es el último supervisor activo, no permitir desactivarlo
+                if (user.role == "SUPERVISOR" && user.isActive) {
                     val adminCount = userRepository.getAdminCount()
                     if (adminCount <= 1) {
                         _uiState.value = _uiState.value.copy(
-                            errorMessage = "No se puede desactivar el último administrador del sistema"
+                            errorMessage = "No se puede desactivar el último supervisor del sistema"
                         )
                         return@launch
                     }

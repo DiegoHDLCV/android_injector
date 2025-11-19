@@ -31,7 +31,7 @@ data class KeyVaultState(
     val showImportJsonDialog: Boolean = false,  // Diálogo para importar desde JSON
     val currentUser: User? = null,  // Usuario actual para permisos
     val isAdmin: Boolean = false,     // Flag rápido para verificar si es admin
-    val userRole: String = PermissionManager.ROLE_USER,
+    val userRole: String = PermissionManager.ROLE_OPERATOR,
     val showKEKStoragePasswordDialog: Boolean = false,  // Diálogo para pedir contraseña antes de mostrar KEK Storage
     val showKEKStorage: Boolean = false,  // Flag para mostrar/ocultar KEK Storage
     val kekStoragePasswordError: String? = null,  // Error de contraseña al mostrar KEK Storage
@@ -94,7 +94,7 @@ class KeyVaultViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     currentUser = null,
                     isAdmin = false,
-                    userRole = PermissionManager.ROLE_USER
+                    userRole = PermissionManager.ROLE_OPERATOR
                 )
             }
         } catch (e: Exception) {

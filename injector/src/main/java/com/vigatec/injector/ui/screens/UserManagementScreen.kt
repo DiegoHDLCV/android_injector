@@ -188,8 +188,8 @@ fun UserListItem(
                 }
 
                 val (roleLabel, roleColor, roleContentColor) = when (user.role) {
-                    "ADMIN" -> Triple(
-                        "Admin",
+                    "SUPERVISOR" -> Triple(
+                        "Supervisor",
                         MaterialTheme.colorScheme.primaryContainer,
                         MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -199,7 +199,7 @@ fun UserListItem(
                         MaterialTheme.colorScheme.onTertiaryContainer
                     )
                     else -> Triple(
-                        "Usuario",
+                        user.role,
                         MaterialTheme.colorScheme.secondaryContainer,
                         MaterialTheme.colorScheme.onSecondaryContainer
                     )
@@ -271,7 +271,7 @@ fun CreateUserDialog(
     LaunchedEffect(role) {
         when (role) {
             "OPERATOR" -> selectedPermissions = PermissionsCatalog.OPERATOR_DEFAULT_PERMISSION_IDS
-            "ADMIN" -> selectedPermissions = PermissionsCatalog.SYSTEM_PERMISSION_IDS
+            "SUPERVISOR" -> selectedPermissions = PermissionsCatalog.SYSTEM_PERMISSION_IDS
         }
     }
 
@@ -325,7 +325,7 @@ fun CreateUserDialog(
                             selectedPermissions - permissionId
                         }
                     },
-                    isAdmin = role == "ADMIN"
+                    isAdmin = role == "SUPERVISOR"
                 )
             }
         },
@@ -370,7 +370,7 @@ fun EditUserDialog(
     LaunchedEffect(role) {
         when (role) {
             "OPERATOR" -> selectedPermissions = PermissionsCatalog.OPERATOR_DEFAULT_PERMISSION_IDS
-            "ADMIN" -> selectedPermissions = PermissionsCatalog.SYSTEM_PERMISSION_IDS
+            "SUPERVISOR" -> selectedPermissions = PermissionsCatalog.SYSTEM_PERMISSION_IDS
         }
     }
 
@@ -415,7 +415,7 @@ fun EditUserDialog(
                                 selectedPermissions - permissionId
                             }
                         },
-                        isAdmin = role == "ADMIN"
+                        isAdmin = role == "SUPERVISOR"
                     )
                 }
 
