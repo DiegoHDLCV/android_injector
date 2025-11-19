@@ -206,15 +206,15 @@ class UsbCableDetector(private val context: Context) {
      * NOTA: Implementado con timeout para evitar bloqueos prolongados
      * Si CH340 detection tarda más de 1 segundo, asume que no está disponible
      */
-    fun detectUsingCH340Cable(): Boolean {
+    suspend fun detectUsingCH340Cable(): Boolean {
         return try {
-            Log.d(TAG, "🔌 Método 5 (CH340): Detectando cable especial con timeout (1s)...")
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                Log.d(TAG, "🔌 Método 5 (CH340): Detectando cable especial con timeout (1s)...")
 
-            // Usar el detector CH340 con timeout para evitar bloqueos
-            val ch340Detector = CH340CableDetector(context)
+                // Usar el detector CH340 con timeout para evitar bloqueos
+                val ch340Detector = CH340CableDetector(context)
 
-            // Usar timeout de 1 segundo - si no completa en ese tiempo, asume no detectado
-            val detected = runBlocking {
+                // Usar timeout de 1 segundo - si no completa en ese tiempo, asume no detectado
                 try {
                     kotlinx.coroutines.withTimeoutOrNull(1000) {
                         ch340Detector.detectCable()
@@ -223,15 +223,15 @@ class UsbCableDetector(private val context: Context) {
                     Log.w(TAG, "⚠️ Método 5 (CH340) timeout: ${e.message}")
                     false
                 }
-            }
-
-            if (detected) {
-                Log.i(TAG, "✓ Método 5 (CH340): Cable especial CH340 detectado")
-                Log.d(TAG, ch340Detector.getDeviceInfo())
-                true
-            } else {
-                Log.d(TAG, "✗ Método 5 (CH340): Cable CH340 no detectado")
-                false
+            }.also { detected ->
+                if (detected) {
+                    // No necesitamos reinstanciar para obtener info, usamos una nueva instancia si es necesario
+                    // o asumimos que detectCable ya logueó lo necesario.
+                    // Para simplificar y evitar llamadas bloqueantes extra, solo logueamos el éxito.
+                    Log.i(TAG, "✓ Método 5 (CH340): Cable especial CH340 detectado")
+                } else {
+                    Log.d(TAG, "✗ Método 5 (CH340): Cable CH340 no detectado")
+                }
             }
 
         } catch (e: Exception) {
@@ -245,36 +245,38 @@ class UsbCableDetector(private val context: Context) {
      * Lógica del keyreceiver: Cable presente si AL MENOS 2 de 4 métodos lo detectan
      * O si el método 1 (UsbManager - más confiable) lo detecta
      */
-    fun detectCombined(): DetectionResult {
-        Log.d(TAG, "═══ Iniciando detección combinada de cable USB ═══")
+    suspend fun detectCombined(): DetectionResult {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            Log.d(TAG, "═══ Iniciando detección combinada de cable USB ═══")
 
-        val method1 = detectUsingUsbManager()
-        val method2 = detectUsingDeviceNodes()
-        val method3 = detectUsingSystemFiles()
-        val method4 = detectUsingTtyClass()
-        val method5 = detectUsingCH340Cable()
+            val method1 = detectUsingUsbManager()
+            val method2 = detectUsingDeviceNodes()
+            val method3 = detectUsingSystemFiles()
+            val method4 = detectUsingTtyClass()
+            val method5 = detectUsingCH340Cable()
 
-        // LÓGICA DEL KEYRECEIVER: Cable presente si AL MENOS 2 de 5 métodos lo detectan
-        // O si el método 1 (UsbManager - más confiable) lo detecta
-        val methodsCount = listOf(method1, method2, method3, method4, method5).count { it }
-        val detected = methodsCount >= 2 || method1
-        
-        val result = DetectionResult(
-            detected = detected,
-            usbManagerDetected = method1,
-            deviceNodesDetected = method2,
-            systemFilesDetected = method3,
-            ttyClassDetected = method4,
-            ch340CableDetected = method5
-        )
+            // LÓGICA DEL KEYRECEIVER: Cable presente si AL MENOS 2 de 5 métodos lo detectan
+            // O si el método 1 (UsbManager - más confiable) lo detecta
+            val methodsCount = listOf(method1, method2, method3, method4, method5).count { it }
+            val detected = methodsCount >= 2 || method1
+            
+            val result = DetectionResult(
+                detected = detected,
+                usbManagerDetected = method1,
+                deviceNodesDetected = method2,
+                systemFilesDetected = method3,
+                ttyClassDetected = method4,
+                ch340CableDetected = method5
+            )
 
-        if (detected) {
-            Log.i(TAG, "✅ CABLE USB DETECTADO (${result.detectionCount()}/5 métodos)")
-        } else {
-            Log.w(TAG, "⚠️ CABLE USB NO DETECTADO (0/5 métodos)")
+            if (detected) {
+                Log.i(TAG, "✅ CABLE USB DETECTADO (${result.detectionCount()}/5 métodos)")
+            } else {
+                Log.w(TAG, "⚠️ CABLE USB NO DETECTADO (0/5 métodos)")
+            }
+
+            result
         }
-
-        return result
     }
 
     /**
@@ -313,4 +315,5 @@ class UsbCableDetector(private val context: Context) {
         }
     }
 }
+
 

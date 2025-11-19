@@ -4,11 +4,16 @@ import android.app.Application
 import android.util.Log
 import com.vigatec.config.EnumManufacturer
 import com.vigatec.config.SystemConfig
+import com.vigatec.manufacturer.base.controllers.hardware.IBeeperController
 import com.vigatec.manufacturer.base.controllers.hardware.IDeviceController
+import com.vigatec.manufacturer.base.controllers.hardware.ILedController
+import com.vigatec.manufacturer.base.controllers.hardware.IPrinterController
 import com.vigatec.manufacturer.base.controllers.manager.IHardwareController
 import com.vigatec.manufacturer.base.controllers.system.ISystemController
+import com.vigatec.manufacturer.libraries.aisino.AisinoHardwareManager
 import com.vigatec.manufacturer.libraries.aisino.controller.system.AisinoSystemController
 import com.vigatec.manufacturer.libraries.aisino.workflow.hardware.AisinoDeviceController
+import com.vigatec.manufacturer.libraries.newpos.NewposHardwareManager
 import com.vigatec.manufacturer.libraries.newpos.controller.hardware.NewposDeviceController
 import com.vigatec.manufacturer.libraries.newpos.controller.system.NewposSystemController
 import com.vigatec.manufacturer.libraries.urovo.controller.system.UrovoSystemController
@@ -63,6 +68,54 @@ object ManufacturerHardwareManager : IHardwareController {
         }
     }
 
+    private val printerControllerInstance: IPrinterController by lazy {
+        Log.d(TAG, "Seleccionando PrinterController para fabricante: ${SystemConfig.managerSelected}")
+        when (SystemConfig.managerSelected) {
+            EnumManufacturer.NEWPOS -> NewposHardwareManager.printerController()
+            EnumManufacturer.AISINO -> AisinoHardwareManager.printerController()
+            EnumManufacturer.UROVO -> {
+                Log.w(TAG, "UrovoPrinterController no implementado aún, usando AisinoHardwareManager como fallback")
+                AisinoHardwareManager.printerController()  // Fallback
+            }
+            else -> {
+                Log.w(TAG, "Fabricante desconocido: ${SystemConfig.managerSelected}, usando AisinoHardwareManager como fallback")
+                AisinoHardwareManager.printerController()  // Fallback por defecto
+            }
+        }
+    }
+
+    private val ledControllerInstance: ILedController by lazy {
+        Log.d(TAG, "Seleccionando LedController para fabricante: ${SystemConfig.managerSelected}")
+        when (SystemConfig.managerSelected) {
+            EnumManufacturer.NEWPOS -> NewposHardwareManager.ledController()
+            EnumManufacturer.AISINO -> AisinoHardwareManager.ledController()
+            EnumManufacturer.UROVO -> {
+                Log.w(TAG, "UrovoLedController no implementado aún, usando AisinoHardwareManager como fallback")
+                AisinoHardwareManager.ledController()  // Fallback
+            }
+            else -> {
+                Log.w(TAG, "Fabricante desconocido: ${SystemConfig.managerSelected}, usando AisinoHardwareManager como fallback")
+                AisinoHardwareManager.ledController()  // Fallback por defecto
+            }
+        }
+    }
+
+    private val beeperControllerInstance: IBeeperController by lazy {
+        Log.d(TAG, "Seleccionando BeeperController para fabricante: ${SystemConfig.managerSelected}")
+        when (SystemConfig.managerSelected) {
+            EnumManufacturer.NEWPOS -> NewposHardwareManager.beeperController()
+            EnumManufacturer.AISINO -> AisinoHardwareManager.beeperController()
+            EnumManufacturer.UROVO -> {
+                Log.w(TAG, "UrovoBeeperController no implementado aún, usando AisinoHardwareManager como fallback")
+                AisinoHardwareManager.beeperController()  // Fallback
+            }
+            else -> {
+                Log.w(TAG, "Fabricante desconocido: ${SystemConfig.managerSelected}, usando AisinoHardwareManager como fallback")
+                AisinoHardwareManager.beeperController()  // Fallback por defecto
+            }
+        }
+    }
+
     override fun initializeController(application: Application) {
         Log.i(TAG, "Inicializando ManufacturerHardwareManager para: ${SystemConfig.managerSelected}")
 
@@ -71,6 +124,8 @@ object ManufacturerHardwareManager : IHardwareController {
             if (systemControllerInstance is UrovoSystemController) {
                 systemControllerInstance.initialize(application)
             }
+        } else if (SystemConfig.managerSelected == EnumManufacturer.AISINO) {
+             AisinoHardwareManager.initializeController(application)
         }
 
         Log.i(TAG, "✓ ManufacturerHardwareManager inicializado")
@@ -82,6 +137,18 @@ object ManufacturerHardwareManager : IHardwareController {
 
     override fun systemController(): ISystemController {
         return systemControllerInstance
+    }
+
+    override fun printerController(): IPrinterController {
+        return printerControllerInstance
+    }
+
+    override fun ledController(): ILedController {
+        return ledControllerInstance
+    }
+
+    override fun beeperController(): IBeeperController {
+        return beeperControllerInstance
     }
 
     /**

@@ -412,21 +412,40 @@ fun KeyInjectionModal(
                                     }
                                 }
                                 InjectionStatus.SUCCESS -> {
-                                    TextButton(
-                                        onClick = { 
-                                            Log.i("KeyInjectionModal", "=== CERRANDO MODAL FUTUREX DESDE UI (ÉXITO) ===")
-                                            Log.i("KeyInjectionModal", "Usuario presionó botón 'Cerrar' en estado de éxito")
-                                            viewModel.hideInjectionModal() 
+                                    Button(
+                                        onClick = {
+                                            Log.i("KeyInjectionModal", "Usuario presionó botón 'Imprimir Voucher'")
+                                            viewModel.printVoucher()
                                         },
+                                        enabled = !state.isPrintingVoucher,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.secondary
+                                        ),
                                         modifier = Modifier.padding(end = 12.dp)
                                     ) {
-                                        Text("Cerrar")
+                                        if (state.isPrintingVoucher) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(18.dp),
+                                                color = MaterialTheme.colorScheme.onSecondary,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Imprimiendo...")
+                                        } else {
+                                            Icon(
+                                                Icons.Default.Print,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text("Imprimir")
+                                        }
                                     }
                                     Button(
-                                        onClick = { 
+                                        onClick = {
                                             Log.i("KeyInjectionModal", "=== CERRANDO MODAL FUTUREX DESDE UI (ÉXITO) ===")
                                             Log.i("KeyInjectionModal", "Usuario presionó botón 'Completado'")
-                                            viewModel.hideInjectionModal() 
+                                            viewModel.hideInjectionModal()
                                         },
                                         colors = ButtonDefaults.buttonColors(
                                             containerColor = MaterialTheme.colorScheme.primary

@@ -66,7 +66,10 @@ data class KeyInjectionState(
     val error: String? = null,
     val showInjectionModal: Boolean = false,
     val cableConnected: Boolean = false,  // Nuevo: estado de conexión de cable
-    val keysToInject: List<KeyInjectionItem> = emptyList()  // NUEVO: Lista de llaves preparadas para inyectar
+    val keysToInject: List<KeyInjectionItem> = emptyList(),  // NUEVO: Lista de llaves preparadas para inyectar
+    val isPrintingVoucher: Boolean = false, // NUEVO: Estado de carga para impresión
+    val deviceSerial: String? = null, // NUEVO: Serial del dispositivo receptor
+    val deviceModel: String? = null   // NUEVO: Modelo del dispositivo receptor
 )
 
 @HiltViewModel
@@ -1229,91 +1232,108 @@ class KeyInjectionViewModel @Inject constructor(
         }
     }
 
-    private fun sendData(data: ByteArray) {
-        if (comController == null) {
-            throw Exception("Controlador de comunicación no inicializado")
-        }
+    private suspend fun sendData(data: ByteArray) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            if (comController == null) {
+                throw Exception("Controlador de comunicación no inicializado")
+            }
 
-        Log.d(TAG, "📤 Iniciando envío de datos...")
-        Log.d(TAG, "  Tamaño del buffer a enviar: ${data.size} bytes")
-        Log.d(TAG, "  Primeros 40 caracteres (hex): ${data.toHexString().take(40)}...")
-        Log.d(TAG, "  Todos los bytes (hex): ${data.toHexString()}")
+            Log.d(TAG, "📤 Iniciando envío de datos...")
+            Log.d(TAG, "  Tamaño del buffer a enviar: ${data.size} bytes")
+            Log.d(TAG, "  Primeros 40 caracteres (hex): ${data.toHexString().take(40)}...")
+            Log.d(TAG, "  Todos los bytes (hex): ${data.toHexString()}")
 
-        val sendStartTime = System.currentTimeMillis()
-
-        // Intentar enviar con reintentos
-        var result = comController!!.write(data, 1000)
-        val sendEndTime = System.currentTimeMillis()
-        val sendDurationMs = sendEndTime - sendStartTime
-
-        if (result < 0) {
-            Log.w(TAG, "⚠️ Primer intento de escritura falló: $result, reintentando...")
-
-            // Si el error es por pérdida de interfaz USB, intentar reabrir el puerto
-            if (result == -1) {
-                Log.w(TAG, "⚠️ Posible pérdida de interfaz USB, intentando reabrir puerto...")
-                try {
-                    // Cerrar y reabrir el puerto
-                    comController!!.close()
-                    // Usar runBlocking para delay en función no-suspend
-                    kotlinx.coroutines.runBlocking {
-                        kotlinx.coroutines.delay(200) // Pequeño delay antes de reabrir
-                    }
-
-                    comController!!.init(
-                        EnumCommConfBaudRate.BPS_115200,
-                        EnumCommConfParity.NOPAR,
-                        EnumCommConfDataBits.DB_8
-                    )
-                    val openResult = comController!!.open()
-                    if (openResult != 0) {
-                        Log.e(TAG, "❌ Error al reabrir puerto: $openResult")
-                        throw Exception("Error al reabrir puerto USB: $openResult")
-                    }
-                    Log.i(TAG, "✓ Puerto reabierto exitosamente")
-                } catch (e: Exception) {
-                    Log.e(TAG, "❌ Error al reabrir puerto: ${e.message}")
-                    throw Exception("Error al reabrir puerto USB: ${e.message}")
+            // OPTIMIZACIÓN: Limpiar buffer de entrada antes de enviar comandos críticos
+            try {
+                val flushBuffer = ByteArray(1024)
+                var flushedBytes = 0
+                while (true) {
+                    val read = comController!!.readData(flushBuffer.size, flushBuffer, 50) // Timeout corto de 50ms
+                    if (read <= 0) break
+                    flushedBytes += read
                 }
+                if (flushedBytes > 0) {
+                    Log.d(TAG, "  🧹 Buffer limpiado: $flushedBytes bytes descartados")
+                }
+            } catch (e: Exception) {
+                // Si falla la limpieza, no es crítico, continuar
+                Log.d(TAG, "  Buffer ya limpio o error al limpiar: ${e.message}")
             }
 
-            // Reintentar escritura después de un pequeño delay
-            kotlinx.coroutines.runBlocking {
-                kotlinx.coroutines.delay(200)
-            }
+            val sendStartTime = System.currentTimeMillis()
 
-            result = comController!!.write(data, 1000)
+            // Intentar enviar con reintentos
+            var result = comController!!.write(data, 1000)
+            val sendEndTime = System.currentTimeMillis()
+            val sendDurationMs = sendEndTime - sendStartTime
+
             if (result < 0) {
-                Log.e(TAG, "❌ Error al enviar datos después de reintento: $result")
-                throw Exception("Error al enviar datos: $result")
+                Log.w(TAG, "⚠️ Primer intento de escritura falló: $result, reintentando...")
+
+                // Si el error es por pérdida de interfaz USB, intentar reabrir el puerto
+                if (result == -1) {
+                    Log.w(TAG, "⚠️ Posible pérdida de interfaz USB, intentando reabrir puerto...")
+                    try {
+                        // Cerrar y reabrir el puerto
+                        comController!!.close()
+                        kotlinx.coroutines.delay(200) // Pequeño delay antes de reabrir
+
+                        comController!!.init(
+                            EnumCommConfBaudRate.BPS_115200,
+                            EnumCommConfParity.NOPAR,
+                            EnumCommConfDataBits.DB_8
+                        )
+                        val openResult = comController!!.open()
+                        if (openResult != 0) {
+                            Log.e(TAG, "❌ Error al reabrir puerto: $openResult")
+                            throw Exception("Error al reabrir puerto USB: $openResult")
+                        }
+                        Log.i(TAG, "✓ Puerto reabierto exitosamente")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ Error al reabrir puerto: ${e.message}")
+                        throw Exception("Error al reabrir puerto USB: ${e.message}")
+                    }
+                }
+
+                // Reintentar escritura después de un pequeño delay
+                kotlinx.coroutines.delay(200)
+
+                result = comController!!.write(data, 1000)
+                if (result < 0) {
+                    Log.e(TAG, "❌ Error al enviar datos después de reintento: $result")
+                    throw Exception("Error al enviar datos: $result")
+                } else {
+                    Log.i(TAG, "✓ Enviados ${result} bytes en segundo intento (duración: ${sendDurationMs}ms): ${data.toHexString().take(40)}...")
+                }
             } else {
-                Log.i(TAG, "✓ Enviados ${result} bytes en segundo intento (duración: ${sendDurationMs}ms): ${data.toHexString().take(40)}...")
+                Log.i(TAG, "✓ Enviados ${result} bytes (duración: ${sendDurationMs}ms): ${data.toHexString().take(40)}...")
             }
-        } else {
-            Log.i(TAG, "✓ Enviados ${result} bytes (duración: ${sendDurationMs}ms): ${data.toHexString().take(40)}...")
         }
     }
 
-    private fun waitForResponse(): ByteArray {
-        Log.i(TAG, "Esperando respuesta (timeout: 10s)...")
-        val readStartTime = System.currentTimeMillis()
+    private suspend fun waitForResponse(): ByteArray {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            Log.i(TAG, "Esperando respuesta (timeout: 3s)...")
+            val readStartTime = System.currentTimeMillis()
 
-        val buffer = ByteArray(1024)
-        val bytesRead = comController!!.readData(buffer.size, buffer, 10000)
-        val readEndTime = System.currentTimeMillis()
-        val readDurationMs = readEndTime - readStartTime
+            val buffer = ByteArray(1024)
+            // OPTIMIZACIÓN: Reducir timeout de 10s a 3s para respuestas más rápidas
+            val bytesRead = comController!!.readData(buffer.size, buffer, 3000)
+            val readEndTime = System.currentTimeMillis()
+            val readDurationMs = readEndTime - readStartTime
 
-        if (bytesRead <= 0) {
-            Log.e(TAG, "❌ Timeout o error al leer respuesta: $bytesRead bytes leídos")
-            throw Exception("Timeout o error al leer respuesta")
+            if (bytesRead <= 0) {
+                Log.e(TAG, "❌ Timeout o error al leer respuesta: $bytesRead bytes leídos")
+                throw Exception("Timeout o error al leer respuesta")
+            }
+
+            val response = buffer.copyOf(bytesRead)
+            Log.i(TAG, "✓ Recibidos $bytesRead bytes en ${readDurationMs}ms")
+            Log.i(TAG, "  Primeros 40 caracteres hex: ${response.toHexString().take(40)}...")
+            Log.d(TAG, "  Respuesta completa (hex): ${response.toHexString()}")
+
+            response
         }
-
-        val response = buffer.copyOf(bytesRead)
-        Log.i(TAG, "✓ Recibidos $bytesRead bytes en ${readDurationMs}ms")
-        Log.i(TAG, "  Primeros 40 caracteres hex: ${response.toHexString().take(40)}...")
-        Log.d(TAG, "  Respuesta completa (hex): ${response.toHexString()}")
-
-        return response
     }
 
     private fun processInjectionResponse(response: ByteArray, keyConfig: KeyConfiguration, @Suppress("UNUSED_PARAMETER") commandSent: ByteArray) {
@@ -1350,7 +1370,9 @@ class KeyInjectionViewModel @Inject constructor(
                 if (parsedMessage.responseCode == "00") {
                     Log.i(TAG, "✓ Inyección exitosa para ${keyConfig.usage}")
                     _state.value = _state.value.copy(
-                        log = _state.value.log + "✓ ${keyConfig.usage}: Inyectada exitosamente\n"
+                        log = _state.value.log + "✓ ${keyConfig.usage}: Inyectada exitosamente\n",
+                        deviceSerial = parsedMessage.deviceSerial,
+                        deviceModel = parsedMessage.deviceModel
                     )
 
                     // NUEVO: Extraer información del dispositivo receptor de la respuesta
@@ -1561,7 +1583,7 @@ class KeyInjectionViewModel @Inject constructor(
      * Envía comando para leer el número de serie del dispositivo
      */
     @Suppress("UNUSED")
-    fun readDeviceSerial(): String? {
+    suspend fun readDeviceSerial(): String? {
         if (comController == null) {
             Log.e(TAG, "No se puede leer número de serie: controlador no inicializado")
             return null
@@ -1613,7 +1635,7 @@ class KeyInjectionViewModel @Inject constructor(
      * Envía comando para escribir el número de serie del dispositivo
      */
     @Suppress("UNUSED")
-    fun writeDeviceSerial(serialNumber: String): Boolean {
+    suspend fun writeDeviceSerial(serialNumber: String): Boolean {
         if (comController == null) {
             Log.e(TAG, "No se puede escribir número de serie: controlador no inicializado")
             return false
@@ -1670,7 +1692,7 @@ class KeyInjectionViewModel @Inject constructor(
      * Envía comando para eliminar todas las llaves del dispositivo
      */
     @Suppress("UNUSED")
-    fun deleteAllKeys(): Boolean {
+    suspend fun deleteAllKeys(): Boolean {
         if (comController == null) {
             Log.e(TAG, "No se puede eliminar llaves: controlador no inicializado")
             return false
@@ -1721,7 +1743,7 @@ class KeyInjectionViewModel @Inject constructor(
      * Envía comando para eliminar una llave específica
      */
     @Suppress("UNUSED")
-    fun deleteSingleKey(keySlot: Int, keyType: String): Boolean {
+    suspend fun deleteSingleKey(keySlot: Int, keyType: String): Boolean {
         if (comController == null) {
             Log.e(TAG, "No se puede eliminar llave: controlador no inicializado")
             return false
@@ -1776,7 +1798,7 @@ class KeyInjectionViewModel @Inject constructor(
      * Exporta una KEK al dispositivo SubPOS en claro (sin cifrar)
      * La KEK se envía al slot 00 (fijo para KEKs) usando el comando de inyección Futurex
      */
-    private fun exportKEKToDevice(kek: InjectedKeyEntity) {
+    private suspend fun exportKEKToDevice(kek: InjectedKeyEntity) {
         Log.i(TAG, "=== EXPORTANDO KEK AL SUBPOS ===")
         Log.i(TAG, "KEK a exportar:")
         Log.i(TAG, "  - KCV: ${kek.kcv}")
@@ -1925,6 +1947,13 @@ class KeyInjectionViewModel @Inject constructor(
 
             while (isActive) {
                 try {
+                    // ⚠️ OPTIMIZACIÓN: No detectar durante inyección activa
+                    if (_state.value.status == InjectionStatus.INJECTING) {
+                        Log.d(TAG, "║ ⏸️ Detección pausada: inyección en progreso")
+                        kotlinx.coroutines.delay(1000) // Esperar poco y volver a chequear
+                        continue
+                    }
+
                     val detected = detectCableConnection()
                     val currentState = _state.value.cableConnected
 
@@ -1980,7 +2009,7 @@ class KeyInjectionViewModel @Inject constructor(
      * Lógica: Cable presente si AL MENOS 2 de 5 métodos lo detectan
      * O si el método 1 (UsbManager - más confiable) lo detecta
      */
-    private fun detectCableConnection(): Boolean {
+    private suspend fun detectCableConnection(): Boolean {
         return try {
             Log.d(TAG, "🔍 Iniciando detección de cable USB (5 métodos)...")
             
@@ -2165,6 +2194,119 @@ class KeyInjectionViewModel @Inject constructor(
             }
 
             Log.i(TAG, "================================================")
+        }
+    }
+
+    /**
+     * Generate voucher data from the current injection state
+     * @return VoucherData if injection was successful, null otherwise
+     */
+    fun generateVoucherData(): com.vigatec.injector.model.VoucherData? {
+        return try {
+            val state = _state.value
+            val profile = state.currentProfile ?: return null
+
+            // Collect injected keys information
+            val injectedKeys = state.keysToInject
+                .filter { it.status == KeyInjectionItemStatus.INJECTED }
+                .map { item ->
+                    com.vigatec.injector.model.VoucherData.InjectedKeyInfo(
+                        keyUsage = item.keyConfig.usage,
+                        keySlot = item.keyConfig.slot,
+                        keyType = item.keyConfig.keyType,
+                        kcv = item.keyConfig.selectedKey,
+                        status = "INYECTADA"
+                    )
+                }
+
+            // Get current date and time
+            val calendar = java.util.Calendar.getInstance()
+            val dateFormat = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+            val timeFormat = java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
+            val injectionDate = dateFormat.format(calendar.time)
+            val injectionTime = timeFormat.format(calendar.time)
+
+            // Create VoucherData
+            com.vigatec.injector.model.VoucherData(
+                deviceSerial = state.deviceSerial ?: "DESCONOCIDO",
+                deviceModel = state.deviceModel ?: "DESCONOCIDO",
+                profileName = profile.name,
+                username = currentUsername,
+                injectionDate = injectionDate,
+                injectionTime = injectionTime,
+                injectionStatus = "EXITOSA",
+                keysInjected = injectedKeys,
+                totalKeys = profile.keyConfigurations.size,
+                successfulKeys = injectedKeys.size
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error generating voucher data", e)
+            null
+        }
+    }
+
+    /**
+     * Print injection voucher with current state information
+     * @param onSuccess Callback when printing succeeds
+     * @param onError Callback when printing fails with error message
+     */
+    fun printVoucher(
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        // Evitar múltiples clics si ya está imprimiendo
+        if (_state.value.isPrintingVoucher) {
+            Log.w(TAG, "Ignorando solicitud de impresión: ya hay una impresión en curso")
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            Log.d(TAG, "Starting voucher print process")
+            
+            // Actualizar estado a cargando
+            Log.d(TAG, "Setting isPrintingVoucher = true")
+            _state.value = _state.value.copy(isPrintingVoucher = true)
+
+            val voucherData = generateVoucherData()
+            if (voucherData == null) {
+                Log.e(TAG, "Failed to generate voucher data")
+                Log.d(TAG, "Setting isPrintingVoucher = false (error generating data)")
+                _state.value = _state.value.copy(isPrintingVoucher = false)
+                onError("Error al generar datos del voucher")
+                return@launch
+            }
+
+            try {
+                // Imprimir voucher
+                Log.d(TAG, "Calling VoucherPrinter...")
+
+                com.vigatec.injector.util.VoucherPrinter.printInjectionVoucher(
+                    voucherData = voucherData,
+                    onSuccess = {
+                        Log.i(TAG, "Voucher printed successfully")
+                        viewModelScope.launch {
+                            Log.d(TAG, "Setting isPrintingVoucher = false (success)")
+                            _state.value = _state.value.copy(isPrintingVoucher = false)
+                            _snackbarEvent.emit("Voucher impreso exitosamente")
+                            onSuccess()
+                        }
+                    },
+                    onError = { errorMessage ->
+                        Log.e(TAG, "Voucher printing failed: $errorMessage")
+                        viewModelScope.launch {
+                            Log.d(TAG, "Setting isPrintingVoucher = false (error callback)")
+                            _state.value = _state.value.copy(isPrintingVoucher = false)
+                            _snackbarEvent.emit("Error al imprimir voucher: $errorMessage")
+                            onError(errorMessage)
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during voucher printing", e)
+                Log.d(TAG, "Setting isPrintingVoucher = false (exception)")
+                _state.value = _state.value.copy(isPrintingVoucher = false)
+                onError("Error: ${e.localizedMessage}")
+            }
         }
     }
 

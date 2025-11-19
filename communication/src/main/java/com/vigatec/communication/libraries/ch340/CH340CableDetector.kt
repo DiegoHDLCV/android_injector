@@ -107,14 +107,14 @@ class CH340CableDetector(private val context: Context) {
 
             // Step 1.5: Verificar si hay dispositivos USB conectados antes de intentar detectarlos
             val deviceList = usbManager.deviceList
-            Log.d(TAG, "║ Dispositivos USB detectados por UsbManager: ${deviceList.size}")
+//            Log.d(TAG, "║ Dispositivos USB detectados por UsbManager: ${deviceList.size}")
             if (deviceList.isEmpty()) {
-                Log.w(TAG, "║ ⚠️ No hay dispositivos USB detectados por UsbManager")
-                Log.w(TAG, "║    Posibles causas:")
-                Log.w(TAG, "║    1. El dispositivo está en modo ADB (conectado a PC)")
-                Log.w(TAG, "║    2. No se está usando un cable OTG en el dispositivo HOST")
-                Log.w(TAG, "║    3. El cable CH340 no está conectado")
-                Log.w(TAG, "║    SOLUCIÓN: Desconecta el cable USB de la PC y usa un cable OTG")
+//                Log.w(TAG, "║ ⚠️ No hay dispositivos USB detectados por UsbManager")
+//                Log.w(TAG, "║    Posibles causas:")
+//                Log.w(TAG, "║    1. El dispositivo está en modo ADB (conectado a PC)")
+//                Log.w(TAG, "║    2. No se está usando un cable OTG en el dispositivo HOST")
+//                Log.w(TAG, "║    3. El cable CH340 no está conectado")
+//                Log.w(TAG, "║    SOLUCIÓN: Desconecta el cable USB de la PC y usa un cable OTG")
             } else {
                 deviceList.values.forEach { device ->
                     Log.d(TAG, "║    - ${device.deviceName} (VID: 0x${device.vendorId.toString(16)}, PID: 0x${device.productId.toString(16)})")
@@ -127,16 +127,16 @@ class CH340CableDetector(private val context: Context) {
             if (availableDrivers.isEmpty()) {
                 Log.e(TAG, "║ ❌ No USB serial devices found")
                 if (deviceList.isEmpty()) {
-                    Log.e(TAG, "║ ⚠️ IMPORTANTE: No hay dispositivos USB detectados")
-                    Log.e(TAG, "║    El dispositivo puede estar en modo ADB (conectado a PC)")
-                    Log.e(TAG, "║    Para usar CH340, el dispositivo debe estar en modo HOST")
-                    Log.e(TAG, "║    SOLUCIÓN:")
-                    Log.e(TAG, "║    1. Desconecta el cable USB de la PC")
-                    Log.e(TAG, "║    2. Conecta un cable OTG al dispositivo")
-                    Log.e(TAG, "║    3. Conecta el cable CH340 al adaptador OTG")
+//                    Log.e(TAG, "║ ⚠️ IMPORTANTE: No hay dispositivos USB detectados")
+//                    Log.e(TAG, "║    El dispositivo puede estar en modo ADB (conectado a PC)")
+//                    Log.e(TAG, "║    Para usar CH340, el dispositivo debe estar en modo HOST")
+//                    Log.e(TAG, "║    SOLUCIÓN:")
+//                    Log.e(TAG, "║    1. Desconecta el cable USB de la PC")
+//                    Log.e(TAG, "║    2. Conecta un cable OTG al dispositivo")
+//                    Log.e(TAG, "║    3. Conecta el cable CH340 al adaptador OTG")
                 } else {
-                    Log.e(TAG, "║ ⚠️ Hay dispositivos USB pero no son seriales compatibles")
-                    Log.e(TAG, "║    Verifica que el cable CH340 esté correctamente conectado")
+//                    Log.e(TAG, "║ ⚠️ Hay dispositivos USB pero no son seriales compatibles")
+//                    Log.e(TAG, "║    Verifica que el cable CH340 esté correctamente conectado")
                 }
                 Log.d(TAG, "╚═══════════════════════════════════════════════════════════════")
                 return@withContext false

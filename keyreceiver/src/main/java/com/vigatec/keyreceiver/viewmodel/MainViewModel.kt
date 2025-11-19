@@ -1342,6 +1342,13 @@ class MainViewModel @Inject constructor(
 
             while (isActive) {
                 try {
+                    // ⚠️ OPTIMIZACIÓN: No detectar durante comunicación activa
+                    if (_connectionStatus.value == ConnectionStatus.LISTENING) {
+                        Log.v(TAG, "║ ⏸️ Detección pausada: escucha activa en progreso")
+                        kotlinx.coroutines.delay(1000)
+                        continue
+                    }
+
                     val detected = detectCableConnection()
                     val currentState = _cableConnected.value
 

@@ -1,7 +1,10 @@
 package com.vigatec.manufacturer.base.controllers.manager
 
 import android.content.Context
+import com.vigatec.manufacturer.base.controllers.hardware.IBeeperController
 import com.vigatec.manufacturer.base.controllers.hardware.IDeviceController
+import com.vigatec.manufacturer.base.controllers.hardware.ILedController
+import com.vigatec.manufacturer.base.controllers.hardware.IPrinterController
 import com.vigatec.manufacturer.base.controllers.system.ISystemController
 
 /**
@@ -43,4 +46,25 @@ interface IHardwareController {
      * @return Implementación de ISystemController específica del fabricante
      */
     fun systemController(): ISystemController
+
+    /**
+     * Retorna el controlador de impresora térmica.
+     *
+     * @return Implementación de IPrinterController específica del fabricante
+     */
+    fun printerController(): IPrinterController
+
+    /**
+     * Retorna el controlador de LED.
+     *
+     * @return Implementación de ILedController específica del fabricante
+     */
+    fun ledController(): ILedController
+
+    /**
+     * Retorna el controlador de beeper/buzzer.
+     *
+     * @return Implementación de IBeeperController específica del fabricante
+     */
+    fun beeperController(): IBeeperController
 }

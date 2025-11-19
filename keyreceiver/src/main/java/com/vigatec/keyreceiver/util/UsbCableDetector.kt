@@ -91,13 +91,13 @@ class UsbCableDetector(private val context: Context) {
             }
             
             if (accessibleNodes.isNotEmpty()) {
-                CommLog.i(TAG, "✓ Método 2 (/dev/): ${accessibleNodes.size} puerto(s) accesible(s)")
+//                CommLog.i(TAG, "✓ Método 2 (/dev/): ${accessibleNodes.size} puerto(s) accesible(s)")
                 accessibleNodes.forEach { node ->
                     CommLog.d(TAG, "  → Accesible: $node")
                 }
                 true
             } else {
-                CommLog.w(TAG, "✗ Método 2 (/dev/): No hay puertos seriales accesibles")
+//                CommLog.w(TAG, "✗ Método 2 (/dev/): No hay puertos seriales accesibles")
                 false
             }
             
@@ -116,7 +116,7 @@ class UsbCableDetector(private val context: Context) {
             val usbDevicesFile = File("/sys/bus/usb/devices")
             
             if (!usbDevicesFile.exists() || !usbDevicesFile.isDirectory) {
-                CommLog.w(TAG, "✗ Método 3 (/sys/bus/usb): directorio no disponible")
+//                CommLog.w(TAG, "✗ Método 3 (/sys/bus/usb): directorio no disponible")
                 return false
             }
             
@@ -147,15 +147,15 @@ class UsbCableDetector(private val context: Context) {
                 CommLog.i(TAG, "✓ Método 3 (/sys/bus/usb): Dispositivo(s) USB serial encontrado(s)")
                 true
             } else if (usbDevices.isNotEmpty()) {
-                CommLog.w(TAG, "✗ Método 3 (/sys/bus/usb): ${usbDevices.size} USB(s) pero sin interfaz serial")
+//                CommLog.w(TAG, "✗ Método 3 (/sys/bus/usb): ${usbDevices.size} USB(s) pero sin interfaz serial")
                 false
             } else {
-                CommLog.w(TAG, "✗ Método 3 (/sys/bus/usb): No hay dispositivos USB")
+//                CommLog.w(TAG, "✗ Método 3 (/sys/bus/usb): No hay dispositivos USB")
                 false
             }
             
         } catch (e: Exception) {
-            CommLog.e(TAG, "❌ Método 3 error: ${e.message}")
+//            CommLog.e(TAG, "❌ Método 3 error: ${e.message}")
             false
         }
     }
@@ -169,7 +169,7 @@ class UsbCableDetector(private val context: Context) {
             val ttyClassDir = File("/sys/class/tty")
             
             if (!ttyClassDir.exists() || !ttyClassDir.isDirectory) {
-                CommLog.w(TAG, "✗ Método 4 (/sys/class/tty): directorio no disponible")
+//                CommLog.w(TAG, "✗ Método 4 (/sys/class/tty): directorio no disponible")
                 return false
             }
             
@@ -185,7 +185,7 @@ class UsbCableDetector(private val context: Context) {
                 }
                 true
             } else {
-                CommLog.w(TAG, "✗ Método 4 (/sys/class/tty): No hay puertos USB-TTY")
+//                CommLog.w(TAG, "✗ Método 4 (/sys/class/tty): No hay puertos USB-TTY")
                 false
             }
             
@@ -208,7 +208,7 @@ class UsbCableDetector(private val context: Context) {
      */
     fun detectUsingCH340Cable(): Boolean {
         return try {
-            CommLog.d(TAG, "🔌 Método 5 (CH340): Detectando cable especial con timeout (1s)...")
+//            CommLog.d(TAG, "🔌 Método 5 (CH340): Detectando cable especial con timeout (1s)...")
 
             // Usar el detector CH340 con timeout para evitar bloqueos
             val ch340Detector = CH340CableDetector(context)
@@ -220,7 +220,7 @@ class UsbCableDetector(private val context: Context) {
                         ch340Detector.detectCable()
                     } ?: false
                 } catch (e: Exception) {
-                    CommLog.w(TAG, "⚠️ Método 5 (CH340) timeout: ${e.message}")
+//                    CommLog.w(TAG, "⚠️ Método 5 (CH340) timeout: ${e.message}")
                     false
                 }
             }
@@ -230,12 +230,12 @@ class UsbCableDetector(private val context: Context) {
                 CommLog.d(TAG, ch340Detector.getDeviceInfo())
                 true
             } else {
-                CommLog.d(TAG, "✗ Método 5 (CH340): Cable CH340 no detectado")
+//                CommLog.d(TAG, "✗ Método 5 (CH340): Cable CH340 no detectado")
                 false
             }
 
         } catch (e: Exception) {
-            CommLog.w(TAG, "⚠️ Método 5 (CH340) error: ${e.message}")
+//            CommLog.w(TAG, "⚠️ Método 5 (CH340) error: ${e.message}")
             false
         }
     }
@@ -267,7 +267,7 @@ class UsbCableDetector(private val context: Context) {
         if (detected) {
             CommLog.i(TAG, "✅ CABLE USB DETECTADO (${result.detectionCount()}/5 métodos)")
         } else {
-            CommLog.w(TAG, "⚠️ CABLE USB NO DETECTADO (0/5 métodos)")
+//            CommLog.w(TAG, "⚠️ CABLE USB NO DETECTADO (0/5 métodos)")
         }
 
         return result

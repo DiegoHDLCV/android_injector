@@ -15,5 +15,8 @@ class InjectorApplication : Application() {
 
         // Configurar USB en modo HOST (MASTER detecta dispositivos)
         UsbModeManager.configureUsbMode()
+
+        // Inicializar Hardware Manager (necesario para PrinterApi)
+        com.vigatec.manufacturer.ManufacturerHardwareManager.initializeController(this)
     }
 }
