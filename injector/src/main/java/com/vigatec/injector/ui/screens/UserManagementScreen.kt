@@ -280,6 +280,7 @@ fun CreateUserDialog(
         title = { Text("Crear Nuevo Usuario") },
         text = {
             Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
@@ -379,6 +380,7 @@ fun EditUserDialog(
         title = { Text("Editar Usuario") },
         text = {
             Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedTextField(
