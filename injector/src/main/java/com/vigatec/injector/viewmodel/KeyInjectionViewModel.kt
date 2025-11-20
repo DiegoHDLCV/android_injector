@@ -52,6 +52,8 @@ enum class KeyInjectionItemStatus {
 
 data class KeyInjectionItem(
     val keyConfig: KeyConfiguration,
+    val keyKcv: String = "",  // KCV de la llave
+    val keyCustomName: String = "",  // Nombre personalizado de la llave
     val status: KeyInjectionItemStatus = KeyInjectionItemStatus.PENDING,
     val errorMessage: String? = null
 )
@@ -161,10 +163,17 @@ class KeyInjectionViewModel @Inject constructor(
 
         currentUsername = username
 
-        // NUEVO: Preparar lista de llaves para inyectar
+        // NUEVO: Preparar lista de llaves para inyectar con información completa
         val keysToInject = profile.keyConfigurations.map { keyConfig ->
+            // Obtener la entidad de la llave para acceder al KCV y nombre personalizado
+            val keyEntity = kotlinx.coroutines.runBlocking {
+                injectedKeyRepository.getKeyByKcv(keyConfig.selectedKey)
+            }
+            
             KeyInjectionItem(
                 keyConfig = keyConfig,
+                keyKcv = keyEntity?.kcv ?: keyConfig.selectedKey,
+                keyCustomName = keyEntity?.customName ?: "",
                 status = KeyInjectionItemStatus.PENDING
             )
         }

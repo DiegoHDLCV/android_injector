@@ -74,7 +74,9 @@ fun MainScaffold(
             userPermissions.contains(PermissionProvider.CEREMONY_OPERATIONAL)
     }
     val canShowCeremony = remember(userRole, hasCeremonyPermission) {
-        userRole != PermissionManager.ROLE_OPERATOR && hasCeremonyPermission
+        // Supervisors always have access to Ceremony
+        userRole == PermissionManager.ROLE_SUPERVISOR || 
+        (userRole != PermissionManager.ROLE_OPERATOR && hasCeremonyPermission)
     }
     val currentDestinations = remember(canShowCeremony) {
         if (canShowCeremony) {

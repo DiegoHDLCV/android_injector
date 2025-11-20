@@ -16,6 +16,7 @@ import com.vigatec.injector.data.local.preferences.UserPreferencesManager
 import com.vigatec.injector.data.local.preferences.CustodianTimeoutPreferencesManager
 import com.vigatec.injector.util.PermissionManager
 import com.vigatec.injector.util.PermissionsCatalog
+import com.vigatec.injector.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -170,19 +171,21 @@ object AppModule {
             userDao = userDao,
             username = "admin",
             defaultPassword = DEFAULT_ADMIN_PASSWORD,
-            role = "ADMIN",
+            role = PermissionManager.ROLE_SUPERVISOR,
             fullName = "Administrador"
         )
         logUserSyncResult("ADMIN", adminResult)
 
-        val devResult = ensureUserAccount(
-            userDao = userDao,
-            username = "dev",
-            defaultPassword = DEFAULT_DEV_PASSWORD,
-            role = "ADMIN",
-            fullName = "Desarrollador"
-        )
-        logUserSyncResult("DEV", devResult)
+        if (BuildConfig.FLAVOR == "dev") {
+            val devResult = ensureUserAccount(
+                userDao = userDao,
+                username = "dev",
+                defaultPassword = DEFAULT_DEV_PASSWORD,
+                role = PermissionManager.ROLE_SUPERVISOR,
+                fullName = "Desarrollador"
+            )
+            logUserSyncResult("DEV", devResult)
+        }
 
         val operator1Result = ensureUserAccount(
             userDao = userDao,

@@ -762,21 +762,26 @@ private fun KeyItemRow(item: KeyInjectionItem, index: Int, total: Int) {
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Mostrar KCV
                 Text(
-                    text = "Slot: ${item.keyConfig.slot}",
+                    text = "KCV: ${item.keyKcv.take(8)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
-                Text(
-                    text = "•",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-                Text(
-                    text = item.keyConfig.keyType,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                )
+                // Mostrar nombre personalizado si existe
+                if (item.keyCustomName.isNotEmpty()) {
+                    Text(
+                        text = "•",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = item.keyCustomName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
             if (item.status == KeyInjectionItemStatus.ERROR && item.errorMessage != null) {
                 Text(

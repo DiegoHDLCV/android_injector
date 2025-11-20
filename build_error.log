@@ -1,0 +1,148 @@
+Starting a Gradle Daemon (subsequent builds will be faster)
+> Task :communication:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :communication:preBuild UP-TO-DATE
+> Task :communication:preDebugBuild UP-TO-DATE
+> Task :communication:generateDebugResValues UP-TO-DATE
+> Task :communication:generateDebugResources UP-TO-DATE
+> Task :communication:packageDebugResources UP-TO-DATE
+> Task :communication:parseDebugLocalResources UP-TO-DATE
+> Task :communication:generateDebugRFile UP-TO-DATE
+> Task :config:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :config:preBuild UP-TO-DATE
+> Task :config:preDebugBuild UP-TO-DATE
+> Task :config:generateDebugResValues UP-TO-DATE
+> Task :config:generateDebugResources UP-TO-DATE
+> Task :config:packageDebugResources UP-TO-DATE
+> Task :config:parseDebugLocalResources UP-TO-DATE
+> Task :config:generateDebugRFile UP-TO-DATE
+> Task :config:compileDebugKotlin UP-TO-DATE
+> Task :config:javaPreCompileDebug UP-TO-DATE
+> Task :config:compileDebugJavaWithJavac NO-SOURCE
+> Task :config:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :format:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :format:preBuild UP-TO-DATE
+> Task :format:preDebugBuild UP-TO-DATE
+> Task :format:generateDebugResValues UP-TO-DATE
+> Task :format:generateDebugResources UP-TO-DATE
+> Task :format:packageDebugResources UP-TO-DATE
+> Task :format:parseDebugLocalResources UP-TO-DATE
+> Task :format:generateDebugRFile UP-TO-DATE
+> Task :utils:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :utils:preBuild UP-TO-DATE
+> Task :utils:preDebugBuild UP-TO-DATE
+> Task :utils:generateDebugResValues UP-TO-DATE
+> Task :utils:generateDebugResources UP-TO-DATE
+> Task :utils:packageDebugResources UP-TO-DATE
+> Task :utils:parseDebugLocalResources UP-TO-DATE
+> Task :utils:generateDebugRFile UP-TO-DATE
+> Task :utils:compileDebugKotlin UP-TO-DATE
+> Task :utils:javaPreCompileDebug UP-TO-DATE
+> Task :utils:compileDebugJavaWithJavac NO-SOURCE
+> Task :utils:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :format:compileDebugKotlin UP-TO-DATE
+> Task :format:javaPreCompileDebug UP-TO-DATE
+> Task :format:compileDebugJavaWithJavac NO-SOURCE
+> Task :format:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :communication:compileDebugKotlin UP-TO-DATE
+> Task :communication:javaPreCompileDebug UP-TO-DATE
+> Task :communication:compileDebugJavaWithJavac NO-SOURCE
+> Task :communication:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :injector:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :injector:preBuild UP-TO-DATE
+> Task :injector:preDevDebugBuild UP-TO-DATE
+> Task :injector:generateDevDebugBuildConfig UP-TO-DATE
+> Task :communication:compileDebugLibraryResources UP-TO-DATE
+> Task :config:compileDebugLibraryResources UP-TO-DATE
+> Task :format:compileDebugLibraryResources UP-TO-DATE
+> Task :communication:writeDebugAarMetadata UP-TO-DATE
+> Task :config:writeDebugAarMetadata UP-TO-DATE
+> Task :format:writeDebugAarMetadata UP-TO-DATE
+> Task :manufacturer:preBuild UP-TO-DATE
+> Task :manufacturer:preDebugBuild UP-TO-DATE
+> Task :manufacturer:writeDebugAarMetadata UP-TO-DATE
+> Task :persistence:preBuild UP-TO-DATE
+> Task :persistence:preDebugBuild UP-TO-DATE
+> Task :persistence:writeDebugAarMetadata UP-TO-DATE
+> Task :utils:writeDebugAarMetadata UP-TO-DATE
+> Task :injector:checkDevDebugAarMetadata UP-TO-DATE
+> Task :injector:generateDevDebugResValues UP-TO-DATE
+> Task :manufacturer:generateDebugResValues UP-TO-DATE
+> Task :manufacturer:generateDebugResources UP-TO-DATE
+> Task :manufacturer:packageDebugResources UP-TO-DATE
+> Task :persistence:generateDebugResValues UP-TO-DATE
+> Task :persistence:generateDebugResources UP-TO-DATE
+> Task :persistence:packageDebugResources UP-TO-DATE
+> Task :injector:mapDevDebugSourceSetPaths UP-TO-DATE
+> Task :injector:generateDevDebugResources UP-TO-DATE
+> Task :injector:mergeDevDebugResources UP-TO-DATE
+> Task :injector:packageDevDebugResources UP-TO-DATE
+> Task :injector:parseDevDebugLocalResources UP-TO-DATE
+> Task :injector:createDevDebugCompatibleScreenManifests UP-TO-DATE
+> Task :communication:extractDeepLinksDebug UP-TO-DATE
+> Task :communication:processDebugManifest UP-TO-DATE
+> Task :config:extractDeepLinksDebug UP-TO-DATE
+> Task :config:processDebugManifest UP-TO-DATE
+> Task :format:extractDeepLinksDebug UP-TO-DATE
+> Task :format:processDebugManifest UP-TO-DATE
+> Task :injector:extractDeepLinksDevDebug UP-TO-DATE
+> Task :manufacturer:extractDeepLinksDebug UP-TO-DATE
+> Task :manufacturer:processDebugManifest UP-TO-DATE
+> Task :persistence:extractDeepLinksDebug UP-TO-DATE
+> Task :persistence:processDebugManifest UP-TO-DATE
+> Task :utils:extractDeepLinksDebug UP-TO-DATE
+> Task :utils:processDebugManifest UP-TO-DATE
+> Task :injector:processDevDebugMainManifest UP-TO-DATE
+> Task :injector:processDevDebugManifest UP-TO-DATE
+> Task :injector:processDevDebugManifestForPackage UP-TO-DATE
+> Task :manufacturer:compileDebugLibraryResources UP-TO-DATE
+> Task :manufacturer:parseDebugLocalResources UP-TO-DATE
+> Task :manufacturer:generateDebugRFile UP-TO-DATE
+> Task :persistence:compileDebugLibraryResources UP-TO-DATE
+> Task :persistence:parseDebugLocalResources UP-TO-DATE
+> Task :persistence:generateDebugRFile UP-TO-DATE
+> Task :utils:compileDebugLibraryResources UP-TO-DATE
+> Task :injector:processDevDebugResources UP-TO-DATE
+> Task :manufacturer:compileDebugAidl NO-SOURCE
+> Task :manufacturer:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :manufacturer:compileDebugKotlin UP-TO-DATE
+> Task :manufacturer:javaPreCompileDebug UP-TO-DATE
+> Task :manufacturer:compileDebugJavaWithJavac NO-SOURCE
+> Task :manufacturer:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :persistence:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :persistence:kspDebugKotlin UP-TO-DATE
+> Task :persistence:compileDebugKotlin UP-TO-DATE
+> Task :persistence:javaPreCompileDebug UP-TO-DATE
+> Task :persistence:compileDebugJavaWithJavac UP-TO-DATE
+> Task :utils:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :persistence:transformDebugClassesWithAsm UP-TO-DATE
+> Task :persistence:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :injector:kspDevDebugKotlin UP-TO-DATE
+
+> Task :injector:compileDevDebugKotlin
+e: file:///Users/diegoherreradelacalle/StudioProjects/android_injector/injector/src/main/java/com/vigatec/injector/viewmodel/ProfileViewModel.kt:89:37 Unresolved reference 'role'.
+
+> Task :injector:compileDevDebugKotlin FAILED
+
+[Incubating] Problems report is available at: file:///Users/diegoherreradelacalle/StudioProjects/android_injector/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':injector:compileDevDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 9s
+92 actionable tasks: 1 executed, 91 up-to-date

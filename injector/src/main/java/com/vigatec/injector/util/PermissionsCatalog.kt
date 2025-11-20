@@ -77,7 +77,6 @@ object PermissionsCatalog {
      */
     val OPERATOR_DEFAULT_PERMISSION_IDS: Set<String> = setOf(
         KEY_VAULT,
-        SELECT_KTK,
         EXECUTE_INJECTION
     )
 

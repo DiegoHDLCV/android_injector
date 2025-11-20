@@ -241,7 +241,35 @@ fun LoginScreen(
                             )
                         ) {
                             Text(
-                                "🔓 Auto-login Admin (DEV)",
+                                "🔓 Supervisor (DEV)",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Button(
+                            onClick = {
+                                // Auto-fill operator credentials and login
+                                loginViewModel.onUsernameChange("operador1")
+                                loginViewModel.onPasswordChange("Operador2025@")
+                                // Small delay to ensure state updates before login
+                                focusManager.clearFocus()
+                                loginViewModel.login()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp),
+                            enabled = !loginViewModel.isLoading,
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.7f),
+                                disabledContainerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Text(
+                                "🔓 Operador (DEV)",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp
                             )

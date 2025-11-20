@@ -21,7 +21,6 @@ import com.vigatec.injector.viewmodel.UserManagementViewModel
 import com.vigatec.injector.ui.components.PasswordTextField
 import com.vigatec.injector.ui.components.PasswordConfirmationFields
 import com.vigatec.injector.ui.components.RoleSelector
-import com.vigatec.injector.ui.components.PermissionsSelector
 import com.vigatec.injector.util.PermissionsCatalog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -314,20 +313,6 @@ fun CreateUserDialog(
                     selectedRole = role,
                     onRoleChange = { role = it }
                 )
-
-                // Sección de permisos
-                PermissionsSelector(
-                    allPermissions = allPermissions,
-                    selectedPermissions = selectedPermissions,
-                    onPermissionChange = { permissionId, checked ->
-                        selectedPermissions = if (checked) {
-                            selectedPermissions + permissionId
-                        } else {
-                            selectedPermissions - permissionId
-                        }
-                    },
-                    isAdmin = role == "SUPERVISOR"
-                )
             }
         },
         confirmButton = {
@@ -404,22 +389,6 @@ fun EditUserDialog(
                     selectedRole = role,
                     onRoleChange = { role = it }
                 )
-
-                // Sección de permisos
-                if (permissionsLoaded) {
-                    PermissionsSelector(
-                        allPermissions = allPermissions,
-                        selectedPermissions = selectedPermissions,
-                        onPermissionChange = { permissionId, checked ->
-                            selectedPermissions = if (checked) {
-                                selectedPermissions + permissionId
-                            } else {
-                                selectedPermissions - permissionId
-                            }
-                        },
-                        isAdmin = role == "SUPERVISOR"
-                    )
-                }
 
                 Button(
                     onClick = { showPasswordDialog = true },

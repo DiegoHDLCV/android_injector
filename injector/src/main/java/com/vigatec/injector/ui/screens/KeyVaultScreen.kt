@@ -122,7 +122,6 @@ fun KeyVaultScreen(
                                 key = keyWithProfiles.key,
                                 assignedProfiles = keyWithProfiles.assignedProfiles,
                                 onDelete = { viewModel.onShowDeleteModal(it) },
-                                onToggleKTK = { viewModel.toggleKeyAsKTK(it) },
                                 isAdmin = state.isAdmin,
                                 onHideKEKStorage = { viewModel.hideKEKStorage() }
                             )
@@ -258,7 +257,6 @@ fun KeyCard(
     key: InjectedKeyEntity,
     assignedProfiles: List<String> = emptyList(),
     onDelete: (InjectedKeyEntity) -> Unit,
-    onToggleKTK: (InjectedKeyEntity) -> Unit,
     isAdmin: Boolean = false,
     onHideKEKStorage: (() -> Unit)? = null
 ) {
@@ -435,20 +433,6 @@ fun KeyCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Botón "Marcar como KTK" / "Quitar KTK" - Disponible para todos si NO es KEK Storage
-                if (!isKEKStorage) {
-                    OutlinedButton(
-                        onClick = { onToggleKTK(key) },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (isKTK) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-                            contentColor = if (isKTK) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(if (isKTK) "Quitar KTK" else "Marcar KTK", style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-
                 // Botón Ocultar - Solo para KEK Storage
                 if (isKEKStorage && onHideKEKStorage != null) {
                     OutlinedButton(

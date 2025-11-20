@@ -58,11 +58,14 @@ fun ProfilesScreen(
             TopAppBar(
                 title = { Text("Perfiles de Inyección", fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(onClick = { viewModel.onShowImportModal() }) {
-                        Icon(Icons.Default.Upload, contentDescription = "Importar Perfil")
-                    }
-                    IconButton(onClick = { viewModel.onShowCreateModal() }) {
-                        Icon(Icons.Default.Add, contentDescription = "Crear Perfil")
+                    // Solo mostrar botones de importar/crear para usuarios con permisos de gestión
+                    if (state.canManageProfiles) {
+                        IconButton(onClick = { viewModel.onShowImportModal() }) {
+                            Icon(Icons.Default.Upload, contentDescription = "Importar Perfil")
+                        }
+                        IconButton(onClick = { viewModel.onShowCreateModal() }) {
+                            Icon(Icons.Default.Add, contentDescription = "Crear Perfil")
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -677,21 +680,21 @@ fun ProfileCard(
                 }
 
                 // Menú de desborde (solo para usuarios con permisos de gestión)
-                Box {
-                    IconButton(
-                        onClick = { showOverflow = true },
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Más acciones"
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showOverflow,
-                        onDismissRequest = { showOverflow = false }
-                    ) {
-                        if (canManageProfiles) {
+                if (canManageProfiles) {
+                    Box {
+                        IconButton(
+                            onClick = { showOverflow = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Más acciones"
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showOverflow,
+                            onDismissRequest = { showOverflow = false }
+                        ) {
                             DropdownMenuItem(
                                 text = { Text("Editar") },
                                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
@@ -701,26 +704,6 @@ fun ProfileCard(
                                 text = { Text("Eliminar") },
                                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null) },
                                 onClick = { showOverflow = false; showDeleteConfirm = true }
-                            )
-                        } else {
-                            // Mensaje informativo para usuarios sin permisos
-                            DropdownMenuItem(
-                                text = { 
-                                    Text(
-                                        "Solo lectura",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ) 
-                                },
-                                leadingIcon = { 
-                                    Icon(
-                                        Icons.Default.Lock, 
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ) 
-                                },
-                                onClick = { showOverflow = false },
-                                enabled = false
                             )
                         }
                     }
@@ -772,39 +755,6 @@ fun ProfileCard(
                             } else {
                                 MaterialTheme.colorScheme.error
                             }
-                        )
-                    }
-                }
-            }
-
-            // ====== PROGRESO DE LLAVES ======
-            if (hasAny) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(999.dp)),
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Llaves: $readyKeys/$totalKeys",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp
-                        )
-                        Text(
-                            text = "${(progress * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp
                         )
                     }
                 }
@@ -1465,8 +1415,7 @@ fun KeyConfigurationItem(
 
     // Derivados
     val isKeySelected = remember(config.selectedKey) { config.selectedKey.isNotBlank() }
-    val headline = remember(config) { "Config. ${config.id}" }
-    
+
     // Encontrar la llave seleccionada para obtener su algoritmo
     val selectedKeyEntity = remember(config.selectedKey, availableKeys) {
         availableKeys.find { it.kcv == config.selectedKey }
@@ -1523,20 +1472,20 @@ fun KeyConfigurationItem(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-            // ===== Header compacto con meta + controles =====
+            // ===== Header con información expandida =====
             Row(
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment = Alignment.Top,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.weight(1f)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(40.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(
                                 if (isFullyValid) MaterialTheme.colorScheme.primaryContainer
@@ -1546,7 +1495,12 @@ fun KeyConfigurationItem(
                     ) {
                         Text(getKeyTypeIcon(config.keyType), fontSize = 18.sp)
                     }
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(top = 2.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1554,9 +1508,7 @@ fun KeyConfigurationItem(
                             Text(
                                 text = "Configuración de llave",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             // Indicador de estado
                             if (!isFullyValid) {
@@ -1568,22 +1520,52 @@ fun KeyConfigurationItem(
                                 )
                             }
                         }
-                        // Resumen compacto
-                        Text(
-                            text = if (isExpanded) headline else compactSummary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isFullyValid) MaterialTheme.colorScheme.onSurfaceVariant 
-                                   else MaterialTheme.colorScheme.error,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        // Información detallada sin truncamiento
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            if (config.keyType.isNotBlank()) {
+                                Text(
+                                    text = "Tipo: ${config.keyType}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (config.slot.isNotBlank()) {
+                                Text(
+                                    text = "Slot: ${config.slot}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (config.selectedKey.isNotBlank()) {
+                                Text(
+                                    text = "KCV: ${config.selectedKey}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                )
+                                selectedKeyEntity?.keyAlgorithm?.let { algorithm ->
+                                    Text(
+                                        text = "Algoritmo: $algorithm",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else {
+                                Text(
+                                    text = "Sin llave asignada",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
                     }
                 }
 
                 // Botones de control
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     // Botón expandir/colapsar
                     CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
@@ -1598,7 +1580,7 @@ fun KeyConfigurationItem(
                             )
                         }
                     }
-                    
+
                     // Botón eliminar
                     CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
                         IconButton(

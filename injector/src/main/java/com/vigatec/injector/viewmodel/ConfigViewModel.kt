@@ -22,7 +22,7 @@ data class ConfigUiState(
     val errorMessage: String? = null,
     val applicationVersion: String = "",
     val databaseVersion: String = "",
-    val custodianTimeoutMinutes: Int = 10,  // Timeout de custodios en minutos
+    val custodianTimeoutMinutes: Int = 3,  // Timeout de custodios en minutos
     val isSavingTimeout: Boolean = false,   // Indicador de guardado
     val timeoutSaveMessage: String? = null  // Mensaje de éxito/error al guardar timeout
 )

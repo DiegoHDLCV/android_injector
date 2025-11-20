@@ -105,34 +105,22 @@ fun MainScreen(navController: NavHostController) {
             }
 
             // ========== 6. BOTÓN VERIFICAR LLAVES INSTALADAS ==========
-            Button(
-                onClick = { navController.navigate(Routes.KeyVerificationScreen.route) },
-                enabled = status == ConnectionStatus.DISCONNECTED ||
-                         status == ConnectionStatus.LISTENING ||
-                         status == ConnectionStatus.ERROR,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("🔍 Verificar Llaves Instaladas")
-            }
+//            Button(
+//                onClick = { navController.navigate(Routes.KeyVerificationScreen.route) },
+//                enabled = status == ConnectionStatus.DISCONNECTED ||
+//                         status == ConnectionStatus.LISTENING ||
+//                         status == ConnectionStatus.ERROR,
+//                modifier = Modifier.fillMaxWidth()
+//            ) {
+//                Icon(
+//                    imageVector = Icons.Default.Search,
+//                    contentDescription = null,
+//                    modifier = Modifier.size(20.dp)
+//                )
+//                Spacer(modifier = Modifier.width(8.dp))
+//                Text("🔍 Verificar Llaves Instaladas")
+//            }
 
-            // ========== 7. CONFIGURACIÓN AVANZADA (COLAPSABLE) ==========
-            AdvancedSettingsCard(
-                isExpanded = showAdvancedSettings,
-                onToggle = { showAdvancedSettings = !showAdvancedSettings },
-                selectedProtocol = selectedProtocol,
-                onProtocolSelected = { protocol ->
-                    selectedProtocol = protocol
-                    viewModel.setProtocol(protocol)
-                },
-                isConnectionActive = status != ConnectionStatus.DISCONNECTED &&
-                                   status != ConnectionStatus.ERROR
-            )
         }
     }
 }
@@ -291,117 +279,5 @@ private fun ControlButtons(
     }
 }
 
-/**
- * Sección colapsable de configuración avanzada
- */
-@Composable
-private fun AdvancedSettingsCard(
-    isExpanded: Boolean,
-    onToggle: () -> Unit,
-    selectedProtocol: CommProtocol,
-    onProtocolSelected: (CommProtocol) -> Unit,
-    isConnectionActive: Boolean
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            // Header clickeable
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Configuración Avanzada",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
 
-                IconButton(onClick = onToggle) {
-                    Icon(
-                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = if (isExpanded) "Contraer" else "Expandir"
-                    )
-                }
-            }
 
-            // Contenido colapsable
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = expandVertically(),
-                exit = shrinkVertically()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Divider()
-
-                    Text(
-                        text = "Protocolo de Comunicación",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Column(modifier = Modifier.selectableGroup()) {
-                        CommProtocol.values().forEach { protocol ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .selectable(
-                                        selected = (selectedProtocol == protocol),
-                                        onClick = { onProtocolSelected(protocol) },
-                                        role = Role.RadioButton,
-                                        enabled = !isConnectionActive
-                                    )
-                                    .padding(vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = (selectedProtocol == protocol),
-                                    onClick = null,
-                                    enabled = !isConnectionActive
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = protocol.name,
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                            }
-                        }
-                    }
-
-                    if (isConnectionActive) {
-                        Text(
-                            text = "⚠ Detén la conexión para cambiar de protocolo",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
