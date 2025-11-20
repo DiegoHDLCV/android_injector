@@ -11,6 +11,10 @@ import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.utils.security.StorageKeyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import com.vigatec.injector.util.PermissionManager
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -106,6 +110,7 @@ class KeyVaultViewModel @Inject constructor(
 
     fun loadKeys() {
         viewModelScope.launch {
+            Log.d("Performance", "KeyVaultViewModel loadKeys started at ${System.currentTimeMillis()}")
             _uiState.value = _uiState.value.copy(loading = true)
             Log.d(TAG, "KeyVault - loadKeys() - isAdmin actual: ${_uiState.value.isAdmin}")
             
@@ -124,11 +129,16 @@ class KeyVaultViewModel @Inject constructor(
                 
                 Log.d(TAG, "KeyVault - loadKeys() - Llaves después del filtro: ${filteredKeys.size}")
                 
-                val keysWithProfiles = filteredKeys.map { key ->
-                    val profiles = profileRepository.getProfileNamesByKeyKcv(key.kcv)
-                    KeyWithProfiles(key = key, assignedProfiles = profiles)
+                val keysWithProfiles = withContext(Dispatchers.IO) {
+                    filteredKeys.map { key ->
+                        async {
+                            val profiles = profileRepository.getProfileNamesByKeyKcv(key.kcv)
+                            KeyWithProfiles(key = key, assignedProfiles = profiles)
+                        }
+                    }.awaitAll()
                 }
                 _uiState.value = _uiState.value.copy(keysWithProfiles = keysWithProfiles, loading = false)
+                Log.d("Performance", "KeyVaultViewModel loadKeys finished at ${System.currentTimeMillis()}")
             }
         }
     }

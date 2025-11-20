@@ -127,6 +127,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.navigation.compose)
 
     // Room
     implementation(libs.androidx.room.runtime)

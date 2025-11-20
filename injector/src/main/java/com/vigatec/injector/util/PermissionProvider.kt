@@ -49,14 +49,14 @@ class PermissionProvider @Inject constructor(
 
             Log.d(TAG, "Usuario encontrado: id=${user.id}, username=${user.username}, role=${user.role}")
 
-            if (user.role == "ADMIN") {
-                // Admin tiene TODOS los permisos
-                Log.d(TAG, "Usuario es ADMIN → asignando TODOS los permisos")
+            if (user.role == "ADMIN" || user.role == PermissionManager.ROLE_SUPERVISOR) {
+                // Admin y Supervisor tienen TODOS los permisos
+                Log.d(TAG, "Usuario es ${user.role} → asignando TODOS los permisos")
                 _userPermissions.value = PermissionsCatalog.SYSTEM_PERMISSION_IDS
-                Log.d(TAG, "Permisos asignados a ADMIN: ${_userPermissions.value.joinToString(", ")}")
+                Log.d(TAG, "Permisos asignados a ${user.role}: ${_userPermissions.value.joinToString(", ")}")
             } else {
                 // Obtener permisos desde la BD
-                Log.d(TAG, "Usuario es USER → cargando permisos desde BD")
+                Log.d(TAG, "Usuario es ${user.role} → cargando permisos desde BD")
                 val permissions = userRepository.getUserPermissionsSync(user.id)
                 _userPermissions.value = permissions.map { it.id }.toSet()
 

@@ -15,6 +15,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.Dispatchers
 
 @Singleton
 class InjectedKeyRepository @Inject constructor(
@@ -29,14 +31,14 @@ class InjectedKeyRepository @Inject constructor(
      */
     fun getAllInjectedKeys(): Flow<List<InjectedKeyEntity>> {
         return injectedKeyDao.getAllInjectedKeys().map { keys ->
-            Log.d(TAG, "=== CONSULTA BD - getAllInjectedKeys ===")
-            Log.d(TAG, "Total de llaves consultadas: ${keys.size}")
-            keys.forEachIndexed { index, key ->
-                Log.d(TAG, "BD Consulta $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', KCV=${key.kcv}")
-            }
-            Log.d(TAG, "=== FIN CONSULTA BD ===")
+            // Log.d(TAG, "=== CONSULTA BD - getAllInjectedKeys ===")
+            // Log.d(TAG, "Total de llaves consultadas: ${keys.size}")
+            // keys.forEachIndexed { index, key ->
+            //    Log.d(TAG, "BD Consulta $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', KCV=${key.kcv}")
+            // }
+            // Log.d(TAG, "=== FIN CONSULTA BD ===")
             keys.map { key -> decryptKeyIfNeeded(key) }
-        }
+        }.flowOn(Dispatchers.Default)
     }
 
     /**

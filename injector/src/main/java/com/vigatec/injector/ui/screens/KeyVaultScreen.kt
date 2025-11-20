@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,6 +21,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +45,9 @@ fun KeyVaultScreen(
     viewModel: KeyVaultViewModel = hiltViewModel(),
     onNavigateToExportImport: () -> Unit = {}
 ) {
+    LaunchedEffect(Unit) {
+        android.util.Log.d("Performance", "KeyVaultScreen composed at ${System.currentTimeMillis()}")
+    }
     val state by viewModel.uiState.collectAsState()
 
     // Verificar si hay KEK Storage oculta
@@ -102,9 +107,7 @@ fun KeyVaultScreen(
             }
             
             if (state.loading) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+                KeyVaultSkeleton()
             } else if (state.keysWithProfiles.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No hay llaves almacenadas.", color = MaterialTheme.colorScheme.onBackground)
@@ -117,7 +120,10 @@ fun KeyVaultScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        items(state.keysWithProfiles) { keyWithProfiles ->
+                        items(
+                            items = state.keysWithProfiles,
+                            key = { it.key.id }
+                        ) { keyWithProfiles ->
                             KeyCard(
                                 key = keyWithProfiles.key,
                                 assignedProfiles = keyWithProfiles.assignedProfiles,
@@ -332,21 +338,6 @@ fun KeyCard(
                                 )
                             }
                         }
-                        // Badge KTK
-                        if (isKTK) {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = MaterialTheme.colorScheme.secondary
-                            ) {
-                                Text(
-                                    text = "KTK",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSecondary,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
                     }
                     // Mostrar nombre personalizado si existe
                     if (key.customName.isNotEmpty()) {
@@ -356,6 +347,18 @@ fun KeyCard(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                             fontWeight = FontWeight.Medium
                         )
+                    }
+                }
+
+                // Botón Eliminar - Solo para administradores, icono a la derecha
+                if (isAdmin) {
+                     IconButton(
+                        onClick = { onDelete(key) },
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Eliminar")
                     }
                 }
             }
@@ -371,10 +374,6 @@ fun KeyCard(
                 Text("Algoritmo: ${key.keyAlgorithm}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 // Para llaves de ceremonia, mostrar información relevante
-                // Solo mostrar "Origen" para llaves operacionales (no para KEK Storage)
-                if (!isKEKStorage) {
-                    Text("Origen: Ceremonia", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
                 val keyLengthBytes = when {
                     key.encryptedKeyData.isNotEmpty() -> key.encryptedKeyData.length / 2
                     key.isLegacy() -> {
@@ -384,29 +383,6 @@ fun KeyCard(
                     else -> 0
                 }
                 Text("Longitud: ${keyLengthBytes} bytes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-                // Mostrar estado SOLO si es KTK (no para KEK Storage)
-                if (isKTK) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Estado: ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = when (key.status) {
-                                "ACTIVE" -> Color(0xFF4CAF50)
-                                "EXPORTED" -> Color(0xFF2196F3)
-                                else -> MaterialTheme.colorScheme.surfaceVariant
-                            }
-                        ) {
-                            Text(
-                                text = key.status,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
             }
 
             // Mostrar los perfiles asignados (solo para llaves operacionales, no para KEK Storage)
@@ -425,36 +401,79 @@ fun KeyCard(
             }
 
             Text("Fecha: ${formatDate(key.injectionTimestamp)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Botones de acciones
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Botón Ocultar - Solo para KEK Storage
-                if (isKEKStorage && onHideKEKStorage != null) {
-                    OutlinedButton(
-                        onClick = onHideKEKStorage,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.tertiary
-                        )
-                    ) {
-                        Text("Ocultar", style = MaterialTheme.typography.labelMedium)
-                    }
+            
+            // Botón Ocultar - Solo para KEK Storage
+            if (isKEKStorage && onHideKEKStorage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onHideKEKStorage,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.tertiary
+                    )
+                ) {
+                    Text("Ocultar", style = MaterialTheme.typography.labelMedium)
                 }
+            }
+        }
+    }
+}
 
-                // Botón Eliminar - Solo para administradores
-                if (isAdmin) {
-                    Button(
-                        onClick = { onDelete(key) },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("Eliminar", style = MaterialTheme.typography.labelMedium)
-                    }
+@Composable
+fun KeyVaultSkeleton() {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 300.dp),
+        contentPadding = PaddingValues(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        items(10) {
+            KeyCardSkeleton()
+        }
+    }
+}
+
+@Composable
+fun KeyCardSkeleton() {
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        ),
+        modifier = Modifier.height(180.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), CircleShape)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .height(20.dp)
+                            .width(120.dp)
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                    )
+                    Box(
+                        modifier = Modifier
+                            .height(16.dp)
+                            .width(80.dp)
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                repeat(3) {
+                    Box(
+                        modifier = Modifier
+                            .height(14.dp)
+                            .fillMaxWidth(0.8f)
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(4.dp))
+                    )
                 }
             }
         }
@@ -587,9 +606,10 @@ fun ClearAllKeysDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     )
 }
 
+private val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+
 fun formatDate(timestamp: Long): String {
-    val sdf = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-    return sdf.format(Date(timestamp))
+    return dateFormat.format(Date(timestamp))
 }
 
 /**

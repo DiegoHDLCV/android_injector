@@ -177,12 +177,12 @@ object StorageKeyManager {
                 authTag = byteArrayToHexString(authTag)
             )
 
-            Log.d(TAG, "✓ Llave cifrada exitosamente")
-            Log.d(TAG, "  - Datos originales: ${keyBytes.size} bytes")
-            Log.d(TAG, "  - Datos cifrados: ${ciphertext.size} bytes")
-            Log.d(TAG, "  - IV: ${iv.size} bytes")
-            Log.d(TAG, "  - AuthTag: ${authTag.size} bytes")
-            Log.d(TAG, "================================================")
+            // Log.d(TAG, "✓ Llave cifrada exitosamente")
+            // Log.d(TAG, "  - Datos originales: ${keyBytes.size} bytes")
+            // Log.d(TAG, "  - Datos cifrados: ${ciphertext.size} bytes")
+            // Log.d(TAG, "  - IV: ${iv.size} bytes")
+            // Log.d(TAG, "  - AuthTag: ${authTag.size} bytes")
+            // Log.d(TAG, "================================================")
 
             return result
 
@@ -216,10 +216,10 @@ object StorageKeyManager {
             val iv = hexStringToByteArray(encryptedData.iv)
             val authTag = hexStringToByteArray(encryptedData.authTag)
 
-            Log.d(TAG, "Descifrando:")
-            Log.d(TAG, "  - Ciphertext: ${ciphertext.size} bytes")
-            Log.d(TAG, "  - IV: ${iv.size} bytes")
-            Log.d(TAG, "  - AuthTag: ${authTag.size} bytes")
+            // Log.d(TAG, "Descifrando:")
+            // Log.d(TAG, "  - Ciphertext: ${ciphertext.size} bytes")
+            // Log.d(TAG, "  - IV: ${iv.size} bytes")
+            // Log.d(TAG, "  - AuthTag: ${authTag.size} bytes")
 
             // Obtener KEK desde Keystore
             val kek = getStorageKEK()
@@ -242,9 +242,9 @@ object StorageKeyManager {
 
             val result = byteArrayToHexString(decryptedBytes)
 
-            Log.d(TAG, "✓ Llave descifrada exitosamente")
-            Log.d(TAG, "  - Datos descifrados: ${decryptedBytes.size} bytes")
-            Log.d(TAG, "================================================")
+            // Log.d(TAG, "✓ Llave descifrada exitosamente")
+            // Log.d(TAG, "  - Datos descifrados: ${decryptedBytes.size} bytes")
+            // Log.d(TAG, "================================================")
 
             // Limpiar bytes sensibles
             decryptedBytes.fill(0)

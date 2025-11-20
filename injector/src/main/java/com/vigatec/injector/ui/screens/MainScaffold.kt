@@ -211,6 +211,7 @@ fun RowScope.AddItem(
         selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
         enabled = enabled,
         onClick = {
+            android.util.Log.d("Performance", "Navigation started to ${screen.route} at ${System.currentTimeMillis()}")
             navController.navigate(screen.route) {
                 popUpTo(navController.graph.findStartDestination().id)
                 launchSingleTop = true
