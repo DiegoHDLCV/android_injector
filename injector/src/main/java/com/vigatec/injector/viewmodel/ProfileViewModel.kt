@@ -203,7 +203,7 @@ class ProfileViewModel @Inject constructor(
                 }
                 _state.value = _state.value.copy(
                     compatibleKeys = compatibleKeys,
-                    ktkCompatibilityWarning = "⚠️ KTK 3DES seleccionada: Solo se mostrarán llaves 3DES compatibles con writeKey()"
+                    ktkCompatibilityWarning = "⚠️ KTK 3DES seleccionada: Solo se mostrarán llaves 3DES"
                 )
             }
 
@@ -211,7 +211,7 @@ class ProfileViewModel @Inject constructor(
             ktkAlgorithm.contains("AES", ignoreCase = true) -> {
                 _state.value = _state.value.copy(
                     compatibleKeys = emptyList(),
-                    ktkCompatibilityWarning = "❌ KTK AES no soportada: El método writeKey() solo acepta 3DES. Para inyectar llaves AES, necesitas usar DUKPT (requiere implementación futura)"
+                    ktkCompatibilityWarning = "❌ KTK AES no soportada: Solo acepta 3DES. Para inyectar llaves AES, necesitas usar DUKPT"
                 )
             }
 

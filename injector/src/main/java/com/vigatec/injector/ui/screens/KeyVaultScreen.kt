@@ -46,7 +46,7 @@ fun KeyVaultScreen(
     val state by viewModel.uiState.collectAsState()
 
     // Verificar si hay KEK Storage oculta
-    val hasHiddenKEKStorage = !state.showKEKStorage && state.isAdmin
+    val hasHiddenKEKStorage = !state.showKEKStorage && (state.isAdmin || state.userRole == PermissionManager.ROLE_SUPERVISOR)
 
     Scaffold(
         topBar = {
@@ -56,7 +56,7 @@ fun KeyVaultScreen(
                 onImportTestKeys = { viewModel.onImportTestKeys() },
                 onNavigateToExportImport = onNavigateToExportImport,
                 loading = state.loading,
-                isAdmin = state.isAdmin,
+                isAdmin = state.isAdmin || state.userRole == PermissionManager.ROLE_SUPERVISOR,
                 hasHiddenKEKStorage = hasHiddenKEKStorage,
                 onShowKEKStoragePasswordDialog = { viewModel.onShowKEKStoragePasswordDialog() }
             )
@@ -122,7 +122,7 @@ fun KeyVaultScreen(
                                 key = keyWithProfiles.key,
                                 assignedProfiles = keyWithProfiles.assignedProfiles,
                                 onDelete = { viewModel.onShowDeleteModal(it) },
-                                isAdmin = state.isAdmin,
+                                isAdmin = state.isAdmin || state.userRole == PermissionManager.ROLE_SUPERVISOR,
                                 onHideKEKStorage = { viewModel.hideKEKStorage() }
                             )
                         }

@@ -984,6 +984,42 @@ fun CreateProfileModal(
     onRemoveKeyConfig: (Long) -> Unit,
     onUpdateKeyConfig: (Long, String, String) -> Unit
 ) {
+    // Estado para controlar si el selector de KTK está expandido
+    var ktkExpanded by rememberSaveable { mutableStateOf(false) }
+
+    // KTKs filtradas por búsqueda (excluyendo kek_storage)
+    val filteredKTKs = remember(availableKTKs, ktkSearchQuery) {
+        val filtered = availableKTKs.filter { ktk ->
+            !ktk.isKEKStorage()
+        }
+        if (ktkSearchQuery.isBlank()) {
+            filtered
+        } else {
+            filtered.filter { ktk ->
+                ktk.kcv.contains(ktkSearchQuery, ignoreCase = true) ||
+                ktk.keyAlgorithm.contains(ktkSearchQuery, ignoreCase = true) ||
+                ktk.customName.contains(ktkSearchQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    // Validación de campos obligatorios
+    val validationErrors = remember(formData) {
+        mutableMapOf<String, String>().apply {
+            if (formData.name.trim().isEmpty()) {
+                put("name", "El nombre es requerido")
+            }
+            if (formData.appType.isEmpty()) {
+                put("appType", "Debe seleccionar un tipo de aplicación")
+            }
+            if (formData.selectedKTKKcv.isBlank()) {
+                put("ktk", "Debe seleccionar una KTK")
+            }
+        }
+    }
+
+    val hasErrors = validationErrors.isNotEmpty()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -1065,6 +1101,16 @@ fun CreateProfileModal(
                                     onValueChange = { onFormDataChange(formData.copy(name = it)) },
                                     label = { Text("Nombre") },
                                     singleLine = true,
+                                    isError = validationErrors.containsKey("name"),
+                                    supportingText = {
+                                        if (validationErrors.containsKey("name")) {
+                                            Text(
+                                                validationErrors["name"] ?: "",
+                                                color = MaterialTheme.colorScheme.error,
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 )
 
@@ -1088,8 +1134,18 @@ fun CreateProfileModal(
                                         onValueChange = {}, // evita escribir
                                         readOnly = true,
                                         label = { Text("Tipo de Aplicación") },
+                                        isError = validationErrors.containsKey("appType"),
                                         trailingIcon = {
                                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                                        },
+                                        supportingText = {
+                                            if (validationErrors.containsKey("appType")) {
+                                                Text(
+                                                    validationErrors["appType"] ?: "",
+                                                    color = MaterialTheme.colorScheme.error,
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            }
                                         },
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -1268,13 +1324,176 @@ fun CreateProfileModal(
                                     }
                                 }
 
-                                // NUEVO: Selector de KTK con búsqueda
-                                KTKSelectorComponent(
-                                    availableKTKs = availableKTKs,
-                                    selectedKTKKcv = formData.selectedKTKKcv,
-                                    searchQuery = ktkSearchQuery,
-                                    onSearchChange = onKTKSearchChange,
-                                    onSelectKTK = onSelectKTK
+                                // Selector de KTK expandible con búsqueda
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    val isKTKSelected = formData.selectedKTKKcv.isNotBlank()
+                                    val selectedKTKEntity = remember(formData.selectedKTKKcv, availableKTKs) {
+                                        availableKTKs.find { it.kcv == formData.selectedKTKKcv }
+                                    }
+                                    val displayKTKValue = remember(formData.selectedKTKKcv, selectedKTKEntity) {
+                                        if (formData.selectedKTKKcv.isBlank()) {
+                                            ""
+                                        } else {
+                                            selectedKTKEntity?.let { key ->
+                                                "${key.kcv} (${key.keyAlgorithm})"
+                                            } ?: formData.selectedKTKKcv
+                                        }
+                                    }
+
+                                    OutlinedButton(
+                                        onClick = { ktkExpanded = !ktkExpanded },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = if (isKTKSelected) MaterialTheme.colorScheme.primary
+                                                         else MaterialTheme.colorScheme.error
+                                        ),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            if (isKTKSelected) MaterialTheme.colorScheme.outline
+                                            else MaterialTheme.colorScheme.error
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "KTK Seleccionada",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Text(
+                                                    text = if (isKTKSelected) displayKTKValue else "Seleccionar KTK...",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = if (isKTKSelected) MaterialTheme.colorScheme.onSurface
+                                                           else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                            Icon(
+                                                imageVector = if (ktkExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                contentDescription = if (ktkExpanded) "Colapsar" else "Expandir"
+                                            )
+                                        }
+                                    }
+
+                                    // Expandible selector de KTK
+                                    AnimatedVisibility(
+                                        visible = ktkExpanded,
+                                        enter = expandVertically() + fadeIn(),
+                                        exit = shrinkVertically() + fadeOut()
+                                    ) {
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            // Buscador
+                                            OutlinedTextField(
+                                                value = ktkSearchQuery,
+                                                onValueChange = onKTKSearchChange,
+                                                placeholder = { Text("Buscar KCV o algoritmo...") },
+                                                leadingIcon = {
+                                                    Icon(Icons.Default.Search, contentDescription = "Buscar")
+                                                },
+                                                singleLine = true,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+
+                                            // Lista scrolleable de KTK
+                                            Card(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                            ) {
+                                                if (filteredKTKs.isEmpty()) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(16.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            "No hay KTK disponibles",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                } else {
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .heightIn(max = 230.dp)
+                                                            .verticalScroll(rememberScrollState())
+                                                    ) {
+                                                        filteredKTKs.forEachIndexed { index, ktk ->
+                                                            Surface(
+                                                                onClick = {
+                                                                    onSelectKTK(ktk)
+                                                                    ktkExpanded = false
+                                                                },
+                                                                color = if (ktk.kcv == formData.selectedKTKKcv) {
+                                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                                                } else {
+                                                                    Color.Transparent
+                                                                },
+                                                                modifier = Modifier.fillMaxWidth()
+                                                            ) {
+                                                                Row(
+                                                                    modifier = Modifier
+                                                                        .fillMaxWidth()
+                                                                        .padding(12.dp),
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                                ) {
+                                                                    Icon(
+                                                                        imageVector = if (ktk.kcv == formData.selectedKTKKcv)
+                                                                            Icons.Default.CheckCircle
+                                                                        else Icons.Default.RadioButtonUnchecked,
+                                                                        contentDescription = "Seleccionar",
+                                                                        tint = if (ktk.kcv == formData.selectedKTKKcv)
+                                                                            MaterialTheme.colorScheme.primary
+                                                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                        modifier = Modifier.size(20.dp)
+                                                                    )
+                                                                    Column(modifier = Modifier.weight(1f)) {
+                                                                        Text(
+                                                                            text = if (ktk.customName.isNotEmpty()) ktk.customName else "KTK ${ktk.kcv.take(8)}",
+                                                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                                                                        )
+                                                                        Text(
+                                                                            text = "KCV: ${ktk.kcv}",
+                                                                            style = MaterialTheme.typography.labelSmall,
+                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                            fontFamily = FontFamily.Monospace
+                                                                        )
+                                                                        Text(
+                                                                            text = "Algoritmo: ${ktk.keyAlgorithm}",
+                                                                            style = MaterialTheme.typography.labelSmall,
+                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                        )
+                                                                    }
+                                                                }
+                                                            }
+                                                            if (index < filteredKTKs.size - 1) {
+                                                                HorizontalDivider(
+                                                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (validationErrors.containsKey("ktk")) {
+                                Text(
+                                    validationErrors["ktk"] ?: "",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.labelSmall
                                 )
                             }
                         }
@@ -1343,7 +1562,7 @@ fun CreateProfileModal(
                             )
                         } else {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                formData.keyConfigurations.forEach { config ->
+                                formData.keyConfigurations.reversed().forEach { config ->
                                     KeyConfigurationItem(
                                         config = config,
                                         availableKeys = availableKeys,
@@ -1373,7 +1592,7 @@ fun CreateProfileModal(
                             Text("Cancelar", style = MaterialTheme.typography.labelLarge)
                         }
                         Spacer(Modifier.width(8.dp))
-                        Button(onClick = onSave) {
+                        Button(onClick = onSave, enabled = !hasErrors) {
                             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
                             Text(
@@ -1412,6 +1631,7 @@ fun KeyConfigurationItem(
     var keyTypeExpanded by rememberSaveable { mutableStateOf(false) }
     var keyExpanded by rememberSaveable { mutableStateOf(false) }
     var isExpanded by rememberSaveable { mutableStateOf(false) } // Iniciar contraídas
+    var keySearchQuery by rememberSaveable { mutableStateOf("") }
 
     // Derivados
     val isKeySelected = remember(config.selectedKey) { config.selectedKey.isNotBlank() }
@@ -1420,7 +1640,20 @@ fun KeyConfigurationItem(
     val selectedKeyEntity = remember(config.selectedKey, availableKeys) {
         availableKeys.find { it.kcv == config.selectedKey }
     }
-    
+
+    // Llaves filtradas por búsqueda
+    val filteredKeys = remember(availableKeys, keySearchQuery) {
+        if (keySearchQuery.isBlank()) {
+            availableKeys
+        } else {
+            availableKeys.filter { key ->
+                key.kcv.contains(keySearchQuery, ignoreCase = true) ||
+                key.keyAlgorithm.contains(keySearchQuery, ignoreCase = true) ||
+                key.customName.contains(keySearchQuery, ignoreCase = true)
+            }
+        }
+    }
+
     // Resumen compacto para estado colapsado
     val compactSummary = remember(config, selectedKeyEntity) {
         buildString {
@@ -1804,80 +2037,157 @@ fun KeyConfigurationItem(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(fieldSpacing)
                 ) {
-                    // Llave seleccionada (readOnly + lista larga scrolleable)
-                    ExposedDropdownMenuBox(
-                        expanded = keyExpanded,
-                        onExpandedChange = { keyExpanded = !keyExpanded }
-                    ) {
-                        OutlinedTextField(
-                            value = displayValue,
-                            onValueChange = {}, // no editable
-                            readOnly = true,
-                            label = { Text("Llave seleccionada (KCV)") },
-                            placeholder = { Text("Seleccionar llave...") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyExpanded)
-                            },
-                            supportingText = {
-                                if (!isKeySelected) Text(
-                                    "Requerida para inyectar",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
-                        )
-
-                        // Menú alto + contenido scrolleable
-                        ExposedDropdownMenu(
-                            expanded = keyExpanded,
-                            onDismissRequest = { keyExpanded = false },
-                            modifier = Modifier
-                                .heightIn(max = 360.dp)
-                                .widthIn(min = 280.dp)
+                    // Llave seleccionada con selector scrolleable
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { keyExpanded = !keyExpanded },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = if (isKeySelected) MaterialTheme.colorScheme.primary
+                                             else MaterialTheme.colorScheme.error
+                            ),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isKeySelected) MaterialTheme.colorScheme.outline
+                                else MaterialTheme.colorScheme.error
+                            )
                         ) {
-                            if (availableKeys.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text("No hay llaves disponibles") },
-                                    onClick = { keyExpanded = false }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Llave seleccionada",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = if (isKeySelected) displayValue else "Seleccionar llave...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isKeySelected) MaterialTheme.colorScheme.onSurface
+                                               else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (keyExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (keyExpanded) "Colapsar" else "Expandir"
                                 )
-                            } else {
-                                // Lista con Column scrolleable para evitar problemas de medicion
-                                Column(
+                            }
+                        }
+
+                        // Expandible selector de llaves
+                        AnimatedVisibility(
+                            visible = keyExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                // Buscador
+                                OutlinedTextField(
+                                    value = keySearchQuery,
+                                    onValueChange = { keySearchQuery = it },
+                                    placeholder = { Text("Buscar KCV o algoritmo...") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Search, contentDescription = "Buscar")
+                                    },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                // Lista scrolleable de llaves
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .heightIn(max = 360.dp)
-                                        .verticalScroll(rememberScrollState())
+                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                                 ) {
-                                    availableKeys.forEach { key ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Column {
-                                                    Text(
-                                                        key.kcv,
-                                                        fontFamily = FontFamily.Monospace
-                                                    )
-                                                    Text(
-                                                        "${key.keyAlgorithm} • ID: ${key.id}",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    if (filteredKeys.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                "No hay llaves disponibles",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    } else {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(max = 170.dp)
+                                                .verticalScroll(rememberScrollState())
+                                        ) {
+                                            filteredKeys.forEachIndexed { index, key ->
+                                                Surface(
+                                                    onClick = {
+                                                        onUpdate(config.id, "selectedKey", key.kcv)
+                                                        keyExpanded = false
+                                                        keySearchQuery = ""
+                                                    },
+                                                    color = if (key.kcv == config.selectedKey) {
+                                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                                    } else {
+                                                        Color.Transparent
+                                                    },
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = if (key.kcv == config.selectedKey)
+                                                                Icons.Default.CheckCircle
+                                                            else Icons.Default.RadioButtonUnchecked,
+                                                            contentDescription = "Seleccionar",
+                                                            tint = if (key.kcv == config.selectedKey)
+                                                                MaterialTheme.colorScheme.primary
+                                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                text = key.kcv,
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                            Text(
+                                                                text = key.keyAlgorithm,
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                if (index < filteredKeys.size - 1) {
+                                                    HorizontalDivider(
+                                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                                                     )
                                                 }
-                                            },
-                                            onClick = {
-                                                onUpdate(
-                                                    config.id,
-                                                    "selectedKey",
-                                                    key.kcv
-                                                )
-                                                keyExpanded = false
                                             }
-                                        )
+                                        }
                                     }
                                 }
                             }
+                        }
+
+                        if (!isKeySelected) {
+                            Text(
+                                "Requerida para inyectar",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.labelSmall
+                            )
                         }
                     }
                 }
@@ -2058,73 +2368,157 @@ fun KeyConfigurationItem(
                         )
                     }
 
-                    ExposedDropdownMenuBox(
-                        expanded = keyExpanded,
-                        onExpandedChange = { keyExpanded = !keyExpanded }
-                    ) {
-                        OutlinedTextField(
-                            value = displayValue,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Llave seleccionada (KCV)") },
-                            placeholder = { Text("Seleccionar llave...") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = keyExpanded) },
-                            supportingText = {
-                                if (!isKeySelected) Text(
-                                    "Requerida para inyectar",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
-                        )
-                        ExposedDropdownMenu(
-                            expanded = keyExpanded,
-                            onDismissRequest = { keyExpanded = false },
-                            modifier = Modifier.heightIn(max = 360.dp)
+                    // Llave seleccionada con selector scrolleable
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { keyExpanded = !keyExpanded },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = if (isKeySelected) MaterialTheme.colorScheme.primary
+                                             else MaterialTheme.colorScheme.error
+                            ),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isKeySelected) MaterialTheme.colorScheme.outline
+                                else MaterialTheme.colorScheme.error
+                            )
                         ) {
-                            if (availableKeys.isEmpty()) {
-                                DropdownMenuItem(
-                                    text = { Text("No hay llaves disponibles") },
-                                    onClick = { keyExpanded = false }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Llave seleccionada",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = if (isKeySelected) displayValue else "Seleccionar llave...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isKeySelected) MaterialTheme.colorScheme.onSurface
+                                               else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (keyExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = if (keyExpanded) "Colapsar" else "Expandir"
                                 )
-                            } else {
-                                // Lista con Column scrolleable para evitar problemas de medicion
-                                Column(
+                            }
+                        }
+
+                        // Expandible selector de llaves
+                        AnimatedVisibility(
+                            visible = keyExpanded,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                // Buscador
+                                OutlinedTextField(
+                                    value = keySearchQuery,
+                                    onValueChange = { keySearchQuery = it },
+                                    placeholder = { Text("Buscar KCV o algoritmo...") },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Search, contentDescription = "Buscar")
+                                    },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+
+                                // Lista scrolleable de llaves
+                                Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .heightIn(max = 360.dp)
-                                        .verticalScroll(rememberScrollState())
+                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                                 ) {
-                                    availableKeys.forEach { key ->
-                                        DropdownMenuItem(
-                                            text = {
-                                                Column {
-                                                    Text(
-                                                        key.kcv,
-                                                        fontFamily = FontFamily.Monospace
-                                                    )
-                                                    Text(
-                                                        "${key.keyAlgorithm} • ID: ${key.id}",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    if (filteredKeys.isEmpty()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(16.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                "No hay llaves disponibles",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    } else {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(max = 170.dp)
+                                                .verticalScroll(rememberScrollState())
+                                        ) {
+                                            filteredKeys.forEachIndexed { index, key ->
+                                                Surface(
+                                                    onClick = {
+                                                        onUpdate(config.id, "selectedKey", key.kcv)
+                                                        keyExpanded = false
+                                                        keySearchQuery = ""
+                                                    },
+                                                    color = if (key.kcv == config.selectedKey) {
+                                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                                    } else {
+                                                        Color.Transparent
+                                                    },
+                                                    modifier = Modifier.fillMaxWidth()
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(12.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = if (key.kcv == config.selectedKey)
+                                                                Icons.Default.CheckCircle
+                                                            else Icons.Default.RadioButtonUnchecked,
+                                                            contentDescription = "Seleccionar",
+                                                            tint = if (key.kcv == config.selectedKey)
+                                                                MaterialTheme.colorScheme.primary
+                                                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                        Column(modifier = Modifier.weight(1f)) {
+                                                            Text(
+                                                                text = key.kcv,
+                                                                style = MaterialTheme.typography.bodySmall,
+                                                                fontFamily = FontFamily.Monospace
+                                                            )
+                                                            Text(
+                                                                text = key.keyAlgorithm,
+                                                                style = MaterialTheme.typography.labelSmall,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                                if (index < filteredKeys.size - 1) {
+                                                    HorizontalDivider(
+                                                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                                                     )
                                                 }
-                                            },
-                                            onClick = {
-                                                onUpdate(
-                                                    config.id,
-                                                    "selectedKey",
-                                                    key.kcv
-                                                )
-                                                keyExpanded = false
                                             }
-                                        )
+                                        }
                                     }
                                 }
                             }
+                        }
+
+                        if (!isKeySelected) {
+                            Text(
+                                "Requerida para inyectar",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.labelSmall
+                            )
                         }
                     }
                 }
@@ -2451,7 +2845,7 @@ fun KTKSelectorComponent(
             ) {
                 Column(
                     modifier = Modifier
-                        .heightIn(max = 300.dp)
+                        .heightIn(max = 230.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
                     availableKTKs.forEachIndexed { index, ktk ->
