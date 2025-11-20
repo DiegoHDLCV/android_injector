@@ -37,7 +37,8 @@ data class ProfilesScreenState(
     val importError: String? = null,
     val importWarnings: List<String> = emptyList(),
     // Permisos de usuario
-    val canManageProfiles: Boolean = false // NUEVO: Permiso para editar/eliminar perfiles
+    val canManageProfiles: Boolean = false, // NUEVO: Permiso para editar/eliminar perfiles
+    val userRole: String = "" // NUEVO: Rol del usuario actual
 )
 
 data class ProfileFormData(
@@ -85,6 +86,9 @@ class ProfileViewModel @Inject constructor(
                 false // Sin sesión, sin permisos
             }
             
+            val userRole = session?.third ?: ""
+
+            
             combine(
                 profileRepository.getAllProfiles(),
                 injectedKeyRepository.getAllInjectedKeys()
@@ -94,7 +98,8 @@ class ProfileViewModel @Inject constructor(
                     filteredProfiles = profiles, // Inicialmente sin filtro
                     availableKeys = keys,
                     isLoading = false,
-                    canManageProfiles = canManage // NUEVO: Pasar permiso al estado
+                    canManageProfiles = canManage, // NUEVO: Pasar permiso al estado
+                    userRole = userRole // NUEVO: Pasar rol al estado
                 )
             }.collect {
                 _state.value = it

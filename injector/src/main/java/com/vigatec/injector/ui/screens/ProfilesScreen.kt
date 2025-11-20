@@ -74,35 +74,75 @@ fun ProfilesScreen(
             )
         }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (state.isLoading) {
-                ProfilesSkeletonScreen()
-            } else if (state.profiles.isEmpty()) {
-                EmptyStateScreen(onCreateProfile = { viewModel.onShowCreateModal() })
-            } else {
-                ProfilesContent(
-                    profiles = state.profiles,
-                    filteredProfiles = state.filteredProfiles,
-                    searchQuery = state.searchQuery,
-                    onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
-                    onEdit = { viewModel.onShowCreateModal(it) },
-                    onDelete = { viewModel.onDeleteProfile(it) },
-                    onInject = {
-                        Log.i("ProfilesScreen", "=== ABRIENDO MODAL DE INYECCIÓN FUTUREX ===")
-                        Log.i("ProfilesScreen", "Usuario: $username")
-                        Log.i("ProfilesScreen", "Usuario presionó botón de inyección en perfil: ${it.name}")
-                        Log.i("ProfilesScreen", "Configuraciones de llave: ${it.keyConfigurations.size}")
-                        it.keyConfigurations.forEachIndexed { index, config ->
-                            Log.i("ProfilesScreen", "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
-                        }
-                        keyInjectionViewModel.showInjectionModal(it, username)
-                    },
-                    canManageProfiles = state.canManageProfiles // NUEVO: Pasar permiso
+            // Indicador de rol del usuario
+            val (roleBackground, roleTextColor, roleLabel) = when (state.userRole) {
+                "ADMIN", "SUPERVISOR" -> Triple(
+                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f),
+                    MaterialTheme.colorScheme.tertiary,
+                    "👤 SUPERVISOR"
                 )
+                "OPERATOR" -> Triple(
+                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f),
+                    MaterialTheme.colorScheme.tertiary,
+                    "👤 OPERADOR"
+                )
+                else -> Triple(
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                    "👤 USUARIO"
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(bottomStart = 8.dp, bottomEnd = 8.dp),
+                color = roleBackground,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = roleLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = roleTextColor
+                    )
+                }
+            }
+
+            Box(modifier = Modifier.weight(1f)) {
+                if (state.isLoading) {
+                    ProfilesSkeletonScreen()
+                } else if (state.profiles.isEmpty()) {
+                    EmptyStateScreen(onCreateProfile = { viewModel.onShowCreateModal() })
+                } else {
+                    ProfilesContent(
+                        profiles = state.profiles,
+                        filteredProfiles = state.filteredProfiles,
+                        searchQuery = state.searchQuery,
+                        onSearchQueryChange = { viewModel.onSearchQueryChange(it) },
+                        onEdit = { viewModel.onShowCreateModal(it) },
+                        onDelete = { viewModel.onDeleteProfile(it) },
+                        onInject = {
+                            Log.i("ProfilesScreen", "=== ABRIENDO MODAL DE INYECCIÓN FUTUREX ===")
+                            Log.i("ProfilesScreen", "Usuario: $username")
+                            Log.i("ProfilesScreen", "Usuario presionó botón de inyección en perfil: ${it.name}")
+                            Log.i("ProfilesScreen", "Configuraciones de llave: ${it.keyConfigurations.size}")
+                            it.keyConfigurations.forEachIndexed { index, config ->
+                                Log.i("ProfilesScreen", "  ${index + 1}. ${config.usage} - Slot: ${config.slot} - Tipo: ${config.keyType}")
+                            }
+                            
+                            keyInjectionViewModel.showInjectionModal(it)
+                        },
+                        canManageProfiles = state.canManageProfiles
+                    )
+                }
             }
         }
     }
