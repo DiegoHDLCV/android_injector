@@ -9,12 +9,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.text.SimpleDateFormat
 import java.util.*
 import javax.inject.Inject
 
 data class LogsUiState(
-    val logs: List<InjectionLogEntity> = emptyList(),
     val filteredLogs: List<InjectionLogEntity> = emptyList(),
     val availableUsernames: List<String> = emptyList(),
     val availableProfiles: List<String> = emptyList(),
@@ -23,7 +24,11 @@ data class LogsUiState(
     val selectedDateStart: Long? = null,
     val selectedDateEnd: Long? = null,
     val isLoading: Boolean = false,
-    val errorMessage: String? = null
+    val isLoadingMore: Boolean = false,
+    val errorMessage: String? = null,
+    val hasMorePages: Boolean = true,
+    val currentPage: Int = 0,
+    val totalCount: Int = 0
 )
 
 @HiltViewModel
@@ -31,31 +36,96 @@ class LogsViewModel @Inject constructor(
     private val injectionLogRepository: InjectionLogRepository
 ) : ViewModel() {
 
+    companion object {
+        private const val PAGE_SIZE = 20
+    }
+
     private val _uiState = MutableStateFlow(LogsUiState())
     val uiState: StateFlow<LogsUiState> = _uiState.asStateFlow()
 
     init {
-        loadLogs()
         loadFilterOptions()
+        loadFirstPage()
     }
 
-    private fun loadLogs() {
+    private fun loadFirstPage() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            try {
-                injectionLogRepository.getAllLogs().collect { logs ->
-                    _uiState.value = _uiState.value.copy(
-                        logs = logs,
-                        filteredLogs = applyFilters(logs),
-                        isLoading = false
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                currentPage = 0,
+                filteredLogs = emptyList()
+            )
+            loadLogsPage(pageNumber = 0, isInitialLoad = true)
+        }
+    }
+
+    private suspend fun loadLogsPage(pageNumber: Int, isInitialLoad: Boolean = false) {
+        val startTime = System.currentTimeMillis()
+        android.util.Log.d("LogsPerformance", "=== LOADING PAGE $pageNumber (initial=$isInitialLoad) ===")
+        
+        try {
+            // Run both queries in parallel for better performance
+            coroutineScope {
+                val logsDeferred = async {
+                    injectionLogRepository.getLogsWithFiltersPaged(
+                        username = _uiState.value.selectedUsername,
+                        profileName = _uiState.value.selectedProfile,
+                        startTimestamp = _uiState.value.selectedDateStart,
+                        endTimestamp = _uiState.value.selectedDateEnd,
+                        pageSize = PAGE_SIZE,
+                        pageNumber = pageNumber
                     )
                 }
-            } catch (e: Exception) {
+
+                val countDeferred = async {
+                    injectionLogRepository.getLogsCountWithFilters(
+                        username = _uiState.value.selectedUsername,
+                        profileName = _uiState.value.selectedProfile,
+                        startTimestamp = _uiState.value.selectedDateStart,
+                        endTimestamp = _uiState.value.selectedDateEnd
+                    )
+                }
+
+                // Await both results
+                val logs = logsDeferred.await()
+                val queryTime = System.currentTimeMillis()
+                android.util.Log.d("LogsPerformance", "Data query completed in ${queryTime - startTime}ms, got ${logs.size} logs")
+
+                val totalCount = countDeferred.await()
+                val countTime = System.currentTimeMillis()
+                android.util.Log.d("LogsPerformance", "Both queries completed in ${countTime - startTime}ms")
+
+                val currentLogs = if (isInitialLoad) emptyList() else _uiState.value.filteredLogs
+                val updatedLogs = currentLogs + logs
+
                 _uiState.value = _uiState.value.copy(
+                    filteredLogs = updatedLogs,
                     isLoading = false,
-                    errorMessage = "Error al cargar los logs: ${e.message}"
+                    isLoadingMore = false,
+                    hasMorePages = updatedLogs.size < totalCount,
+                    currentPage = pageNumber,
+                    totalCount = totalCount
                 )
+                
+                val totalTime = System.currentTimeMillis() - startTime
+                android.util.Log.d("LogsPerformance", "Page $pageNumber loaded in ${totalTime}ms. Total logs: ${updatedLogs.size}/$totalCount")
             }
+        } catch (e: Exception) {
+            android.util.Log.e("LogsPerformance", "Error loading page $pageNumber: ${e.message}", e)
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                isLoadingMore = false,
+                errorMessage = "Error al cargar los logs: ${e.message}"
+            )
+        }
+    }
+
+    fun loadMoreLogs() {
+        if (_uiState.value.isLoadingMore || !_uiState.value.hasMorePages) return
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingMore = true)
+            loadLogsPage(pageNumber = _uiState.value.currentPage + 1)
         }
     }
 
@@ -86,35 +156,9 @@ class LogsViewModel @Inject constructor(
             selectedUsername = username,
             selectedProfile = profile,
             selectedDateStart = dateStart,
-            selectedDateEnd = dateEnd,
-            filteredLogs = applyFilters(_uiState.value.logs)
+            selectedDateEnd = dateEnd
         )
-    }
-
-    private fun applyFilters(logs: List<InjectionLogEntity>): List<InjectionLogEntity> {
-        var filtered = logs
-
-        _uiState.value.selectedUsername?.let { username ->
-            if (username.isNotEmpty()) {
-                filtered = filtered.filter { it.username == username }
-            }
-        }
-
-        _uiState.value.selectedProfile?.let { profile ->
-            if (profile.isNotEmpty()) {
-                filtered = filtered.filter { it.profileName == profile }
-            }
-        }
-
-        _uiState.value.selectedDateStart?.let { start ->
-            filtered = filtered.filter { it.timestamp >= start }
-        }
-
-        _uiState.value.selectedDateEnd?.let { end ->
-            filtered = filtered.filter { it.timestamp <= end }
-        }
-
-        return filtered
+        loadFirstPage()
     }
 
     fun clearFilters() {
@@ -122,15 +166,17 @@ class LogsViewModel @Inject constructor(
             selectedUsername = null,
             selectedProfile = null,
             selectedDateStart = null,
-            selectedDateEnd = null,
-            filteredLogs = _uiState.value.logs
+            selectedDateEnd = null
         )
+        loadFirstPage()
     }
 
     fun deleteLog(log: InjectionLogEntity) {
         viewModelScope.launch {
             try {
                 injectionLogRepository.deleteLog(log)
+                // Reload current page to reflect deletion
+                loadFirstPage()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     errorMessage = "Error al eliminar log: ${e.message}"
@@ -143,6 +189,7 @@ class LogsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 injectionLogRepository.deleteAllLogs()
+                loadFirstPage()
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     errorMessage = "Error al eliminar todos los logs: ${e.message}"

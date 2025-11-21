@@ -1,10 +1,10 @@
 package com.vigatec.injector.repository
 
 import android.util.Log
-import com.vigatec.injector.data.local.dao.PermissionDao
-import com.vigatec.injector.data.local.dao.UserDao
-import com.vigatec.injector.data.local.entity.Permission
-import com.vigatec.injector.data.local.entity.User
+import com.vigatec.persistence.dao.PermissionDao
+import com.vigatec.persistence.dao.UserDao
+import com.vigatec.persistence.entities.Permission
+import com.vigatec.persistence.entities.User
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject

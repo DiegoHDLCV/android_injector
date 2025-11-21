@@ -1,7 +1,7 @@
 package com.vigatec.injector.data.model
 
-import com.vigatec.injector.data.local.entity.Permission
-import com.vigatec.injector.data.local.entity.User
+import com.vigatec.persistence.entities.Permission
+import com.vigatec.persistence.entities.User
 
 data class UserWithPermissions(
     val user: User,

@@ -1,6 +1,6 @@
 package com.vigatec.injector.util
 
-import com.vigatec.injector.data.local.entity.Permission
+import com.vigatec.persistence.entities.Permission
 
 /**
  * Catálogo centralizado de permisos del sistema Injector.

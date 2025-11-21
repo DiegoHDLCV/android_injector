@@ -6,7 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vigatec.injector.data.local.entity.User
+import com.vigatec.persistence.entities.User
 import com.vigatec.injector.data.local.preferences.UserPreferencesManager
 import com.vigatec.injector.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel

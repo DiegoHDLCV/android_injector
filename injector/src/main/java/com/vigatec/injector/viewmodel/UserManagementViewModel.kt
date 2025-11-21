@@ -3,8 +3,8 @@ package com.vigatec.injector.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vigatec.injector.data.local.entity.Permission
-import com.vigatec.injector.data.local.entity.User
+import com.vigatec.persistence.entities.Permission
+import com.vigatec.persistence.entities.User
 import com.vigatec.injector.repository.UserRepository
 import com.vigatec.injector.util.PermissionsCatalog
 import dagger.hilt.android.lifecycle.HiltViewModel

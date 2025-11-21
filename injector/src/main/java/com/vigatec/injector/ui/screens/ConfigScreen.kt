@@ -26,6 +26,7 @@ fun ConfigScreen(
     permissionProvider: PermissionProvider,
     onNavigateToLogs: () -> Unit,
     onNavigateToUserManagement: () -> Unit,
+    onNavigateToKioskConfig: () -> Unit,
     onBack: () -> Unit,
     onLogout: () -> Unit = {}
 ) {
@@ -41,12 +42,7 @@ fun ConfigScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Configuración") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, "Volver")
-                    }
-                }
+                title = { Text("Configuración") }
             )
         }
     ) { padding ->
@@ -94,6 +90,16 @@ fun ConfigScreen(
                     description = "Crear, editar y administrar usuarios del sistema",
                     icon = Icons.Default.Group,
                     onClick = onNavigateToUserManagement
+                )
+            }
+            
+            // Sección de Modo Kiosk (solo para administradores)
+            if (userPermissions.contains(PermissionProvider.MANAGE_USERS)) {
+                ConfigOptionCard(
+                    title = "Modo Kiosk",
+                    description = "Configurar restricciones de modo kiosco",
+                    icon = Icons.Default.Lock,
+                    onClick = onNavigateToKioskConfig
                 )
             }
 

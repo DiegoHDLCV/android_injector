@@ -87,6 +87,11 @@ class CeremonyViewModel @Inject constructor(
     private val timeoutManager = CustodianTimeoutManager()
 
     init {
+        // Cargar rol inmediatamente para evitar mostrar rol por defecto
+        viewModelScope.launch {
+            val userRole = sessionManager.getCurrentSession()?.third ?: ""
+            _uiState.value = _uiState.value.copy(userRole = userRole)
+        }
         // Verificar si existe KEK Storage y cargar usuario actual
         refreshCeremonyState()
     }
@@ -128,7 +133,7 @@ class CeremonyViewModel @Inject constructor(
 
                 if (session != null) {
                     val (_, username, role) = session
-                    val isAdmin = role == "ADMIN"
+                    val isAdmin = role == "ADMIN" || role == "SUPERVISOR"
 
                     android.util.Log.d("CeremonyViewModel", "Ceremony - Usuario de sesión: username=$username, role=$role")
                     android.util.Log.d("CeremonyViewModel", "Ceremony - isAdmin determinado: $isAdmin")

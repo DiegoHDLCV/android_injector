@@ -158,4 +158,51 @@ class InjectionLogRepository @Inject constructor(
     suspend fun getDistinctProfiles(): List<String> {
         return injectionLogDao.getDistinctProfiles()
     }
+
+    /**
+     * Obtiene logs paginados para optimizar el rendimiento.
+     * @param pageSize Número de logs por página
+     * @param pageNumber Número de página (0-indexed)
+     */
+    suspend fun getLogsPaged(pageSize: Int, pageNumber: Int): List<InjectionLogEntity> {
+        return injectionLogDao.getLogsPaged(limit = pageSize, offset = pageNumber * pageSize)
+    }
+
+    /**
+     * Obtiene logs paginados con filtros aplicados.
+     */
+    suspend fun getLogsWithFiltersPaged(
+        username: String? = null,
+        profileName: String? = null,
+        startTimestamp: Long? = null,
+        endTimestamp: Long? = null,
+        pageSize: Int,
+        pageNumber: Int
+    ): List<InjectionLogEntity> {
+        return injectionLogDao.getLogsWithFiltersPaged(
+            username = username,
+            profileName = profileName,
+            startTimestamp = startTimestamp,
+            endTimestamp = endTimestamp,
+            limit = pageSize,
+            offset = pageNumber * pageSize
+        )
+    }
+
+    /**
+     * Cuenta el total de logs con filtros aplicados.
+     */
+    suspend fun getLogsCountWithFilters(
+        username: String? = null,
+        profileName: String? = null,
+        startTimestamp: Long? = null,
+        endTimestamp: Long? = null
+    ): Int {
+        return injectionLogDao.getLogsCountWithFilters(
+            username = username,
+            profileName = profileName,
+            startTimestamp = startTimestamp,
+            endTimestamp = endTimestamp
+        )
+    }
 }

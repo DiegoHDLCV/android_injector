@@ -31,13 +31,15 @@ class InjectedKeyRepository @Inject constructor(
      */
     fun getAllInjectedKeys(): Flow<List<InjectedKeyEntity>> {
         return injectedKeyDao.getAllInjectedKeys().map { keys ->
-            // Log.d(TAG, "=== CONSULTA BD - getAllInjectedKeys ===")
-            // Log.d(TAG, "Total de llaves consultadas: ${keys.size}")
-            // keys.forEachIndexed { index, key ->
-            //    Log.d(TAG, "BD Consulta $index: Slot=${key.keySlot}, Tipo=${key.keyType}, isKEK=${key.isKEK}, kekType='${key.kekType}', KCV=${key.kcv}")
-            // }
-            // Log.d(TAG, "=== FIN CONSULTA BD ===")
-            keys.map { key -> decryptKeyIfNeeded(key) }
+            // Optimización: Verificar existencia de KEK una sola vez para toda la lista
+            val hasKEK = StorageKeyManager.hasStorageKEK()
+            
+            // Log de advertencia único si hay llaves cifradas pero no KEK
+            if (!hasKEK && keys.any { it.isEncrypted() }) {
+                Log.w(TAG, "KEK Storage no disponible. Las llaves cifradas no se podrán descifrar.")
+            }
+
+            keys.map { key -> decryptKeyIfNeeded(key, hasKEK) }
         }.flowOn(Dispatchers.Default)
     }
 
@@ -46,15 +48,18 @@ class InjectedKeyRepository @Inject constructor(
      * Si es una llave legacy (sin cifrar), la retorna sin cambios.
      */
     @Suppress("DEPRECATION")
-    private fun decryptKeyIfNeeded(key: InjectedKeyEntity): InjectedKeyEntity {
+    private fun decryptKeyIfNeeded(key: InjectedKeyEntity, hasKEK: Boolean? = null): InjectedKeyEntity {
         // Si la llave no está cifrada o es legacy, devolverla sin cambios
         if (!key.isEncrypted()) {
             return key
         }
 
+        // Usar el valor pasado o verificar si es null
+        val kekExists = hasKEK ?: StorageKeyManager.hasStorageKEK()
+
         // Si no existe KEK Storage, no podemos descifrar
-        if (!StorageKeyManager.hasStorageKEK()) {
-            Log.w(TAG, "Llave cifrada pero no existe KEK Storage: KCV=${key.kcv}")
+        if (!kekExists) {
+            // Log removido para evitar spam por cada llave. Se maneja en getAllInjectedKeys.
             return key
         }
 

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vigatec.injector.util.NavigationDebouncer
 import com.vigatec.injector.viewmodel.ExportImportState
 import com.vigatec.injector.viewmodel.ExportImportViewModel
 import com.vigatec.injector.ui.components.SystemInfoCard
@@ -44,6 +45,7 @@ fun ExportImportScreen(
     onNavigateBack: () -> Unit,
     viewModel: ExportImportViewModel = hiltViewModel()
 ) {
+    val navigationDebouncer = remember { NavigationDebouncer() }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
@@ -71,7 +73,7 @@ fun ExportImportScreen(
             TopAppBar(
                 title = { Text("Exportar / Importar Llaves") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = { navigationDebouncer.onClick(onNavigateBack) }) {
                         Icon(Icons.AutoMirrored.Default.ArrowBack, "Volver")
                     }
                 },

@@ -27,6 +27,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vigatec.injector.ui.navigation.MainScreen
 import com.vigatec.injector.ui.navigation.MainNavGraph
+import com.vigatec.injector.util.NavigationDebouncer
 import com.vigatec.injector.util.PermissionManager
 import com.vigatec.injector.util.PermissionProvider
 import java.io.File
@@ -43,7 +44,8 @@ val bottomBarDestinations = listOf(
     BottomBarDestination(MainScreen.Dashboard.route, Icons.Default.Dashboard),
     BottomBarDestination(MainScreen.KeyVault.route, Icons.Default.VpnKey),
     BottomBarDestination(MainScreen.Ceremony.route, Icons.Default.Security),
-    BottomBarDestination(MainScreen.Profiles.route, Icons.Default.AccountBox)
+    BottomBarDestination(MainScreen.Profiles.route, Icons.Default.AccountBox),
+    BottomBarDestination(MainScreen.Config.route, Icons.Default.Settings)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,8 +54,8 @@ fun MainScaffold(
     username: String,
     userRole: String?,
     permissionProvider: PermissionProvider,
-    onNavigateToConfig: () -> Unit = {},
-    onNavigateToExportImport: () -> Unit = {}
+    onNavigateToExportImport: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     var isCeremonyInProgress by remember { mutableStateOf(false) }
@@ -87,7 +89,6 @@ fun MainScaffold(
     }
 
     Scaffold(
-        topBar = { MainTopAppBar(onNavigateToConfig = onNavigateToConfig, isCeremonyInProgress = isCeremonyInProgress) },
         bottomBar = {
             AppBottomBar(
                 navController = navController,
@@ -100,7 +101,9 @@ fun MainScaffold(
             MainNavGraph(
                 navController = navController,
                 username = username,
+                permissionProvider = permissionProvider,
                 onNavigateToExportImport = onNavigateToExportImport,
+                onLogout = onLogout,
                 onCeremonyStateChanged = { inProgress ->
                     isCeremonyInProgress = inProgress
                 }
@@ -109,55 +112,7 @@ fun MainScaffold(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MainTopAppBar(onNavigateToConfig: () -> Unit = {}, isCeremonyInProgress: Boolean = false) {
-    var showMenu by remember { mutableStateOf(false) }
-    val context = LocalContext.current
 
-    TopAppBar(
-        title = { Text("Injector") },
-        actions = {
-            // Botón de configuración (deshabilitado durante ceremonia)
-            IconButton(
-                onClick = onNavigateToConfig,
-                enabled = !isCeremonyInProgress
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Configuración"
-                )
-            }
-
-            IconButton(
-                onClick = { showMenu = !showMenu },
-                enabled = !isCeremonyInProgress
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "More"
-                )
-            }
-            DropdownMenu(
-                expanded = showMenu,
-                onDismissRequest = { showMenu = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Exportar logs") },
-                    onClick = {
-                        showMenu = false
-                        exportLogs(context)
-                    },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = "Exportar Logs"
-                        )
-                    })
-            }
-        }
-    )
-}
 
 private fun exportLogs(context: Context) {
     val fileName = "comm-logs-${SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())}.txt"
@@ -184,6 +139,8 @@ fun AppBottomBar(
     destinations: List<BottomBarDestination>,
     isCeremonyInProgress: Boolean = false
 ) {
+    val navigationDebouncer = remember { NavigationDebouncer() }
+
     NavigationBar {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
@@ -193,6 +150,7 @@ fun AppBottomBar(
                 screen = screen,
                 currentDestination = currentDestination,
                 navController = navController,
+                navigationDebouncer = navigationDebouncer,
                 enabled = !isCeremonyInProgress
             )
         }
@@ -204,17 +162,27 @@ fun RowScope.AddItem(
     screen: BottomBarDestination,
     currentDestination: NavDestination?,
     navController: NavHostController,
+    navigationDebouncer: NavigationDebouncer,
     enabled: Boolean = true
 ) {
+    val isCurrentDestination = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+
     NavigationBarItem(
         icon = { Icon(imageVector = screen.icon, contentDescription = "Navigation Icon") },
-        selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+        selected = isCurrentDestination,
         enabled = enabled,
         onClick = {
-            android.util.Log.d("Performance", "Navigation started to ${screen.route} at ${System.currentTimeMillis()}")
-            navController.navigate(screen.route) {
-                popUpTo(navController.graph.findStartDestination().id)
-                launchSingleTop = true
+            // Solo navegar si NO estamos ya en esta pantalla
+            if (!isCurrentDestination) {
+                navigationDebouncer.onClick {
+                    android.util.Log.d("Performance", "Navigation started to ${screen.route} at ${System.currentTimeMillis()}")
+                    navController.navigate(screen.route) {
+                        popUpTo(navController.graph.findStartDestination().id)
+                        launchSingleTop = true
+                    }
+                }
+            } else {
+                android.util.Log.d("Navigation", "Already on ${screen.route}, ignoring click")
             }
         }
     )

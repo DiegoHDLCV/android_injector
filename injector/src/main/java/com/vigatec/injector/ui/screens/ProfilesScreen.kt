@@ -56,24 +56,7 @@ fun ProfilesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Perfiles de Inyección", fontWeight = FontWeight.Bold) },
-                actions = {
-                    // Solo mostrar botones de importar/crear para usuarios con permisos de gestión
-                    if (state.canManageProfiles) {
-                        IconButton(onClick = { viewModel.onShowImportModal() }) {
-                            Icon(Icons.Default.Upload, contentDescription = "Importar Perfil")
-                        }
-                        IconButton(onClick = { viewModel.onShowCreateModal() }) {
-                            Icon(Icons.Default.Add, contentDescription = "Crear Perfil")
-                        }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    titleContentColor = MaterialTheme.colorScheme.onSurface,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSurface
-                ),
-                windowInsets = WindowInsets(0, 0, 0, 0)
+                title = { Text("Perfiles de Inyección", fontWeight = FontWeight.Bold) }
             )
         }
     ) { padding ->
@@ -82,6 +65,14 @@ fun ProfilesScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Action buttons
+            if (state.canManageProfiles) {
+                ProfileActionButtons(
+                    onImport = { viewModel.onShowImportModal() },
+                    onCreate = { viewModel.onShowCreateModal() }
+                )
+            }
+            
             // Indicador de rol del usuario
             val (roleBackground, roleTextColor, roleLabel) = when (state.userRole) {
                 "ADMIN", "SUPERVISOR" -> Triple(
@@ -183,6 +174,27 @@ fun ProfilesScreen(
 
     // Modal de inyección de llaves
     KeyInjectionModal(keyInjectionViewModel)
+}
+
+@Composable
+fun ProfileActionButtons(
+    onImport: () -> Unit,
+    onCreate: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onImport) {
+            Icon(Icons.Default.Upload, contentDescription = "Importar Perfil")
+        }
+        IconButton(onClick = onCreate) {
+            Icon(Icons.Default.Add, contentDescription = "Crear Perfil")
+        }
+    }
 }
 
 @Composable

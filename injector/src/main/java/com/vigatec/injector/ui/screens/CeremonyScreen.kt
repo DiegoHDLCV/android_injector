@@ -27,6 +27,7 @@ import com.vigatec.injector.ui.components.HexadecimalTextField
 import com.vigatec.injector.viewmodel.KeyAlgorithmType
 import com.vigatec.persistence.entities.KEKType
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CeremonyScreen(
     navController: NavHostController? = null,
@@ -60,51 +61,54 @@ fun CeremonyScreen(
         viewModel.refreshKEKStorageStatus()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
-            .verticalScroll(scrollState)
-    ) {
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
-            modifier = Modifier.fillMaxWidth()
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Ceremonia de Inyección", fontWeight = FontWeight.Bold) }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(16.dp)
+                .verticalScroll(scrollState)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Ceremonia de Inyección de Llaves",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
 
-                // Indicador de carga
-                if (state.isLoading) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "Procesando...",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                    // Indicador de carga
+                    if (state.isLoading) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Procesando...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                when (state.currentStep) {
-                    1 -> ConfigurationStep(viewModel)
-                    2 -> CustodianStep(viewModel)
-                    3 -> FinalizationStep(viewModel)
+                    when (state.currentStep) {
+                        1 -> ConfigurationStep(viewModel)
+                        2 -> CustodianStep(viewModel)
+                        3 -> FinalizationStep(viewModel)
+                    }
                 }
             }
         }

@@ -16,12 +16,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.vigatec.injector.data.local.entity.User
+import com.vigatec.persistence.entities.User
 import com.vigatec.injector.viewmodel.UserManagementViewModel
 import com.vigatec.injector.ui.components.PasswordTextField
 import com.vigatec.injector.ui.components.PasswordConfirmationFields
 import com.vigatec.injector.ui.components.RoleSelector
 import com.vigatec.injector.util.PermissionsCatalog
+import com.vigatec.injector.util.rememberNavigationDebouncer
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,49 +35,59 @@ fun UserManagementScreen(
     var userToDelete by remember { mutableStateOf<User?>(null) }
     var userToEdit by remember { mutableStateOf<User?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val navigationDebouncer = rememberNavigationDebouncer()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Gestión de Usuarios") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { navigationDebouncer.onClick(onBack) }) {
                         Icon(Icons.AutoMirrored.Default.ArrowBack, "Volver")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showCreateUserDialog = true }) {
-                        Icon(Icons.Default.PersonAdd, "Crear usuario")
                     }
                 }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        if (uiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(uiState.users) { user ->
-                    UserListItem(
-                        user = user,
-                        onToggleActive = { viewModel.toggleUserActiveStatus(user) },
-                        onEdit = { userToEdit = user },
-                        onDelete = { userToDelete = user }
-                    )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+            // Action buttons
+            UserManagementActionButtons(
+                onCreateUser = { showCreateUserDialog = true }
+            )
+            
+            Box(modifier = Modifier.weight(1f)) {
+                if (uiState.isLoading) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(5) {
+                            com.vigatec.injector.ui.components.UserListItemSkeleton(
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(uiState.users) { user ->
+                            UserListItem(
+                                user = user,
+                                onToggleActive = { viewModel.toggleUserActiveStatus(user) },
+                                onEdit = { userToEdit = user },
+                                onDelete = { userToDelete = user }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -148,6 +159,23 @@ fun UserManagementScreen(
         uiState.successMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.clearSuccessMessage()
+        }
+    }
+}
+
+@Composable
+fun UserManagementActionButtons(
+    onCreateUser: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onCreateUser) {
+            Icon(Icons.Default.PersonAdd, "Crear usuario")
         }
     }
 }
@@ -257,7 +285,7 @@ fun UserListItem(
 
 @Composable
 fun CreateUserDialog(
-    allPermissions: List<com.vigatec.injector.data.local.entity.Permission>,
+    allPermissions: List<com.vigatec.persistence.entities.Permission>,
     onDismiss: () -> Unit,
     onConfirm: (String, String, String, String, List<String>) -> Unit
 ) {
@@ -334,7 +362,7 @@ fun CreateUserDialog(
 @Composable
 fun EditUserDialog(
     user: User,
-    allPermissions: List<com.vigatec.injector.data.local.entity.Permission>,
+    allPermissions: List<com.vigatec.persistence.entities.Permission>,
     viewModel: UserManagementViewModel,
     onDismiss: () -> Unit,
     onConfirm: (User, List<String>) -> Unit,

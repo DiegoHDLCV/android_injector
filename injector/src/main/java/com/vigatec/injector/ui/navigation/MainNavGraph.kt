@@ -10,12 +10,17 @@ import com.vigatec.injector.ui.screens.DashboardScreen
 import com.vigatec.injector.ui.screens.KeyVaultScreen
 import com.vigatec.injector.ui.screens.CeremonyScreen
 import com.vigatec.injector.ui.screens.ProfilesScreen
+import com.vigatec.injector.ui.screens.LogsScreen
+import com.vigatec.injector.ui.screens.UserManagementScreen
+import com.vigatec.injector.ui.screens.KioskModeSettingsScreen
 
 @Composable
 fun MainNavGraph(
     navController: NavHostController,
     username: String,
+    permissionProvider: com.vigatec.injector.util.PermissionProvider,
     onNavigateToExportImport: () -> Unit = {},
+    onLogout: () -> Unit = {},
     onCeremonyStateChanged: (Boolean) -> Unit = {}
 ) {
     // Estado compartido de ceremonia
@@ -55,5 +60,58 @@ fun MainNavGraph(
             onCeremonyStateChanged(false)
             ProfilesScreen(username = username)
         }
+        composable(MainScreen.Config.route) {
+            // Resetear estado de ceremonia al salir
+            onCeremonyStateChanged(false)
+            com.vigatec.injector.ui.screens.ConfigScreen(
+                currentUsername = username,
+                permissionProvider = permissionProvider,
+                onNavigateToLogs = {
+                    navController.navigate(MainScreen.Logs.route)
+                },
+                onNavigateToUserManagement = {
+                    navController.navigate(MainScreen.UserManagement.route)
+                },
+                onNavigateToKioskConfig = {
+                    navController.navigate(MainScreen.KioskConfig.route)
+                },
+                onBack = { navController.popBackStack() },
+                onLogout = onLogout
+            )
+        }
+        
+        composable(MainScreen.Logs.route) {
+            // Resetear estado de ceremonia al salir
+            onCeremonyStateChanged(false)
+            LogsScreen(
+                onBack = {
+                    navController.popBackStack()
+                },
+                onLogClick = { logId ->
+                    // TODO: Navigate to log detail if needed within MainNavGraph
+                }
+            )
+        }
+        
+        composable(MainScreen.UserManagement.route) {
+            // Resetear estado de ceremonia al salir
+            onCeremonyStateChanged(false)
+            UserManagementScreen(
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        
+        composable(MainScreen.KioskConfig.route) {
+            // Resetear estado de ceremonia al salir
+            onCeremonyStateChanged(false)
+            KioskModeSettingsScreen(
+                onBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
     }
 }

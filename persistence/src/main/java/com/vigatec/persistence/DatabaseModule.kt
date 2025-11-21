@@ -10,6 +10,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.vigatec.persistence.dao.InjectedKeyDao // Importa el nuevo DAO
 import com.vigatec.persistence.dao.KeyDao
 import com.vigatec.persistence.dao.ProfileDao
+import com.vigatec.persistence.dao.InjectionLogDao
+import com.vigatec.persistence.dao.PermissionDao
+import com.vigatec.persistence.dao.UserDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -100,6 +103,18 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideProfileDao(appDatabase: AppDatabase): ProfileDao = appDatabase.profileDao()
+
+    @Provides
+    @Singleton
+    fun provideInjectionLogDao(appDatabase: AppDatabase): InjectionLogDao = appDatabase.injectionLogDao()
+
+    @Provides
+    @Singleton
+    fun provideUserDao(appDatabase: AppDatabase): UserDao = appDatabase.userDao()
+
+    @Provides
+    @Singleton
+    fun providePermissionDao(appDatabase: AppDatabase): PermissionDao = appDatabase.permissionDao()
 
     // El repositorio se inyecta automáticamente gracias a @Inject constructor,
     // por lo que no necesitas un @Provides para él a menos que sea una interfaz.

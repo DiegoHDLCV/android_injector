@@ -31,6 +31,13 @@ object StorageKeyManager {
     private const val GCM_TAG_LENGTH = 128 // bits
     private const val IV_LENGTH = 12 // bytes (recomendado para GCM)
 
+    // Cache para evitar accesos frecuentes al Keystore (operación costosa)
+    @Volatile
+    private var cachedHasKEK: Boolean? = null
+    
+    @Volatile
+    private var cachedKEK: SecretKey? = null
+
     /**
      * Obtiene una instancia fresca del KeyStore.
      * Esto asegura que siempre tengamos el estado actualizado del Keystore.
@@ -42,14 +49,22 @@ object StorageKeyManager {
     }
 
     /**
-     * Verifica si existe una KEK Storage inicializada
+     * Verifica si existe una KEK Storage inicializada.
+     * Utiliza caché para mejorar rendimiento.
      */
     fun hasStorageKEK(): Boolean {
+        // Retornar valor en caché si existe
+        cachedHasKEK?.let { return it }
+
         return try {
             val keyStore = getKeyStore()
-            keyStore.containsAlias(STORAGE_KEK_ALIAS).also {
-                Log.i(TAG, "¿Existe KEK Storage?: $it")
-            }
+            val exists = keyStore.containsAlias(STORAGE_KEK_ALIAS)
+            
+            // Actualizar caché
+            cachedHasKEK = exists
+            Log.i(TAG, "¿Existe KEK Storage? (Cache updated): $exists")
+            
+            exists
         } catch (e: Exception) {
             Log.e(TAG, "Error verificando KEK Storage", e)
             false
@@ -120,6 +135,10 @@ object StorageKeyManager {
                 keyProtection
             )
 
+            // Actualizar caché
+            cachedHasKEK = true
+            cachedKEK = null // Invalidar cachedKEK para forzar recarga segura cuando se necesite
+
             Log.i(TAG, "✓ KEK Storage almacenada exitosamente en Android Keystore")
             Log.i(TAG, "  - Alias: $STORAGE_KEK_ALIAS")
             Log.i(TAG, "  - Protección hardware: Sí")
@@ -143,17 +162,17 @@ object StorageKeyManager {
      * @throws IllegalStateException Si no existe KEK Storage
      */
     fun encryptKey(keyDataHex: String): EncryptedKeyData {
-        Log.d(TAG, "=== CIFRANDO LLAVE CON KEK STORAGE ===")
+        // Log.d(TAG, "=== CIFRANDO LLAVE CON KEK STORAGE ===")
 
         if (!hasStorageKEK()) {
             throw IllegalStateException("No existe KEK Storage. Ejecuta ceremonia primero.")
         }
 
         val keyBytes = hexStringToByteArray(keyDataHex)
-        Log.d(TAG, "Longitud de llave a cifrar: ${keyBytes.size} bytes")
+        // Log.d(TAG, "Longitud de llave a cifrar: ${keyBytes.size} bytes")
 
         try {
-            // Obtener KEK desde Keystore
+            // Obtener KEK desde Keystore (usando caché)
             val kek = getStorageKEK()
 
             // Inicializar cipher para cifrado
@@ -177,13 +196,6 @@ object StorageKeyManager {
                 authTag = byteArrayToHexString(authTag)
             )
 
-            // Log.d(TAG, "✓ Llave cifrada exitosamente")
-            // Log.d(TAG, "  - Datos originales: ${keyBytes.size} bytes")
-            // Log.d(TAG, "  - Datos cifrados: ${ciphertext.size} bytes")
-            // Log.d(TAG, "  - IV: ${iv.size} bytes")
-            // Log.d(TAG, "  - AuthTag: ${authTag.size} bytes")
-            // Log.d(TAG, "================================================")
-
             return result
 
         } catch (e: Exception) {
@@ -204,7 +216,7 @@ object StorageKeyManager {
      * @throws SecurityException Si la verificación de integridad falla
      */
     fun decryptKey(encryptedData: EncryptedKeyData): String {
-        Log.d(TAG, "=== DESCIFRANDO LLAVE CON KEK STORAGE ===")
+        // Log.d(TAG, "=== DESCIFRANDO LLAVE CON KEK STORAGE ===")
 
         if (!hasStorageKEK()) {
             throw IllegalStateException("No existe KEK Storage. No se pueden descifrar llaves.")
@@ -216,12 +228,7 @@ object StorageKeyManager {
             val iv = hexStringToByteArray(encryptedData.iv)
             val authTag = hexStringToByteArray(encryptedData.authTag)
 
-            // Log.d(TAG, "Descifrando:")
-            // Log.d(TAG, "  - Ciphertext: ${ciphertext.size} bytes")
-            // Log.d(TAG, "  - IV: ${iv.size} bytes")
-            // Log.d(TAG, "  - AuthTag: ${authTag.size} bytes")
-
-            // Obtener KEK desde Keystore
+            // Obtener KEK desde Keystore (usando caché)
             val kek = getStorageKEK()
 
             // Inicializar cipher para descifrado
@@ -241,10 +248,6 @@ object StorageKeyManager {
             }
 
             val result = byteArrayToHexString(decryptedBytes)
-
-            // Log.d(TAG, "✓ Llave descifrada exitosamente")
-            // Log.d(TAG, "  - Datos descifrados: ${decryptedBytes.size} bytes")
-            // Log.d(TAG, "================================================")
 
             // Limpiar bytes sensibles
             decryptedBytes.fill(0)
@@ -317,6 +320,10 @@ object StorageKeyManager {
                 keyProtection
             )
 
+            // Invalidar caché
+            cachedKEK = null
+            cachedHasKEK = true
+
             Log.i(TAG, "Paso 3/4: Ejecutando callback de re-cifrado...")
             // El callback debe manejar el descifrado con la KEK antigua y cifrado con la nueva
             val reencryptedKeys = try {
@@ -327,6 +334,11 @@ object StorageKeyManager {
                 keyStore.deleteEntry(STORAGE_KEK_ALIAS)
                 keyStore.setEntry(STORAGE_KEK_ALIAS, oldKekEntry, keyProtection)
                 keyStore.deleteEntry(oldKekAlias)
+                
+                // Restaurar caché
+                cachedKEK = null
+                cachedHasKEK = true
+                
                 throw e
             }
 
@@ -361,6 +373,11 @@ object StorageKeyManager {
             if (hasStorageKEK()) {
                 val keyStore = getKeyStore()
                 keyStore.deleteEntry(STORAGE_KEK_ALIAS)
+                
+                // Actualizar caché
+                cachedHasKEK = false
+                cachedKEK = null
+                
                 Log.w(TAG, "✓ KEK Storage eliminada")
             } else {
                 Log.i(TAG, "KEK Storage no existía")
@@ -374,14 +391,23 @@ object StorageKeyManager {
     }
 
     /**
-     * Obtiene la KEK Storage desde Android Keystore
+     * Obtiene la KEK Storage desde Android Keystore.
+     * Utiliza caché para mejorar rendimiento.
      */
     private fun getStorageKEK(): SecretKey {
+        // Retornar valor en caché si existe
+        cachedKEK?.let { return it }
+
         val keyStore = getKeyStore()
         val entry = keyStore.getEntry(STORAGE_KEK_ALIAS, null)
             ?: throw IllegalStateException("KEK Storage no encontrada en Keystore")
 
-        return (entry as KeyStore.SecretKeyEntry).secretKey
+        val key = (entry as KeyStore.SecretKeyEntry).secretKey
+        
+        // Actualizar caché
+        cachedKEK = key
+        
+        return key
     }
 
     // Utilidades de conversión

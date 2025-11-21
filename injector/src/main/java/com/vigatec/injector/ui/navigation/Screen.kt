@@ -11,6 +11,7 @@ sealed class Screen(val route: String) {
     }
     object UserManagement : Screen("user_management")
     object ExportImport : Screen("export_import")
+    object KioskConfig : Screen("kiosk_config")
 }
 
 sealed class MainScreen(val route: String) {
@@ -18,4 +19,8 @@ sealed class MainScreen(val route: String) {
     object KeyVault : MainScreen("key_vault")
     object Ceremony : MainScreen("ceremony")
     object Profiles : MainScreen("profiles")
+    object Config : MainScreen("config")
+    object Logs : MainScreen("logs")
+    object UserManagement : MainScreen("user_management")
+    object KioskConfig : MainScreen("kiosk_config")
 }

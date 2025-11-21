@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.vigatec.persistence.entities.InjectionLogEntity
 import com.vigatec.injector.viewmodel.LogsViewModel
+import com.vigatec.injector.util.rememberNavigationDebouncer
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -31,28 +32,15 @@ fun LogsScreen(
     var showFilters by remember { mutableStateOf(false) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
     var selectedLogToDelete by remember { mutableStateOf<InjectionLogEntity?>(null) }
+    val navigationDebouncer = rememberNavigationDebouncer()
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Logs de Inyección") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { navigationDebouncer.onClick(onBack) }) {
                         Icon(Icons.AutoMirrored.Default.ArrowBack, "Volver")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { showFilters = !showFilters }) {
-                        Icon(
-                            if (showFilters) Icons.Default.FilterAltOff else Icons.Default.FilterAlt,
-                            "Filtros"
-                        )
-                    }
-                    IconButton(
-                        onClick = { showDeleteAllDialog = true },
-                        enabled = uiState.filteredLogs.isNotEmpty()
-                    ) {
-                        Icon(Icons.Default.DeleteForever, "Eliminar todos")
                     }
                 }
             )
@@ -63,6 +51,14 @@ fun LogsScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+            // Action buttons
+            LogsActionButtons(
+                showFilters = showFilters,
+                onToggleFilters = { showFilters = !showFilters },
+                onDeleteAll = { showDeleteAllDialog = true },
+                hasLogs = uiState.filteredLogs.isNotEmpty()
+            )
+            
             // Filtros
             if (showFilters) {
                 FilterSection(
@@ -75,11 +71,16 @@ fun LogsScreen(
 
             // Lista de logs
             if (uiState.isLoading) {
-                Box(
+                LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    CircularProgressIndicator()
+                    items(8) {
+                        com.vigatec.injector.ui.components.LogListItemSkeleton(
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             } else if (uiState.filteredLogs.isEmpty()) {
                 Box(
@@ -98,13 +99,52 @@ fun LogsScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(uiState.filteredLogs) { log ->
+                    items(
+                        count = uiState.filteredLogs.size,
+                        key = { index -> uiState.filteredLogs[index].id }
+                    ) { index ->
+                        val log = uiState.filteredLogs[index]
                         CompactLogCard(
                             log = log,
                             onClick = { onLogClick(log.id) },
                             onDelete = { selectedLogToDelete = it },
                             formatTimestamp = { viewModel.formatTimestamp(it) }
                         )
+
+                        // Trigger load more when reaching near the end
+                        if (index >= uiState.filteredLogs.size - 3 && uiState.hasMorePages && !uiState.isLoadingMore) {
+                            LaunchedEffect(Unit) {
+                                android.util.Log.d("LogsPerformance", "Triggering loadMoreLogs at index $index")
+                                viewModel.loadMoreLogs()
+                            }
+                        }
+                    }
+
+                    // Loading more indicator
+                    if (uiState.isLoadingMore) {
+                        items(3) {
+                            com.vigatec.injector.ui.components.LogListItemSkeleton(
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    // End of list indicator
+                    if (!uiState.hasMorePages && uiState.filteredLogs.isNotEmpty()) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Has visto todos los logs (${uiState.totalCount})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -164,6 +204,35 @@ fun LogsScreen(
         LaunchedEffect(error) {
             // Aquí podrías mostrar un Snackbar con el error
             viewModel.clearErrorMessage()
+        }
+    }
+}
+
+@Composable
+fun LogsActionButtons(
+    showFilters: Boolean,
+    onToggleFilters: () -> Unit,
+    onDeleteAll: () -> Unit,
+    hasLogs: Boolean
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onToggleFilters) {
+            Icon(
+                if (showFilters) Icons.Default.FilterAltOff else Icons.Default.FilterAlt,
+                "Filtros"
+            )
+        }
+        IconButton(
+            onClick = onDeleteAll,
+            enabled = hasLogs
+        ) {
+            Icon(Icons.Default.DeleteForever, "Eliminar todos")
         }
     }
 }
@@ -297,10 +366,14 @@ fun CompactLogCard(
 ) {
     var showDeleteMenu by remember { mutableStateOf(false) }
     
+    // Performance: Replace Card with simple Box + border for faster rendering
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp), // Remove shadow
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Row(
             modifier = Modifier
@@ -361,13 +434,17 @@ fun CompactLogCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (log.keyType.isNotEmpty()) {
-                            Surface(
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                shape = MaterialTheme.shapes.small
+                            // Performance: Replace Surface with simple Box
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        shape = MaterialTheme.shapes.small
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = log.keyType,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
@@ -429,9 +506,14 @@ fun StatusChip(status: String) {
         else -> Color.Gray to status
     }
 
-    Surface(
-        color = color.copy(alpha = 0.2f),
-        shape = MaterialTheme.shapes.small
+    // Performance: Replace Surface with Box for faster rendering
+    Box(
+        modifier = Modifier
+            .background(
+                color = color.copy(alpha = 0.2f),
+                shape = MaterialTheme.shapes.small
+            )
+            .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
         Text(
             text = text,

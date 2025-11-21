@@ -1,6 +1,6 @@
 package com.vigatec.injector.util
 
-import com.vigatec.injector.data.local.entity.User
+import com.vigatec.persistence.entities.User
 
 /**
  * Gestor de permisos basado en roles de usuario.

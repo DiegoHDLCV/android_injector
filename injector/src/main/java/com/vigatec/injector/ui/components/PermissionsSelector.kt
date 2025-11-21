@@ -8,7 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.vigatec.injector.data.local.entity.Permission
+import com.vigatec.persistence.entities.Permission
 
 /**
  * Componente reutilizable para seleccionar permisos

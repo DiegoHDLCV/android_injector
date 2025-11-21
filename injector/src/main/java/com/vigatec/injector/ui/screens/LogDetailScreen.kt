@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.vigatec.injector.util.NavigationDebouncer
 import com.vigatec.injector.viewmodel.LogsViewModel
 
 
@@ -26,6 +27,7 @@ fun LogDetailScreen(
     viewModel: LogsViewModel = hiltViewModel(),
     onBack: () -> Unit
 ) {
+    val navigationDebouncer = remember { NavigationDebouncer() }
     val uiState by viewModel.uiState.collectAsState()
     val log = remember(uiState.filteredLogs, logId) {
         uiState.filteredLogs.find { it.id == logId }
@@ -36,7 +38,7 @@ fun LogDetailScreen(
             TopAppBar(
                 title = { Text("Detalle del Log") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { navigationDebouncer.onClick(onBack) }) {
                         Icon(Icons.AutoMirrored.Default.ArrowBack, "Volver")
                     }
                 }
@@ -65,7 +67,7 @@ fun LogDetailScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Button(onClick = onBack) {
+                    Button(onClick = { navigationDebouncer.onClick(onBack) }) {
                         Text("Volver")
                     }
                 }

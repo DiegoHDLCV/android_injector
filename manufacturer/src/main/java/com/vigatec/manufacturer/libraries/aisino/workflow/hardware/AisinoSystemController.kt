@@ -40,4 +40,29 @@ class AisinoSystemController : ISystemController {
         Log.d(TAG, "grantPermission: $packageName permission=$permission")
         return false
     }
+
+    override suspend fun setStatusBarDisabled(disabled: Boolean): Boolean {
+        Log.d(TAG, "setStatusBarDisabled: $disabled")
+        return false
+    }
+
+    override suspend fun setNavigationBarVisible(visible: Boolean): Boolean {
+        Log.d(TAG, "setNavigationBarVisible: $visible")
+        return false
+    }
+
+    override suspend fun setHomeRecentKeysEnabled(homeEnabled: Boolean, recentEnabled: Boolean): Boolean {
+        Log.d(TAG, "setHomeRecentKeysEnabled: home=$homeEnabled recent=$recentEnabled")
+        return false
+    }
+
+    override suspend fun setPowerKeyLongPressIntercept(intercept: Boolean): Boolean {
+        Log.d(TAG, "setPowerKeyLongPressIntercept: $intercept")
+        return false
+    }
+
+    override suspend fun setAppUninstallDisabled(packageName: String, disabled: Boolean): Boolean {
+        Log.d(TAG, "setAppUninstallDisabled: $packageName disabled=$disabled")
+        return false
+    }
 }

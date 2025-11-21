@@ -3,13 +3,14 @@ package com.vigatec.injector.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vigatec.injector.data.local.entity.User
+import com.vigatec.persistence.entities.User
 import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.injector.data.local.preferences.CustodianTimeoutPreferencesManager
 import com.vigatec.injector.repository.UserRepository
 import com.vigatec.injector.util.PermissionProvider
 import com.vigatec.injector.util.SystemInfoProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -58,6 +59,9 @@ class ConfigViewModel @Inject constructor(
                     applicationVersion = systemInfoProvider.getApplicationVersion(),
                     databaseVersion = systemInfoProvider.getDatabaseVersion()
                 )
+            } catch (e: CancellationException) {
+                // Re-lanzar CancellationException - es una cancelación legítima de coroutine
+                throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     errorMessage = "Error al cargar usuario: ${e.message}"
@@ -78,6 +82,9 @@ class ConfigViewModel @Inject constructor(
                     )
                     Log.d(TAG, "Timeout de custodios cargado: $minutes minutos")
                 }
+            } catch (e: CancellationException) {
+                // Re-lanzar CancellationException - es una cancelación legítima de coroutine
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Error al cargar timeout de custodios", e)
             }
@@ -108,6 +115,9 @@ class ConfigViewModel @Inject constructor(
 
                 // Limpiar el mensaje después de 3 segundos
                 clearTimeoutSaveMessage()
+            } catch (e: CancellationException) {
+                // Re-lanzar CancellationException - es una cancelación legítima de coroutine
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Error al guardar timeout de custodios", e)
                 _uiState.value = _uiState.value.copy(

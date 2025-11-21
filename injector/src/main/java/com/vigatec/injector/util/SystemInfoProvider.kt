@@ -2,7 +2,7 @@ package com.vigatec.injector.util
 
 import android.content.Context
 import android.content.pm.PackageManager
-import com.vigatec.injector.data.local.database.AppDatabase
+import com.vigatec.persistence.AppDatabase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton

@@ -131,4 +131,50 @@ interface InjectionLogDao {
      */
     @Query("SELECT DISTINCT profileName FROM injection_logs ORDER BY profileName ASC")
     suspend fun getDistinctProfiles(): List<String>
+
+    /**
+     * Obtiene logs paginados para optimizar el rendimiento.
+     * @param limit Número de logs a obtener por página
+     * @param offset Número de logs a saltar (pageNumber * pageSize)
+     */
+    @Query("SELECT * FROM injection_logs ORDER BY timestamp DESC LIMIT :limit OFFSET :offset")
+    suspend fun getLogsPaged(limit: Int, offset: Int): List<InjectionLogEntity>
+
+    /**
+     * Obtiene logs paginados con filtros aplicados.
+     */
+    @Query("""
+        SELECT * FROM injection_logs
+        WHERE (:username IS NULL OR username = :username)
+        AND (:profileName IS NULL OR profileName = :profileName)
+        AND (:startTimestamp IS NULL OR timestamp >= :startTimestamp)
+        AND (:endTimestamp IS NULL OR timestamp <= :endTimestamp)
+        ORDER BY timestamp DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getLogsWithFiltersPaged(
+        username: String?,
+        profileName: String?,
+        startTimestamp: Long?,
+        endTimestamp: Long?,
+        limit: Int,
+        offset: Int
+    ): List<InjectionLogEntity>
+
+    /**
+     * Cuenta el total de logs con filtros aplicados.
+     */
+    @Query("""
+        SELECT COUNT(*) FROM injection_logs
+        WHERE (:username IS NULL OR username = :username)
+        AND (:profileName IS NULL OR profileName = :profileName)
+        AND (:startTimestamp IS NULL OR timestamp >= :startTimestamp)
+        AND (:endTimestamp IS NULL OR timestamp <= :endTimestamp)
+    """)
+    suspend fun getLogsCountWithFilters(
+        username: String?,
+        profileName: String?,
+        startTimestamp: Long?,
+        endTimestamp: Long?
+    ): Int
 }

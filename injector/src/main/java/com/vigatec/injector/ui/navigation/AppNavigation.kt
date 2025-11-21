@@ -64,7 +64,11 @@ fun AppNavigation() {
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Splash.route
+        startDestination = Screen.Splash.route,
+        enterTransition = { androidx.compose.animation.EnterTransition.None },
+        exitTransition = { androidx.compose.animation.ExitTransition.None },
+        popEnterTransition = { androidx.compose.animation.EnterTransition.None },
+        popExitTransition = { androidx.compose.animation.ExitTransition.None }
     ) {
         composable(Screen.Splash.route) {
             val vm: SplashViewModel = hiltViewModel()
@@ -105,54 +109,12 @@ fun AppNavigation() {
                 username = currentUsername,
                 userRole = currentRole,
                 permissionProvider = permissionProvider,
-                onNavigateToConfig = {
-                    navController.navigate(Screen.Config.route)
-                },
                 onNavigateToExportImport = {
                     navController.navigate(Screen.ExportImport.route)
-                }
-            )
-        }
-
-        composable(Screen.Config.route) {
-            val context = LocalContext.current
-            val permissionProvider = remember {
-                EntryPointAccessors.fromActivity(
-                    context as android.app.Activity,
-                    PermissionProviderEntryPoint::class.java
-                ).permissionProvider()
-            }
-
-            var usernameForConfig by remember { mutableStateOf(currentUsername) }
-
-            // Obtener el username de SessionManager si currentUsername está vacío
-            LaunchedEffect(currentUsername) {
-                if (currentUsername.isEmpty()) {
-                    sessionManager.getLoggedUsername().collect { username ->
-                        usernameForConfig = username ?: ""
-                    }
-                } else {
-                    usernameForConfig = currentUsername
-                }
-            }
-
-            ConfigScreen(
-                currentUsername = usernameForConfig,
-                permissionProvider = permissionProvider,
-                onNavigateToLogs = {
-                    navController.navigate(Screen.Logs.route)
-                },
-                onNavigateToUserManagement = {
-                    navController.navigate(Screen.UserManagement.route)
-                },
-                onBack = {
-                    navController.popBackStack()
                 },
                 onLogout = {
-                    // Limpiar el username y navegar al login
                     currentUsername = ""
                     navController.navigate(Screen.Login.route) {
-                        // Limpiar toda la pila de navegación
                         popUpTo(Screen.Main.route) {
                             inclusive = true
                         }
@@ -161,29 +123,10 @@ fun AppNavigation() {
             )
         }
 
-        composable(Screen.Logs.route) {
-            LogsScreen(
-                onBack = {
-                    navController.popBackStack()
-                },
-                onLogClick = { logId ->
-                    navController.navigate(Screen.LogDetail.createRoute(logId))
-                }
-            )
-        }
-
         composable(Screen.LogDetail.route) { backStackEntry ->
             val logId = backStackEntry.arguments?.getString("logId")?.toLongOrNull() ?: 0L
             LogDetailScreen(
                 logId = logId,
-                onBack = {
-                    navController.popBackStack()
-                }
-            )
-        }
-
-        composable(Screen.UserManagement.route) {
-            UserManagementScreen(
                 onBack = {
                     navController.popBackStack()
                 }

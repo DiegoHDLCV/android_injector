@@ -161,19 +161,72 @@ class NewposSystemController : ISystemController {
         }
     }
 
-    /**
-     * Método específico de NEWPOS: Deshabilitar la desinstalación de una aplicación.
-     * Esto previene que el usuario desinstale la app.
-     */
-    suspend fun disableUninstall(packageName: String, disable: Boolean): Boolean {
+    override suspend fun setStatusBarDisabled(disabled: Boolean): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                Log.i(TAG, "Configurando desinstalación deshabilitada: $packageName = $disable")
-                SystemManager.disableAppUninstalledIncludeFR(packageName, disable)
-                Log.i(TAG, "✓ Protección de desinstalación configurada")
+                Log.i(TAG, "Configurando StatusBar disabled: $disabled")
+                SystemManager.setDisableStatusBar(disabled)
+                Log.i(TAG, "SystemManager.setDisableStatusBar called.")
                 true
             } catch (e: Exception) {
-                Log.e(TAG, "Error en disableUninstall: ${e.message}", e)
+                Log.e(TAG, "Error en setStatusBarDisabled", e)
+                false
+            }
+        }
+    }
+
+    override suspend fun setNavigationBarVisible(visible: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "Configurando NavigationBar visible: $visible")
+                val result = SystemManager.controlNavigationBar(visible)
+                Log.i(TAG, "SystemManager.controlNavigationBar result: $result")
+                result == 0
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en setNavigationBarVisible", e)
+                false
+            }
+        }
+    }
+
+    override suspend fun setHomeRecentKeysEnabled(homeEnabled: Boolean, recentEnabled: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "Configurando Home/Recent keys: home=$homeEnabled, recent=$recentEnabled")
+                SystemManager.setHomeRecentAppKeyEnable(homeEnabled, recentEnabled)
+                Log.i(TAG, "SystemManager.setHomeRecentAppKeyEnable called.")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en setHomeRecentKeysEnabled", e)
+                false
+            }
+        }
+    }
+
+    override suspend fun setPowerKeyLongPressIntercept(intercept: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "Configurando PowerKey intercept: $intercept")
+                val result = SystemManager.powerKeyLongPressIntercept(intercept)
+                Log.i(TAG, "SystemManager.powerKeyLongPressIntercept result: $result")
+                result
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en setPowerKeyLongPressIntercept", e)
+                false
+            }
+        }
+    }
+
+
+    override suspend fun setAppUninstallDisabled(packageName: String, disabled: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "Configurando Uninstall disabled para $packageName: $disabled")
+                val result = SystemManager.disableAppUninstalledIncludeFR(packageName, disabled)
+                Log.i(TAG, "SystemManager.disableAppUninstalledIncludeFR result: $result")
+                result
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en setAppUninstallDisabled", e)
                 false
             }
         }

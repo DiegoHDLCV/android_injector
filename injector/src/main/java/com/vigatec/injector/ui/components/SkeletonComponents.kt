@@ -289,4 +289,172 @@ fun FullScreenSkeleton(
             )
         }
     }
+}
+
+/**
+ * Esqueleto para los items de la lista de usuarios
+ */
+@Composable
+fun UserListItemSkeleton(
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    // Nombre esqueleto
+                    SkeletonBox(
+                        modifier = Modifier.width(150.dp),
+                        height = 16.dp
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    // Username esqueleto
+                    SkeletonBox(
+                        modifier = Modifier.width(100.dp),
+                        height = 12.dp
+                    )
+                }
+
+                // Rol esqueleto
+                SkeletonBox(
+                    modifier = Modifier.width(80.dp),
+                    height = 24.dp,
+                    shape = RoundedCornerShape(8.dp)
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Switch esqueleto
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    SkeletonBox(
+                        modifier = Modifier.width(40.dp),
+                        height = 24.dp,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    SkeletonBox(
+                        modifier = Modifier.width(50.dp),
+                        height = 12.dp
+                    )
+                }
+
+                // Botones de acción esqueleto
+                SkeletonBox(
+                    modifier = Modifier.size(24.dp),
+                    height = 24.dp,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                SkeletonBox(
+                    modifier = Modifier.size(24.dp),
+                    height = 24.dp,
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Esqueleto para los items de la lista de logs
+ */
+@Composable
+fun LogListItemSkeleton(
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // Header: Estado + Fecha
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Estado esqueleto
+                    SkeletonBox(
+                        modifier = Modifier.width(60.dp),
+                        height = 20.dp,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    // Fecha esqueleto
+                    SkeletonBox(
+                        modifier = Modifier.width(100.dp),
+                        height = 12.dp
+                    )
+                }
+                
+                // Usuario y Perfil
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SkeletonBox(
+                        modifier = Modifier.size(14.dp),
+                        height = 14.dp,
+                        shape = RoundedCornerShape(7.dp)
+                    )
+                    SkeletonBox(
+                        modifier = Modifier.width(80.dp),
+                        height = 14.dp
+                    )
+                    SkeletonBox(
+                        modifier = Modifier.width(100.dp),
+                        height = 12.dp
+                    )
+                }
+                
+                // Especificaciones de llaves
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SkeletonBox(
+                        modifier = Modifier.width(70.dp),
+                        height = 16.dp,
+                        shape = RoundedCornerShape(4.dp)
+                    )
+                    SkeletonBox(
+                        modifier = Modifier.width(50.dp),
+                        height = 12.dp
+                    )
+                }
+            }
+            
+            // Botón de más opciones esqueleto
+            SkeletonBox(
+                modifier = Modifier.size(24.dp),
+                height = 24.dp,
+                shape = RoundedCornerShape(12.dp)
+            )
+        }
+    }
 } 

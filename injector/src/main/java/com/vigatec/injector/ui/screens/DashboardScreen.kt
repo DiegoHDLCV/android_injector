@@ -40,6 +40,7 @@ private data class QuickActionMeta(
     val onClick: () -> Unit
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     @Suppress("UNUSED_PARAMETER") username: String,
@@ -62,19 +63,28 @@ fun DashboardScreen(
         Log.d("DashboardScreen", "  - stats.injectionsToday: ${dashboardState.stats.injectionsToday}")
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        //item(key = "connection") { ConnectionStatusCard(dashboardState, viewModel) }
-        item(key = "stats") { 
-            if (dashboardState.isLoading) {
-                DashboardStatsSkeleton()
-            } else {
-                DashboardStats(stats = dashboardState.stats)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Dashboard", fontWeight = FontWeight.Bold) }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(MaterialTheme.colorScheme.background)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            //item(key = "connection") { ConnectionStatusCard(dashboardState, viewModel) }
+            item(key = "stats") { 
+                if (dashboardState.isLoading) {
+                    DashboardStatsSkeleton()
+                } else {
+                    DashboardStats(stats = dashboardState.stats)
+                }
             }
         }
     }

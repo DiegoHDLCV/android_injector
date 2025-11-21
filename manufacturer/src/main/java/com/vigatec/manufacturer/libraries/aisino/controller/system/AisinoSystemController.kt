@@ -132,4 +132,75 @@ class AisinoSystemController : ISystemController {
             }
         }
     }
+
+    override suspend fun setStatusBarDisabled(disabled: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "Configurando StatusBar disabled: $disabled")
+                // SystemApi.setStatusBarDisable(disabled) // Posible API
+                // Por ahora solo logueamos ya que no tenemos la firma exacta
+                Log.w(TAG, "setStatusBarDisabled no implementado completamente en AisinoSystemController")
+                true 
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en setStatusBarDisabled", e)
+                false
+            }
+        }
+    }
+
+    override suspend fun setNavigationBarVisible(visible: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "Configurando NavigationBar visible: $visible")
+                // SystemApi.setNavigationKey(visible) // Posible API
+                Log.w(TAG, "setNavigationBarVisible no implementado completamente en AisinoSystemController")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en setNavigationBarVisible", e)
+                false
+            }
+        }
+    }
+
+    override suspend fun setHomeRecentKeysEnabled(homeEnabled: Boolean, recentEnabled: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "Configurando Home/Recent keys: home=$homeEnabled, recent=$recentEnabled")
+                // SystemApi.setHomeKeyEnable(homeEnabled)
+                // SystemApi.setRecentKeyEnable(recentEnabled)
+                Log.w(TAG, "setHomeRecentKeysEnabled no implementado completamente en AisinoSystemController")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en setHomeRecentKeysEnabled", e)
+                false
+            }
+        }
+    }
+
+    override suspend fun setPowerKeyLongPressIntercept(intercept: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "Configurando PowerKey intercept: $intercept")
+                // SystemApi.setPowerKeyShield(intercept)
+                Log.w(TAG, "setPowerKeyLongPressIntercept no implementado completamente en AisinoSystemController")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en setPowerKeyLongPressIntercept", e)
+                false
+            }
+        }
+    }
+
+    override suspend fun setAppUninstallDisabled(packageName: String, disabled: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.i(TAG, "Configurando Uninstall disabled para $packageName: $disabled")
+                Log.w(TAG, "setAppUninstallDisabled no implementado completamente en AisinoSystemController")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error en setAppUninstallDisabled", e)
+                false
+            }
+        }
+    }
 }

@@ -213,38 +213,29 @@ class KEKManager @Inject constructor(
      */
     suspend fun getActiveKEKEntity() = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "getActiveKEKEntity: Iniciando búsqueda de KEK activa...")
+            Log.d(TAG, "getActiveKEKEntity: Buscando KEK activa...")
 
-            // Buscar todas las KEKs en la base de datos usando first() en lugar de collect()
-            Log.d(TAG, "getActiveKEKEntity: Obteniendo todas las llaves de la BD...")
-            val allKeys = injectedKeyRepository.getAllInjectedKeys().first()
-            Log.d(TAG, "getActiveKEKEntity: Se encontraron ${allKeys.size} llaves en total")
-
-            // Filtrar por el flag isKEK (no por keyType, ya que keyType contiene el nombre real como "DUKPT BDK 3DES")
-            val kekKeys = allKeys.filter { it.isKEK == true }
-            Log.d(TAG, "getActiveKEKEntity: ${kekKeys.size} llaves marcadas como KEK/KTK encontradas (isKEK=true)")
-            kekKeys.forEach { kek ->
-                Log.d(TAG, "  - KCV: ${kek.kcv}, Tipo: ${kek.keyType}, Estado: ${kek.status}, isKEK: ${kek.isKEK}")
-            }
-
-            // Filtrar solo por estado ACTIVE (ya no se usa EXPORTED)
-            val activeKeks = kekKeys.filter { it.status == "ACTIVE" }
-            Log.d(TAG, "getActiveKEKEntity: ${activeKeks.size} KEKs activas encontradas")
-
-            // Seleccionar la más reciente
-            val activeKEK = activeKeks.maxByOrNull { it.injectionTimestamp }
-
-            if (activeKEK != null) {
-                Log.d(TAG, "getActiveKEKEntity: KEK activa encontrada - KCV=${activeKEK.kcv}, Estado=${activeKEK.status}")
+            // Optimización: Usar método específico del repositorio que ya descifra y busca eficientemente
+            val kek = injectedKeyRepository.getCurrentKEK()
+            
+            if (kek != null) {
+                Log.d(TAG, "getActiveKEKEntity: Candidato encontrado - KCV=${kek.kcv}, Estado=${kek.status}, isKEK=${kek.isKEK}")
+                
+                // Verificar estado ACTIVE
+                if (kek.status == "ACTIVE") {
+                    Log.d(TAG, "getActiveKEKEntity: KEK válida y activa retornada")
+                    return@withContext kek
+                } else {
+                    Log.w(TAG, "getActiveKEKEntity: KEK encontrada pero no está ACTIVE")
+                }
             } else {
-                Log.d(TAG, "getActiveKEKEntity: No se encontró KEK activa")
+                Log.d(TAG, "getActiveKEKEntity: No se encontró ninguna llave marcada como KEK")
             }
 
-            activeKEK
+            null
 
         } catch (e: Exception) {
             Log.e(TAG, "getActiveKEKEntity: Error obteniendo entidad de KEK activa", e)
-            Log.e(TAG, "getActiveKEKEntity: Stack trace: ${e.stackTraceToString()}")
             null
         }
     }

@@ -55,7 +55,13 @@ fun KeyVaultScreen(
 
     Scaffold(
         topBar = {
-            KeyVaultTopBar(
+            KeyVaultTopBar()
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            // Action buttons
+            KeyVaultActionButtons(
                 onRefresh = { viewModel.loadKeys() },
                 onClearAll = { viewModel.onShowClearAllConfirmation() },
                 onImportTestKeys = { viewModel.onImportTestKeys() },
@@ -65,10 +71,7 @@ fun KeyVaultScreen(
                 hasHiddenKEKStorage = hasHiddenKEKStorage,
                 onShowKEKStoragePasswordDialog = { viewModel.onShowKEKStoragePasswordDialog() }
             )
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            
             // Indicador de rol del usuario
             val (roleBackground, roleTextColor, roleLabel) = when {
                 state.isAdmin || state.userRole == PermissionManager.ROLE_SUPERVISOR -> Triple(
@@ -196,7 +199,14 @@ fun KeyVaultScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun KeyVaultTopBar(
+fun KeyVaultTopBar() {
+    TopAppBar(
+        title = { Text("Almacén de Llaves", fontWeight = FontWeight.Bold) }
+    )
+}
+
+@Composable
+fun KeyVaultActionButtons(
     onRefresh: () -> Unit,
     onClearAll: () -> Unit,
     onImportTestKeys: () -> Unit,
@@ -206,56 +216,57 @@ fun KeyVaultTopBar(
     hasHiddenKEKStorage: Boolean = false,
     onShowKEKStoragePasswordDialog: () -> Unit = {}
 ) {
-    TopAppBar(
-        title = { Text("Almacén de Llaves", fontWeight = FontWeight.Bold) },
-        actions = {
-            IconButton(onClick = onRefresh, enabled = !loading) {
-                Icon(Icons.Default.Refresh, contentDescription = "Refrescar")
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Botón Refrescar
+        IconButton(onClick = onRefresh, enabled = !loading) {
+            Icon(Icons.Default.Refresh, contentDescription = "Refrescar")
+        }
+        
+        // Mostrar indicador de KEK Storage oculta si existe
+        if (isAdmin && hasHiddenKEKStorage) {
+            IconButton(
+                onClick = onShowKEKStoragePasswordDialog,
+                enabled = !loading
+            ) {
+                Icon(
+                    Icons.Default.VisibilityOff,
+                    contentDescription = "KEK Storage oculta - Toca para mostrar",
+                    tint = MaterialTheme.colorScheme.tertiary
+                )
             }
-            // Mostrar indicador de KEK Storage oculta si existe
-            if (isAdmin && hasHiddenKEKStorage) {
+        }
+        
+        // Solo admins pueden acceder a exportar/importar
+        if (isAdmin) {
+            IconButton(
+                onClick = onNavigateToExportImport,
+                enabled = !loading
+            ) {
+                Icon(Icons.Default.ImportExport, contentDescription = "Exportar/Importar")
+            }
+            
+            @Suppress("KotlinConstantConditions")
+            val isDevFlavor = BuildConfig.FLAVOR == "dev"
+            if (isDevFlavor) {
                 IconButton(
-                    onClick = onShowKEKStoragePasswordDialog,
+                    onClick = onImportTestKeys,
                     enabled = !loading
                 ) {
-                    Icon(
-                        Icons.Default.VisibilityOff,
-                        contentDescription = "KEK Storage oculta - Toca para mostrar",
-                        tint = MaterialTheme.colorScheme.tertiary
-                    )
+                    Icon(Icons.Default.Upload, contentDescription = "Importar Llaves de Prueba")
                 }
             }
-            // Solo admins pueden acceder a exportar/importar
-            if (isAdmin) {
-                @Suppress("KotlinConstantConditions")
-                val isDevFlavor = BuildConfig.FLAVOR == "dev"
-                IconButton(
-                    onClick = onNavigateToExportImport,
-                    enabled = !loading
-                ) {
-                    Icon(Icons.Default.ImportExport, contentDescription = "Exportar/Importar")
-                }
-                @Suppress("KotlinConstantConditions")
-                if (isDevFlavor) {
-                    IconButton(
-                        onClick = onImportTestKeys,
-                        enabled = !loading
-                    ) {
-                        Icon(Icons.Default.Upload, contentDescription = "Importar Llaves de Prueba")
-                    }
-                }
-                IconButton(onClick = onClearAll, enabled = !loading) {
-                    Icon(Icons.Default.Delete, contentDescription = "Limpiar Almacén")
-                }
+            
+            IconButton(onClick = onClearAll, enabled = !loading) {
+                Icon(Icons.Default.Delete, contentDescription = "Limpiar Almacén")
             }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
-            actionIconContentColor = MaterialTheme.colorScheme.onSurface
-        ),
-        windowInsets = WindowInsets(0, 0, 0, 0)
-    )
+        }
+    }
 }
 
 @Composable

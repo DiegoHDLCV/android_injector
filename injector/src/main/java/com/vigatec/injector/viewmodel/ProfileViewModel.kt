@@ -65,6 +65,11 @@ class ProfileViewModel @Inject constructor(
     val state = _state.asStateFlow()
 
     init {
+        // Cargar rol inmediatamente para evitar mostrar "USUARIO" por defecto
+        viewModelScope.launch {
+            val userRole = sessionManager.getCurrentSession()?.third ?: ""
+            _state.value = _state.value.copy(userRole = userRole)
+        }
         loadData()
     }
 

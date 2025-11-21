@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.vigatec.persistence.entities.InjectedKeyEntity
 import com.vigatec.persistence.repository.InjectedKeyRepository
 import com.vigatec.persistence.repository.ProfileRepository
-import com.vigatec.injector.data.local.entity.User
+import com.vigatec.persistence.entities.User
 import com.vigatec.injector.data.local.preferences.SessionManager
 import com.vigatec.utils.security.StorageKeyManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -81,7 +81,7 @@ class KeyVaultViewModel @Inject constructor(
 
             if (session != null) {
                 val (_, username, role) = session
-                val isAdmin = role == "ADMIN"
+                val isAdmin = role == "ADMIN" || role == "SUPERVISOR"
 
                 Log.d(TAG, "KeyVault - Usuario de sesión: username=$username, role=$role")
                 Log.d(TAG, "KeyVault - isAdmin determinado: $isAdmin")

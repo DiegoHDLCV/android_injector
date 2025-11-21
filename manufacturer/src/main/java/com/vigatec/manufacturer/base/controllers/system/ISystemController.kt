@@ -67,4 +67,47 @@ interface ISystemController {
      * @return true si se otorgó el permiso exitosamente
      */
     suspend fun grantPermission(packageName: String, permission: String): Boolean
+
+    /**
+     * Habilita o deshabilita la barra de estado (status bar).
+     *
+     * @param disabled true para deshabilitar (ocultar/bloquear), false para habilitar
+     * @return true si la operación fue exitosa
+     */
+    suspend fun setStatusBarDisabled(disabled: Boolean): Boolean
+
+    /**
+     * Habilita o deshabilita la barra de navegación (botones virtuales).
+     *
+     * @param visible true para mostrar, false para ocultar
+     * @return true si la operación fue exitosa
+     */
+    suspend fun setNavigationBarVisible(visible: Boolean): Boolean
+
+    /**
+     * Habilita o deshabilita las teclas Home y Recent apps.
+     *
+     * @param homeEnabled true para habilitar tecla Home
+     * @param recentEnabled true para habilitar tecla Recent
+     * @return true si la operación fue exitosa
+     */
+    suspend fun setHomeRecentKeysEnabled(homeEnabled: Boolean, recentEnabled: Boolean): Boolean
+
+    /**
+     * Intercepta la pulsación larga del botón de encendido (Power).
+     * Útil para evitar que el usuario apague el dispositivo.
+     *
+     * @param intercept true para interceptar (bloquear menú de apagado), false para comportamiento normal
+     * @return true si la operación fue exitosa
+     */
+    suspend fun setPowerKeyLongPressIntercept(intercept: Boolean): Boolean
+
+    /**
+     * Evita que una aplicación sea desinstalada por el usuario.
+     *
+     * @param packageName Nombre del paquete
+     * @param disabled true para evitar desinstalación, false para permitirla
+     * @return true si la operación fue exitosa
+     */
+    suspend fun setAppUninstallDisabled(packageName: String, disabled: Boolean): Boolean
 }
